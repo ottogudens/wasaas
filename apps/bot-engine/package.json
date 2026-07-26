@@ -12,9 +12,11 @@
     "@builderbot/bot": "^1.4.3-y.6",
     "@builderbot/manager": "^1.4.3-y.6",
     "@builderbot/provider-baileys": "^1.4.3-y.6",
+    "@types/ws": "^8.18.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "ws": "^8.21.1"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
