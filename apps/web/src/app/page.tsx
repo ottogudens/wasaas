@@ -1,13 +1,13 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Bot, QrCode, Sparkles, CreditCard, Shield, Zap, RefreshCw, CheckCircle2, FileText, Send } from 'lucide-react';
+import { Bot, QrCode, Sparkles, CreditCard, Shield, CheckCircle2, FileText, Send } from 'lucide-react';
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<'qr' | 'prompt' | 'rag' | 'billing'>('qr');
   const [qrCodeData, setQrCodeData] = useState<string | null>(null);
   const [botStatus, setBotStatus] = useState<'DISCONNECTED' | 'GENERATING' | 'CONNECTED'>('DISCONNECTED');
-  const [tenantId, setTenantId] = useState<string>('tenant-demo-01');
+  const tenantId = 'tenant-demo-01';
   const [systemPrompt, setSystemPrompt] = useState<string>(
     'Eres un asistente virtual profesional especializado en atención al cliente. Responde de manera concisa y amable.'
   );
@@ -188,7 +188,7 @@ export default function Dashboard() {
                   <div className="p-4 bg-white rounded-2xl shadow-xl inline-block">
                     <img src={qrCodeData.startsWith('http') ? qrCodeData : `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrCodeData)}`} alt="WhatsApp QR Code" className="w-56 h-56" />
                   </div>
-                  <p className="text-xs text-slate-400">Escanea desde WhatsApp -> Dispositivos Vinculados</p>
+                  <p className="text-xs text-slate-400">Escanea desde WhatsApp -&gt; Dispositivos Vinculados</p>
                 </div>
               ) : (
                 <div className="text-center space-y-4">
