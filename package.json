@@ -1,0 +1,21 @@
+{
+  "name": "saas-whatsapp-agent-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SaaS Multi-tenant platform for AI WhatsApp Agents",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev --workspace=apps/api",
+    "dev:web": "npm run dev --workspace=apps/web",
+    "dev:bot-engine": "npm run dev --workspace=apps/bot-engine",
+    "build": "npm run build --workspaces",
+    "db:generate": "npm run db:generate --workspace=packages/database",
+    "db:push": "npm run db:push --workspace=packages/database"
+  },
+  "keywords": [],
+  "author": "Skale IA",
+  "license": "ISC"
+}
