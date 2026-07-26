@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { Bot, QrCode, Sparkles, CreditCard, Shield, CheckCircle2, FileText, Send } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<'qr' | 'prompt' | 'rag' | 'billing'>('qr');
@@ -75,10 +74,6 @@ export default function Dashboard() {
       });
     } catch (error) {
       console.error('Error solicitando QR:', error);
-      // Demo fallback con string de Baileys sintácticamente válido
-      setTimeout(() => {
-        setQrCodeData('2@WASaaS-WhatsApp-Auth-Demo-Payload');
-      }, 1000);
     }
   };
 
@@ -187,13 +182,9 @@ export default function Dashboard() {
               ) : qrCodeData ? (
                 <div className="text-center space-y-4">
                   <div className="p-4 bg-white rounded-2xl shadow-xl inline-block">
-                    {qrCodeData.startsWith('http') ? (
-                      <img src={qrCodeData} alt="WhatsApp QR Code" className="w-56 h-56" />
-                    ) : (
-                      <QRCodeSVG value={qrCodeData} size={240} level="M" />
-                    )}
+                    <img src={qrCodeData} alt="WhatsApp QR Code" className="w-64 h-64 border border-slate-200 rounded-lg shadow-inner" />
                   </div>
-                  <p className="text-xs text-slate-400">Escanea desde WhatsApp -&gt; Dispositivos Vinculados</p>
+                  <p className="text-xs text-slate-400 font-medium">Escanea desde WhatsApp -&gt; Dispositivos Vinculados</p>
                 </div>
               ) : (
                 <div className="text-center space-y-4">

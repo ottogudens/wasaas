@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { BotManager, BotManagerApi } from '@builderbot/manager';
 import { addKeyword, EVENTS } from '@builderbot/bot';
 import { WebSocketServer, WebSocket } from 'ws';
+import QRCode from 'qrcode';
 
 const PORT = process.env.BOT_ENGINE_PORT ? parseInt(process.env.BOT_ENGINE_PORT) : 3005;
 const WS_PORT = process.env.WS_PORT ? parseInt(process.env.WS_PORT) : 3006;
@@ -41,7 +42,7 @@ const managerApi = new BotManagerApi(manager, {
   apiKey: API_KEY,
 });
 
-// 4. Registrar Flujo Base de Agente IA con tipos explicitos
+// 4. Registrar Flujo Base de Agente IA
 const defaultAiFlow = addKeyword(EVENTS.WELCOME)
   .addAction(async (ctx: any, { flowDynamic }: { flowDynamic: any }) => {
     const userPrompt = ctx.body;
@@ -54,13 +55,28 @@ const defaultAiFlow = addKeyword(EVENTS.WELCOME)
 
 managerApi.registerFlow('default_ai_flow', 'Flujo IA Multitenant', defaultAiFlow);
 
-// 5. Suscribirse a eventos del Manager con tipos explicitos
-manager.on('bot:qr', (tenantId: string, data: any) => {
+// 5. Suscribirse a eventos del Manager y generar QR DataURL oficial de Baileys
+manager.on('bot:qr', async (tenantId: string, data: any) => {
   console.log(`[BotManager] Transmitiendo QR para Tenant: ${tenantId}`);
+  let qrImageBase64 = data.qr;
+
+  // Si data.qr es un raw string de Baileys, convertirlo directamente a Base64 PNG en el servidor
+  if (data.qr && typeof data.qr === 'string' && !data.qr.startsWith('data:image')) {
+    try {
+      qrImageBase64 = await QRCode.toDataURL(data.qr, {
+        margin: 2,
+        scale: 8,
+        errorCorrectionLevel: 'M',
+      });
+    } catch (err) {
+      console.error('Error convirtiendo QR a DataURL:', err);
+    }
+  }
+
   broadcast({
     event: 'bot:qr',
     tenantId,
-    qr: data.qr,
+    qr: qrImageBase64,
   });
 });
 
