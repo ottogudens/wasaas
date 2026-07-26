@@ -8,12 +8,12 @@ const WS_PORT = process.env.WS_PORT ? parseInt(process.env.WS_PORT) : 3006;
 const SESSIONS_DIR = process.env.SESSIONS_DIR || './sessions';
 const API_KEY = process.env.INTERNAL_API_KEY || 'skale-saas-secret-key';
 
-// 1. Inicializar Servidor de WebSockets para emiti QR en vivo al Frontend
+// 1. Inicializar Servidor de WebSockets
 const wss = new WebSocketServer({ port: WS_PORT });
 const connectedClients = new Set<WebSocket>();
 
-wss.on('connection', (ws) => {
-  console.log('📡 [WebSocket] Cliente Frontend conectado para recepción de QR');
+wss.on('connection', (ws: WebSocket) => {
+  console.log('📡 [WebSocket] Cliente Frontend conectado');
   connectedClients.add(ws);
 
   ws.on('close', () => {
@@ -41,9 +41,9 @@ const managerApi = new BotManagerApi(manager, {
   apiKey: API_KEY,
 });
 
-// 4. Registrar Flujo Base de Agente IA
+// 4. Registrar Flujo Base de Agente IA con tipos explicitos
 const defaultAiFlow = addKeyword(EVENTS.WELCOME)
-  .addAction(async (ctx, { flowDynamic }) => {
+  .addAction(async (ctx: any, { flowDynamic }: { flowDynamic: any }) => {
     const userPrompt = ctx.body;
     console.log(`[BotEngine] Mensaje recibido de ${ctx.from}: ${userPrompt}`);
     
@@ -54,8 +54,8 @@ const defaultAiFlow = addKeyword(EVENTS.WELCOME)
 
 managerApi.registerFlow('default_ai_flow', 'Flujo IA Multitenant', defaultAiFlow);
 
-// 5. Suscribirse a eventos del Manager y transmitir vía WebSockets
-manager.on('bot:qr', (tenantId, data) => {
+// 5. Suscribirse a eventos del Manager con tipos explicitos
+manager.on('bot:qr', (tenantId: string, data: any) => {
   console.log(`[BotManager] Transmitiendo QR para Tenant: ${tenantId}`);
   broadcast({
     event: 'bot:qr',
@@ -64,7 +64,7 @@ manager.on('bot:qr', (tenantId, data) => {
   });
 });
 
-manager.on('bot:connected', (tenantId) => {
+manager.on('bot:connected', (tenantId: string) => {
   console.log(`[BotManager] Transmitiendo Conexión para Tenant: ${tenantId}`);
   broadcast({
     event: 'bot:connected',
@@ -73,7 +73,7 @@ manager.on('bot:connected', (tenantId) => {
   });
 });
 
-manager.on('bot:disconnected', (tenantId) => {
+manager.on('bot:disconnected', (tenantId: string) => {
   console.log(`[BotManager] Transmitiendo Desconexión para Tenant: ${tenantId}`);
   broadcast({
     event: 'bot:disconnected',
