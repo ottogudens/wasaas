@@ -12,20 +12,33 @@ export default function Dashboard() {
     'Eres un asistente virtual profesional especializado en atención al cliente. Responde de manera concisa y amable.'
   );
 
+  // Endpoint configuration for Railway production
+  const [botEngineUrl, setBotEngineUrl] = useState<string>('');
+  const [wsUrl, setWsUrl] = useState<string>('');
+
   // RAG document state
   const [documentText, setDocumentText] = useState<string>('');
   const [ragStatus, setRagStatus] = useState<string | null>(null);
 
+  useEffect(() => {
+    // Detectar URLs de producción o fallback local
+    const envBotUrl = process.env.NEXT_PUBLIC_BOT_ENGINE_URL;
+    const envWsUrl = process.env.NEXT_PUBLIC_WS_URL;
+
+    if (envBotUrl) setBotEngineUrl(envBotUrl);
+    if (envWsUrl) setWsUrl(envWsUrl);
+  }, []);
+
   // Conectar con el Servidor WebSockets de bot-engine
   useEffect(() => {
-    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3006';
-    let socket: WebSocket;
+    if (!wsUrl) return;
 
+    let socket: WebSocket;
     try {
       socket = new WebSocket(wsUrl);
 
       socket.onopen = () => {
-        console.log('📡 Conectado al WebSockets de Bot Engine');
+        console.log('📡 Conectado al WebSockets de Bot Engine en:', wsUrl);
       };
 
       socket.onmessage = (event) => {
@@ -55,16 +68,16 @@ export default function Dashboard() {
     return () => {
       if (socket) socket.close();
     };
-  }, []);
+  }, [wsUrl]);
 
   const handleRequestQr = async () => {
     setBotStatus('GENERATING');
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_BOT_ENGINE_URL || 'http://localhost:3005';
+      const targetUrl = botEngineUrl || process.env.NEXT_PUBLIC_BOT_ENGINE_URL || 'http://localhost:3005';
       const apiKey = process.env.NEXT_PUBLIC_INTERNAL_API_KEY || 'skale-saas-secret-key';
 
       // Petición al BotManagerApi para inicializar la instancia del tenant
-      await fetch(`${apiUrl}/bot/start`, {
+      await fetch(`${targetUrl}/bot/start`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -74,6 +87,7 @@ export default function Dashboard() {
       });
     } catch (error) {
       console.error('Error solicitando QR:', error);
+      alert('Debes configurar la URL de bot-engine de Railway en el panel de configuración inferior.');
     }
   };
 
@@ -154,11 +168,31 @@ export default function Dashboard() {
           </nav>
         </div>
 
-        <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex items-center gap-3">
-          <Shield className="w-5 h-5 text-emerald-400" />
-          <div className="text-xs">
-            <p className="font-semibold text-slate-200">Tenant Activo</p>
-            <p className="text-slate-500">{tenantId}</p>
+        <div className="space-y-3">
+          <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
+            <p className="text-xs font-semibold text-slate-300">Servidores de Railway</p>
+            <input
+              type="text"
+              placeholder="https://bot-engine-xxx.up.railway.app"
+              value={botEngineUrl}
+              onChange={(e) => setBotEngineUrl(e.target.value)}
+              className="w-full p-2 text-xs rounded bg-slate-950 border border-slate-800 text-slate-200"
+            />
+            <input
+              type="text"
+              placeholder="wss://bot-engine-xxx.up.railway.app"
+              value={wsUrl}
+              onChange={(e) => setWsUrl(e.target.value)}
+              className="w-full p-2 text-xs rounded bg-slate-950 border border-slate-800 text-slate-200"
+            />
+          </div>
+
+          <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex items-center gap-3">
+            <Shield className="w-5 h-5 text-emerald-400" />
+            <div className="text-xs">
+              <p className="font-semibold text-slate-200">Tenant Activo</p>
+              <p className="text-slate-500">{tenantId}</p>
+            </div>
           </div>
         </div>
       </aside>
