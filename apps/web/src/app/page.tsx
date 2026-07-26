@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Bot, QrCode, Sparkles, CreditCard, Shield, CheckCircle2, FileText, Send } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<'qr' | 'prompt' | 'rag' | 'billing'>('qr');
@@ -74,9 +75,9 @@ export default function Dashboard() {
       });
     } catch (error) {
       console.error('Error solicitando QR:', error);
-      // Fallback de demostración UI en caso de entorno local sin API expuesta
+      // Demo fallback con string de Baileys sintácticamente válido
       setTimeout(() => {
-        setQrCodeData('https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=WASaaS-WhatsApp-Auth-Demo');
+        setQrCodeData('2@WASaaS-WhatsApp-Auth-Demo-Payload');
       }, 1000);
     }
   };
@@ -186,7 +187,11 @@ export default function Dashboard() {
               ) : qrCodeData ? (
                 <div className="text-center space-y-4">
                   <div className="p-4 bg-white rounded-2xl shadow-xl inline-block">
-                    <img src={qrCodeData.startsWith('http') ? qrCodeData : `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrCodeData)}`} alt="WhatsApp QR Code" className="w-56 h-56" />
+                    {qrCodeData.startsWith('http') ? (
+                      <img src={qrCodeData} alt="WhatsApp QR Code" className="w-56 h-56" />
+                    ) : (
+                      <QRCodeSVG value={qrCodeData} size={240} level="M" />
+                    )}
                   </div>
                   <p className="text-xs text-slate-400">Escanea desde WhatsApp -&gt; Dispositivos Vinculados</p>
                 </div>
