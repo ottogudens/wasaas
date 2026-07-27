@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Bot, QrCode, Sparkles, CreditCard, Shield, CheckCircle2, FileText, Send } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Bot, QrCode, Sparkles, CreditCard, Shield, CheckCircle2, FileText, Send, RefreshCw, Loader2 } from 'lucide-react';
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<'qr' | 'prompt' | 'rag' | 'billing'>('qr');
@@ -12,7 +12,7 @@ export default function Dashboard() {
     'Eres un asistente virtual profesional especializado en atención al cliente. Responde de manera concisa y amable.'
   );
 
-  // Endpoint configuration for Railway production
+  // Endpoint configuration (auto-detected dynamically)
   const [botEngineUrl, setBotEngineUrl] = useState<string>('');
   const [wsUrl, setWsUrl] = useState<string>('');
 
@@ -20,14 +20,64 @@ export default function Dashboard() {
   const [documentText, setDocumentText] = useState<string>('');
   const [ragStatus, setRagStatus] = useState<string | null>(null);
 
+  // Auto-detect dynamic endpoints based on environment or browser location
   useEffect(() => {
-    // Detectar URLs de producción o fallback local
-    const envBotUrl = process.env.NEXT_PUBLIC_BOT_ENGINE_URL;
-    const envWsUrl = process.env.NEXT_PUBLIC_WS_URL;
+    let apiHost = process.env.NEXT_PUBLIC_BOT_ENGINE_URL;
+    let websocketUrl = process.env.NEXT_PUBLIC_WS_URL;
 
-    if (envBotUrl) setBotEngineUrl(envBotUrl);
-    if (envWsUrl) setWsUrl(envWsUrl);
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname;
+      const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+
+      if (!apiHost) {
+        if (hostname === 'localhost' || hostname === '127.0.0.1') {
+          apiHost = 'http://localhost:3005';
+        } else {
+          // Si estamos en Railway o producción
+          apiHost = `${protocol}//${hostname.replace('web', 'bot-engine')}`;
+        }
+      }
+
+      if (!websocketUrl) {
+        if (hostname === 'localhost' || hostname === '127.0.0.1') {
+          websocketUrl = 'ws://localhost:3006';
+        } else {
+          websocketUrl = `${wsProtocol}//${hostname.replace('web', 'bot-engine')}`;
+        }
+      }
+    }
+
+    setBotEngineUrl(apiHost || '');
+    setWsUrl(websocketUrl || '');
   }, []);
+
+  const handleRequestQr = useCallback(async (overrideUrl?: string) => {
+    setBotStatus('GENERATING');
+    try {
+      const targetUrl = overrideUrl || botEngineUrl || process.env.NEXT_PUBLIC_BOT_ENGINE_URL || 'http://localhost:3005';
+      const apiKey = process.env.NEXT_PUBLIC_INTERNAL_API_KEY || 'skale-saas-secret-key';
+
+      // Petición al BotManagerApi para inicializar automáticamente la instancia del tenant
+      await fetch(`${targetUrl}/bot/start`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+        },
+        body: JSON.stringify({ tenantId }),
+      });
+    } catch (error) {
+      console.error('Error solicitando QR automáticamente:', error);
+    }
+  }, [botEngineUrl, tenantId]);
+
+  // Solicitud automática del código QR al tener la URL del motor
+  useEffect(() => {
+    if (botEngineUrl && botStatus === 'DISCONNECTED') {
+      handleRequestQr(botEngineUrl);
+    }
+  }, [botEngineUrl, botStatus, handleRequestQr]);
 
   // Conectar con el Servidor WebSockets de bot-engine
   useEffect(() => {
@@ -69,27 +119,6 @@ export default function Dashboard() {
       if (socket) socket.close();
     };
   }, [wsUrl]);
-
-  const handleRequestQr = async () => {
-    setBotStatus('GENERATING');
-    try {
-      const targetUrl = botEngineUrl || process.env.NEXT_PUBLIC_BOT_ENGINE_URL || 'http://localhost:3005';
-      const apiKey = process.env.NEXT_PUBLIC_INTERNAL_API_KEY || 'skale-saas-secret-key';
-
-      // Petición al BotManagerApi para inicializar la instancia del tenant
-      await fetch(`${targetUrl}/bot/start`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-        },
-        body: JSON.stringify({ tenantId }),
-      });
-    } catch (error) {
-      console.error('Error solicitando QR:', error);
-      alert('Debes configurar la URL de bot-engine de Railway en el panel de configuración inferior.');
-    }
-  };
 
   const handleProcessRag = async () => {
     if (!documentText) return;
@@ -169,22 +198,19 @@ export default function Dashboard() {
         </div>
 
         <div className="space-y-3">
-          <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
-            <p className="text-xs font-semibold text-slate-300">Servidores de Railway</p>
-            <input
-              type="text"
-              placeholder="https://bot-engine-xxx.up.railway.app"
-              value={botEngineUrl}
-              onChange={(e) => setBotEngineUrl(e.target.value)}
-              className="w-full p-2 text-xs rounded bg-slate-950 border border-slate-800 text-slate-200"
-            />
-            <input
-              type="text"
-              placeholder="wss://bot-engine-xxx.up.railway.app"
-              value={wsUrl}
-              onChange={(e) => setWsUrl(e.target.value)}
-              className="w-full p-2 text-xs rounded bg-slate-950 border border-slate-800 text-slate-200"
-            />
+          <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-slate-300">Estado de Servidores</p>
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                Auto Detectado
+              </span>
+            </div>
+            <div className="text-[11px] font-mono text-slate-400 truncate">
+              <span className="text-slate-500">API:</span> {botEngineUrl || 'Detectando...'}
+            </div>
+            <div className="text-[11px] font-mono text-slate-400 truncate">
+              <span className="text-slate-500">WS:</span> {wsUrl || 'Detectando...'}
+            </div>
           </div>
 
           <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex items-center gap-3">
@@ -203,10 +229,10 @@ export default function Dashboard() {
           <div className="max-w-2xl mx-auto space-y-6">
             <div>
               <h2 className="text-2xl font-bold">Vincular WhatsApp</h2>
-              <p className="text-slate-400 text-sm">Escanea el código QR generado para conectar tu bot a WhatsApp Web.</p>
+              <p className="text-slate-400 text-sm">Escanea el código QR generado automáticamente para conectar tu bot a WhatsApp Web.</p>
             </div>
 
-            <div className="p-8 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col items-center justify-center min-h-[350px] shadow-2xl relative overflow-hidden">
+            <div className="p-8 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col items-center justify-center min-h-[380px] shadow-2xl relative overflow-hidden">
               {botStatus === 'CONNECTED' ? (
                 <div className="text-center space-y-4">
                   <CheckCircle2 className="w-16 h-16 text-emerald-400 mx-auto animate-bounce" />
@@ -215,20 +241,33 @@ export default function Dashboard() {
                 </div>
               ) : qrCodeData ? (
                 <div className="text-center space-y-4">
-                  <div className="p-4 bg-white rounded-2xl shadow-xl inline-block">
+                  <div className="p-4 bg-white rounded-2xl shadow-xl inline-block relative group">
                     <img src={qrCodeData} alt="WhatsApp QR Code" className="w-64 h-64 border border-slate-200 rounded-lg shadow-inner" />
                   </div>
-                  <p className="text-xs text-slate-400 font-medium">Escanea desde WhatsApp -&gt; Dispositivos Vinculados</p>
+                  <div className="flex items-center justify-center gap-2 text-xs text-slate-400 font-medium">
+                    <RefreshCw className="w-3.5 h-3.5 text-emerald-400 animate-spin" />
+                    <span>Escanea desde WhatsApp -&gt; Dispositivos Vinculados</span>
+                  </div>
+                  <button
+                    onClick={() => handleRequestQr()}
+                    className="mt-2 text-xs text-slate-400 hover:text-emerald-400 underline transition-colors"
+                  >
+                    Regenerar Código QR
+                  </button>
                 </div>
               ) : (
                 <div className="text-center space-y-4">
-                  <QrCode className="w-16 h-16 text-slate-600 mx-auto" />
-                  <p className="text-slate-400 text-sm">Presiona el botón para solicitar el código QR de vinculación.</p>
+                  <div className="relative inline-block">
+                    <QrCode className="w-16 h-16 text-slate-600 mx-auto opacity-50" />
+                    <Loader2 className="w-8 h-8 text-emerald-400 animate-spin absolute inset-0 m-auto" />
+                  </div>
+                  <p className="text-slate-300 text-sm font-medium">Generando código QR automáticamente...</p>
+                  <p className="text-xs text-slate-500 max-w-sm">Inicializando la sesión de WhatsApp para la empresa. No necesitas presionar ningún botón.</p>
                   <button
-                    onClick={handleRequestQr}
-                    className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 font-semibold text-slate-950 shadow-lg shadow-emerald-500/20 hover:opacity-90 transition-all"
+                    onClick={() => handleRequestQr()}
+                    className="px-4 py-2 mt-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition-all flex items-center gap-2 mx-auto"
                   >
-                    Generar Código QR
+                    <RefreshCw className="w-3.5 h-3.5" /> Forzar Reintento
                   </button>
                 </div>
               )}
