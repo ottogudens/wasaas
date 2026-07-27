@@ -119,7 +119,11 @@ export default function Dashboard() {
         setErrorMessage(`Falla HTTP al conectar con bot-engine: ${errDetail}`);
         addLog(`❌ Error HTTP en /api/bots: ${errDetail}`);
       } else {
-        addLog(`✅ Instancia del bot creada/activa (${res.status === 409 ? 'Ya existía' : 'Nueva'}). Esperando emisión de evento QR...`);
+        if (res.status === 409) {
+          addLog(`ℹ️ Instancia del bot ya existe en el servidor. Esperando QR...`);
+        } else {
+          addLog(`✅ Nueva instancia creada exitosamente. Esperando QR...`);
+        }
       }
     } catch (error) {
       const err = error as Error;
@@ -129,7 +133,7 @@ export default function Dashboard() {
     }
   }, [botEngineUrl, tenantId, addLog]);
 
-  // Solicitud automática del código QR al tener la URL del motor
+  // Solicitud automática del código QR al tener la URL del motor (solo si no está activo)
   useEffect(() => {
     if (botEngineUrl && botStatus === 'DISCONNECTED') {
       handleRequestQr(botEngineUrl);
