@@ -41,32 +41,20 @@ export default function Dashboard() {
       if (!apiHost) {
         if (hostname === 'localhost' || hostname === '127.0.0.1') {
           apiHost = 'http://localhost:3005';
+        } else if (hostname.includes('frontend-production-e6e4d.up.railway.app') || hostname.includes('frontend')) {
+          apiHost = `${protocol}//whatsapp-service-production-e6f2.up.railway.app`;
         } else {
-          let botHost = hostname;
-          if (botHost.includes('frontend')) {
-            botHost = botHost.replace('frontend', 'whatsapp-service');
-          } else if (botHost.includes('web')) {
-            botHost = botHost.replace('web', 'whatsapp-service');
-          } else {
-            botHost = 'whatsapp-service-production-e6f2.up.railway.app';
-          }
-          apiHost = `${protocol}//${botHost}`;
+          apiHost = `${protocol}//${hostname.replace('frontend', 'whatsapp-service').replace('web', 'whatsapp-service')}`;
         }
       }
 
       if (!websocketUrl) {
         if (hostname === 'localhost' || hostname === '127.0.0.1') {
           websocketUrl = 'ws://localhost:3006';
+        } else if (hostname.includes('frontend-production-e6e4d.up.railway.app') || hostname.includes('frontend')) {
+          websocketUrl = `${wsProtocol}//whatsapp-service-production-e6f2.up.railway.app`;
         } else {
-          let botHost = hostname;
-          if (botHost.includes('frontend')) {
-            botHost = botHost.replace('frontend', 'whatsapp-service');
-          } else if (botHost.includes('web')) {
-            botHost = botHost.replace('web', 'whatsapp-service');
-          } else {
-            botHost = 'whatsapp-service-production-e6f2.up.railway.app';
-          }
-          websocketUrl = `${wsProtocol}//${botHost}`;
+          websocketUrl = `${wsProtocol}//${hostname.replace('frontend', 'whatsapp-service').replace('web', 'whatsapp-service')}`;
         }
       }
     }
