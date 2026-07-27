@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { BotManager, BotManagerApi } from '@builderbot/manager';
 import { BaileysProvider } from '@builderbot/provider-baileys';
 import { addKeyword, EVENTS } from '@builderbot/bot';
+import { fetchLatestBaileysVersion } from 'baileys';
 import { WebSocketServer, WebSocket } from 'ws';
 import QRCode from 'qrcode';
 
@@ -10,12 +11,17 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT) : (process.env.BOT_EN
 const SESSIONS_DIR = process.env.SESSIONS_DIR || './sessions';
 const API_KEY = process.env.INTERNAL_API_KEY || 'skale-saas-secret-key';
 
+// Obtenemos dinámicamente la última versión soporada por las APIs de WhatsApp Web
+const { version } = await fetchLatestBaileysVersion();
+console.log(`🌐 [Baileys] Versión de WhatsApp Web obtenida de servidores oficiales: ${version.join('.')}`);
+
 // 1. Inicializar Orquestador de Instancias Multi-tenant
 console.log(`📂 [BotManager] Directorio de sesiones: ${SESSIONS_DIR}`);
 const manager = new BotManager({
   sessionsDir: SESSIONS_DIR,
   defaultProviderClass: BaileysProvider as any,
   defaultProviderOptions: {
+    version,
     writeLog: true,
   },
 });
@@ -24,6 +30,13 @@ const manager = new BotManager({
 const originalCreateBot = manager.createBot.bind(manager);
 manager.createBot = async (tenantConfig: any) => {
   console.log(`🚀 [BotEngine] Creando e inicializando proveedor de WhatsApp para Tenant: ${tenantConfig.tenantId}...`);
+  
+  // Inyectar versión dinámica si no se especifica
+  if (!tenantConfig.providerOptions) {
+    tenantConfig.providerOptions = {};
+  }
+  tenantConfig.providerOptions.version = version;
+
   const botInstance = await originalCreateBot(tenantConfig);
 
   const provider = botInstance.provider;
@@ -44,7 +57,7 @@ manager.createBot = async (tenantConfig: any) => {
       }
     });
 
-    // Forzar inicio del proveedor vendor de Baileys si no se inició de forma automática
+    // Forzar inicio del proveedor vendor de Baileys
     if (typeof provider.initVendor === 'function') {
       try {
         console.log(`🔄 [BotEngine] Invocando initVendor() explícitamente para Tenant: ${tenantConfig.tenantId}...`);
