@@ -50,7 +50,7 @@ export default function Dashboard() {
 
       if (!websocketUrl) {
         if (hostname === 'localhost' || hostname === '127.0.0.1') {
-          websocketUrl = 'ws://localhost:3006';
+          websocketUrl = 'ws://localhost:3005';
         } else if (hostname.includes('frontend-production-e6e4d.up.railway.app') || hostname.includes('frontend')) {
           websocketUrl = `${wsProtocol}//whatsapp-service-production-e6f2.up.railway.app`;
         } else {
@@ -63,6 +63,32 @@ export default function Dashboard() {
     setWsUrl(websocketUrl || '');
     addLog(`Configuración de URLs inicial: API=${apiHost} | WS=${websocketUrl}`);
   }, [addLog]);
+
+  const fetchQrViaRest = useCallback(async (targetUrl: string, apiKey: string) => {
+    try {
+      const res = await fetch(`${targetUrl}/api/bots/${tenantId}/qr`, {
+        headers: { 'x-api-key': apiKey },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.qr) {
+          setQrCodeData(data.qr);
+          setBotStatus('GENERATING');
+          setErrorMessage(null);
+          addLog(`⚡ Código QR obtenido exitosamente vía REST Polling.`);
+          return true;
+        } else if (data.status === 'connected') {
+          setBotStatus('CONNECTED');
+          setQrCodeData(null);
+          addLog(`🎉 Bot ya está conectado a WhatsApp.`);
+          return true;
+        }
+      }
+    } catch (e) {
+      console.warn('Error polling QR via REST:', e);
+    }
+    return false;
+  }, [tenantId, addLog]);
 
   const handleRequestQr = useCallback(async (overrideUrl?: string) => {
     setBotStatus('GENERATING');
@@ -93,7 +119,7 @@ export default function Dashboard() {
         setErrorMessage(`Falla HTTP al conectar con bot-engine: ${errDetail}`);
         addLog(`❌ Error HTTP en /api/bots: ${errDetail}`);
       } else {
-        addLog(`✅ Instancia del bot creada/activa (${res.status === 409 ? 'Ya existía' : 'Nueva'}). Esperando emisión de evento QR vía WebSocket...`);
+        addLog(`✅ Instancia del bot creada/activa (${res.status === 409 ? 'Ya existía' : 'Nueva'}). Esperando emisión de evento QR...`);
       }
     } catch (error) {
       const err = error as Error;
@@ -109,6 +135,18 @@ export default function Dashboard() {
       handleRequestQr(botEngineUrl);
     }
   }, [botEngineUrl, botStatus, handleRequestQr]);
+
+  // Polling fallback vía REST en caso de que no haya WebSocket o mientras se genera
+  useEffect(() => {
+    if (!botEngineUrl || botStatus === 'CONNECTED') return;
+
+    const apiKey = process.env.NEXT_PUBLIC_INTERNAL_API_KEY || 'skale-saas-secret-key';
+    const interval = setInterval(() => {
+      fetchQrViaRest(botEngineUrl, apiKey);
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [botEngineUrl, botStatus, fetchQrViaRest]);
 
   // Conectar con el Servidor WebSockets de bot-engine
   useEffect(() => {
