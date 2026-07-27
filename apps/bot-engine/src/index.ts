@@ -10,8 +10,9 @@ import QRCode from 'qrcode';
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : (process.env.BOT_ENGINE_PORT ? parseInt(process.env.BOT_ENGINE_PORT) : 3005);
 const SESSIONS_DIR = process.env.SESSIONS_DIR || './sessions';
 const API_KEY = process.env.INTERNAL_API_KEY || 'skale-saas-secret-key';
+const API_URL = process.env.API_URL || 'http://localhost:3001';
 
-// Obtenemos dinámicamente la última versión soporada por las APIs de WhatsApp Web
+// Obtenemos dinámicamente la última versión soportada por las APIs de WhatsApp Web
 const { version } = await fetchLatestBaileysVersion();
 console.log(`🌐 [Baileys] Versión de WhatsApp Web obtenida de servidores oficiales: ${version.join('.')}`);
 
@@ -114,15 +115,36 @@ const broadcast = (data: object) => {
   }
 };
 
-// 5. Registrar Flujo Base de Agente IA
+// 5. Registrar Flujo Base de Agente IA con integración NestJS AI
 const defaultAiFlow = addKeyword(EVENTS.WELCOME)
   .addAction(async (ctx: any, { flowDynamic }: { flowDynamic: any }) => {
     const userPrompt = ctx.body;
     console.log(`🤖 [BotEngine] Mensaje recibido de ${ctx.from}: "${userPrompt}"`);
     
-    await flowDynamic([
-      { body: `🤖 *Asistente IA*: Hola, recibí tu consulta: "${userPrompt}". Procesando con base de conocimiento RAG...` }
-    ]);
+    let botReply = '🤖 *Asistente IA*: Hola, recibí tu mensaje. En este momento estoy procesando tu solicitud.';
+
+    try {
+      // Consultar al microservicio NestJS de IA y RAG
+      const response = await fetch(`${API_URL}/ai/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: userPrompt,
+          systemPrompt: 'Eres un asistente de ventas y atención al cliente muy cordial.',
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.reply) {
+          botReply = data.reply;
+        }
+      }
+    } catch (err) {
+      console.warn('⚠️ Error al consultar el módulo NestJS AI API, usando respuesta por defecto:', err);
+    }
+
+    await flowDynamic([{ body: botReply }]);
   });
 
 managerApi.registerFlow('default_ai_flow', 'Flujo IA Multitenant', defaultAiFlow);
