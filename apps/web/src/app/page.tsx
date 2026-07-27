@@ -28,7 +28,7 @@ export default function Dashboard() {
     setLogs((prev) => [`[${timestamp}] ${msg}`, ...prev.slice(0, 19)]);
   }, []);
 
-  // Detect endpoints (env variables > fallback automatico > edicion manual)
+  // Detect endpoints (env variables > fallback automatico oficial de Railway > edicion manual)
   useEffect(() => {
     let apiHost = process.env.NEXT_PUBLIC_BOT_ENGINE_URL;
     let websocketUrl = process.env.NEXT_PUBLIC_WS_URL;
@@ -44,11 +44,11 @@ export default function Dashboard() {
         } else {
           let botHost = hostname;
           if (botHost.includes('frontend')) {
-            botHost = botHost.replace('frontend', 'bot-engine');
+            botHost = botHost.replace('frontend', 'whatsapp-service');
           } else if (botHost.includes('web')) {
-            botHost = botHost.replace('web', 'bot-engine');
+            botHost = botHost.replace('web', 'whatsapp-service');
           } else {
-            botHost = `bot-engine-${botHost}`;
+            botHost = 'whatsapp-service-production-e6f2.up.railway.app';
           }
           apiHost = `${protocol}//${botHost}`;
         }
@@ -60,11 +60,11 @@ export default function Dashboard() {
         } else {
           let botHost = hostname;
           if (botHost.includes('frontend')) {
-            botHost = botHost.replace('frontend', 'bot-engine');
+            botHost = botHost.replace('frontend', 'whatsapp-service');
           } else if (botHost.includes('web')) {
-            botHost = botHost.replace('web', 'bot-engine');
+            botHost = botHost.replace('web', 'whatsapp-service');
           } else {
-            botHost = `bot-engine-${botHost}`;
+            botHost = 'whatsapp-service-production-e6f2.up.railway.app';
           }
           websocketUrl = `${wsProtocol}//${botHost}`;
         }
@@ -79,7 +79,7 @@ export default function Dashboard() {
   const handleRequestQr = useCallback(async (overrideUrl?: string) => {
     setBotStatus('GENERATING');
     setErrorMessage(null);
-    const targetUrl = overrideUrl || botEngineUrl || process.env.NEXT_PUBLIC_BOT_ENGINE_URL || 'http://localhost:3005';
+    const targetUrl = overrideUrl || botEngineUrl || process.env.NEXT_PUBLIC_BOT_ENGINE_URL || 'https://whatsapp-service-production-e6f2.up.railway.app';
     const apiKey = process.env.NEXT_PUBLIC_INTERNAL_API_KEY || 'skale-saas-secret-key';
 
     addLog(`Iniciando solicitud automática de QR a ${targetUrl}/bot/start...`);
@@ -277,7 +277,7 @@ export default function Dashboard() {
                     type="text"
                     value={botEngineUrl}
                     onChange={(e) => setBotEngineUrl(e.target.value)}
-                    placeholder="https://bot-engine-xxx.up.railway.app"
+                    placeholder="https://whatsapp-service-production-e6f2.up.railway.app"
                     className="w-full p-1.5 text-[11px] font-mono rounded bg-slate-950 border border-slate-800 text-slate-200 focus:border-emerald-500 focus:outline-none"
                   />
                 </div>
@@ -287,7 +287,7 @@ export default function Dashboard() {
                     type="text"
                     value={wsUrl}
                     onChange={(e) => setWsUrl(e.target.value)}
-                    placeholder="wss://bot-engine-xxx.up.railway.app"
+                    placeholder="wss://whatsapp-service-production-e6f2.up.railway.app"
                     className="w-full p-1.5 text-[11px] font-mono rounded bg-slate-950 border border-slate-800 text-slate-200 focus:border-emerald-500 focus:outline-none"
                   />
                 </div>
