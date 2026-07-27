@@ -5,29 +5,51 @@ import { addKeyword, EVENTS } from '@builderbot/bot';
 import { WebSocketServer, WebSocket } from 'ws';
 import QRCode from 'qrcode';
 
-// En Railway, la variable PORT la inyecta la plataforma para el proxy público.
+// En Railway se expone un único puerto público (PORT).
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : (process.env.BOT_ENGINE_PORT ? parseInt(process.env.BOT_ENGINE_PORT) : 3005);
-const WS_PORT = process.env.WS_PORT ? parseInt(process.env.WS_PORT) : 3006;
 const SESSIONS_DIR = process.env.SESSIONS_DIR || './sessions';
 const API_KEY = process.env.INTERNAL_API_KEY || 'skale-saas-secret-key';
 
-// 1. Inicializar Servidor de WebSockets
-const wss = new WebSocketServer({ port: WS_PORT });
+// 1. Inicializar Orquestador de Instancias Multi-tenant
+console.log(`📂 [BotManager] Directorio de sesiones: ${SESSIONS_DIR}`);
+const manager = new BotManager({
+  sessionsDir: SESSIONS_DIR,
+  defaultProviderClass: BaileysProvider as any,
+});
+
+// 2. Inicializar Servidor de API REST para el Manager
+const managerApi = new BotManagerApi(manager, {
+  port: PORT,
+  apiKey: API_KEY,
+} as any);
+
+// 3. Iniciar el servidor HTTP Polka
+managerApi.start();
+
+// 4. Adjuntar el servidor de WebSockets al mismo puerto HTTP (Polka server)
+const httpServer = (managerApi as any).app?.server;
 const connectedClients = new Set<WebSocket>();
 
-wss.on('connection', (ws: WebSocket) => {
-  console.log('📡 [WebSocket] Cliente Frontend conectado desde navegador');
-  connectedClients.add(ws);
+if (httpServer) {
+  const wss = new WebSocketServer({ server: httpServer });
 
-  ws.on('close', () => {
-    console.log('🔌 [WebSocket] Cliente Frontend desconectado');
-    connectedClients.delete(ws);
-  });
+  wss.on('connection', (ws: WebSocket) => {
+    console.log('📡 [WebSocket] Cliente Frontend conectado desde navegador (Puerto Compartido HTTP/WS)');
+    connectedClients.add(ws);
 
-  ws.on('error', (err) => {
-    console.error('❌ [WebSocket Error en Cliente]:', err);
+    ws.on('close', () => {
+      console.log('🔌 [WebSocket] Cliente Frontend desconectado');
+      connectedClients.delete(ws);
+    });
+
+    ws.on('error', (err) => {
+      console.error('❌ [WebSocket Error en Cliente]:', err);
+    });
   });
-});
+  console.log(`🚀 [Bot Engine Worker] REST API & WebSockets compartiendo el puerto ${PORT}`);
+} else {
+  console.error('❌ [Bot Engine Error] No se pudo obtener el servidor HTTP para adjuntar WebSockets.');
+}
 
 const broadcast = (data: object) => {
   const payload = JSON.stringify(data);
@@ -38,20 +60,7 @@ const broadcast = (data: object) => {
   }
 };
 
-// 2. Inicializar Orquestador de Instancias Multi-tenant especificando BaileysProvider por defecto
-console.log(`📂 [BotManager] Directorio de sesiones: ${SESSIONS_DIR}`);
-const manager = new BotManager({
-  sessionsDir: SESSIONS_DIR,
-  defaultProviderClass: BaileysProvider as any,
-});
-
-// 3. Inicializar Servidor de API REST para el Manager
-const managerApi = new BotManagerApi(manager, {
-  port: PORT,
-  apiKey: API_KEY,
-} as any);
-
-// 4. Registrar Flujo Base de Agente IA
+// 5. Registrar Flujo Base de Agente IA
 const defaultAiFlow = addKeyword(EVENTS.WELCOME)
   .addAction(async (ctx: any, { flowDynamic }: { flowDynamic: any }) => {
     const userPrompt = ctx.body;
@@ -64,7 +73,7 @@ const defaultAiFlow = addKeyword(EVENTS.WELCOME)
 
 managerApi.registerFlow('default_ai_flow', 'Flujo IA Multitenant', defaultAiFlow);
 
-// 5. Suscribirse a eventos del Manager y generar QR DataURL oficial de Baileys
+// 6. Suscribirse a eventos del Manager y generar QR DataURL oficial de Baileys
 manager.on('bot:qr', async (tenantId: string, data: any) => {
   console.log(`⚡ [BotManager Event] Evento 'bot:qr' disparado para Tenant: ${tenantId}`);
   let qrImageBase64 = data.qr;
@@ -79,7 +88,7 @@ manager.on('bot:qr', async (tenantId: string, data: any) => {
     return;
   }
 
-  // Si data.qr es un raw string de Baileys, convertirlo directamente a Base64 PNG en el servidor
+  // Convertir string de Baileys a DataURL PNG Base64
   if (typeof data.qr === 'string' && !data.qr.startsWith('data:image')) {
     try {
       qrImageBase64 = await QRCode.toDataURL(data.qr, {
@@ -132,7 +141,3 @@ manager.on('bot:disconnected', (tenantId: string) => {
     error: typeof err === 'string' ? err : err?.message || 'Error interno en BotManager',
   });
 });
-
-// 6. Iniciar servidor
-managerApi.start();
-console.log(`🚀 [Bot Engine Worker] REST API en puerto ${PORT} | WebSockets en puerto ${WS_PORT}`);
