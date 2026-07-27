@@ -4,7 +4,8 @@ import { addKeyword, EVENTS } from '@builderbot/bot';
 import { WebSocketServer, WebSocket } from 'ws';
 import QRCode from 'qrcode';
 
-const PORT = process.env.BOT_ENGINE_PORT ? parseInt(process.env.BOT_ENGINE_PORT) : 3005;
+// En Railway, la variable PORT la inyecta la plataforma para el proxy público.
+const PORT = process.env.PORT ? parseInt(process.env.PORT) : (process.env.BOT_ENGINE_PORT ? parseInt(process.env.BOT_ENGINE_PORT) : 3005);
 const WS_PORT = process.env.WS_PORT ? parseInt(process.env.WS_PORT) : 3006;
 const SESSIONS_DIR = process.env.SESSIONS_DIR || './sessions';
 const API_KEY = process.env.INTERNAL_API_KEY || 'skale-saas-secret-key';
@@ -42,10 +43,15 @@ const manager = new BotManager({
   sessionsDir: SESSIONS_DIR,
 });
 
-// 3. Inicializar Servidor de API REST para el Manager
+// 3. Inicializar Servidor de API REST para el Manager con habilitación CORS
 const managerApi = new BotManagerApi(manager, {
   port: PORT,
   apiKey: API_KEY,
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'x-api-key', 'Authorization'],
+  },
 });
 
 // 4. Registrar Flujo Base de Agente IA
