@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Bot, QrCode, Sparkles, CreditCard, Shield, CheckCircle2, FileText, Send, RefreshCw, Loader2, Settings2, AlertTriangle, Terminal } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<'qr' | 'prompt' | 'rag' | 'billing'>('qr');
@@ -375,7 +376,11 @@ export default function Dashboard() {
               ) : qrCodeData ? (
                 <div className="text-center space-y-4">
                   <div className="p-4 bg-white rounded-2xl shadow-xl inline-block relative group">
-                    <img src={qrCodeData} alt="WhatsApp QR Code" className="w-64 h-64 border border-slate-200 rounded-lg shadow-inner" />
+                    {qrCodeData.startsWith('data:image') ? (
+                      <img src={qrCodeData} alt="WhatsApp QR Code" className="w-64 h-64 border border-slate-200 rounded-lg shadow-inner" />
+                    ) : (
+                      <QRCodeSVG value={qrCodeData} size={256} className="w-64 h-64 border border-slate-200 rounded-lg shadow-inner" />
+                    )}
                   </div>
                   <div className="flex items-center justify-center gap-2 text-xs text-slate-400 font-medium">
                     <RefreshCw className="w-3.5 h-3.5 text-emerald-400 animate-spin" />
