@@ -45,16 +45,11 @@ const manager = new BotManager({
   defaultProviderClass: BaileysProvider as any,
 });
 
-// 3. Inicializar Servidor de API REST para el Manager con habilitación CORS
+// 3. Inicializar Servidor de API REST para el Manager
 const managerApi = new BotManagerApi(manager, {
   port: PORT,
   apiKey: API_KEY,
-  cors: {
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'x-api-key', 'Authorization'],
-  },
-});
+} as any);
 
 // 4. Registrar Flujo Base de Agente IA
 const defaultAiFlow = addKeyword(EVENTS.WELCOME)
@@ -130,7 +125,7 @@ manager.on('bot:disconnected', (tenantId: string) => {
   });
 });
 
-manager.on('error', (err: any) => {
+(manager as any).on('error', (err: any) => {
   console.error(`💥 [BotManager Global Error]:`, err);
   broadcast({
     event: 'bot:error',
