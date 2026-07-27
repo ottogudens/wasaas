@@ -17,6 +17,34 @@ const manager = new BotManager({
   defaultProviderClass: BaileysProvider as any,
 });
 
+// Interceptar eventos de Baileys cuando se crea un bot
+const originalCreateBot = manager.createBot.bind(manager);
+manager.createBot = async (tenantConfig: any) => {
+  console.log(`🚀 [BotEngine] Creando e inicializando proveedor de WhatsApp para Tenant: ${tenantConfig.tenantId}...`);
+  const botInstance = await originalCreateBot(tenantConfig);
+
+  const provider = botInstance.provider;
+  if (provider) {
+    // Escuchar el evento 'require_action' nativo de BaileysProvider que contiene el QR code
+    provider.on('require_action', async (actionData: any) => {
+      const qrStr = actionData?.payload?.qr;
+      console.log(`⚡ [Baileys Native Event] 'require_action' recibido para Tenant ${tenantConfig.tenantId}. QR String presente: ${!!qrStr}`);
+      
+      if (qrStr) {
+        (manager as any).emit('bot:qr', tenantConfig.tenantId, { qr: qrStr });
+      }
+    });
+
+    // Escuchar directamente 'qr' si lo emite el provider
+    provider.on('qr', (qrStr: string) => {
+      console.log(`⚡ [Baileys Native Event] 'qr' directo recibido para Tenant ${tenantConfig.tenantId}`);
+      (manager as any).emit('bot:qr', tenantConfig.tenantId, { qr: qrStr });
+    });
+  }
+
+  return botInstance;
+};
+
 // 2. Inicializar Servidor de API REST para el Manager
 const managerApi = new BotManagerApi(manager, {
   port: PORT,
