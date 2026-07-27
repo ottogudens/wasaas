@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { BotManager, BotManagerApi } from '@builderbot/manager';
+import { BaileysProvider } from '@builderbot/provider-baileys';
 import { addKeyword, EVENTS } from '@builderbot/bot';
 import { WebSocketServer, WebSocket } from 'ws';
 import QRCode from 'qrcode';
@@ -37,10 +38,11 @@ const broadcast = (data: object) => {
   }
 };
 
-// 2. Inicializar Orquestador de Instancias Multi-tenant
+// 2. Inicializar Orquestador de Instancias Multi-tenant especificando BaileysProvider por defecto
 console.log(`📂 [BotManager] Directorio de sesiones: ${SESSIONS_DIR}`);
 const manager = new BotManager({
   sessionsDir: SESSIONS_DIR,
+  defaultProviderClass: BaileysProvider as any,
 });
 
 // 3. Inicializar Servidor de API REST para el Manager con habilitación CORS

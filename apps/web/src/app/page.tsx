@@ -70,27 +70,30 @@ export default function Dashboard() {
     const targetUrl = overrideUrl || botEngineUrl || process.env.NEXT_PUBLIC_BOT_ENGINE_URL || 'https://whatsapp-service-production-e6f2.up.railway.app';
     const apiKey = process.env.NEXT_PUBLIC_INTERNAL_API_KEY || 'skale-saas-secret-key';
 
-    addLog(`Iniciando solicitud automática de QR a ${targetUrl}/bot/start...`);
+    addLog(`Iniciando solicitud de bot en ${targetUrl}/api/bots...`);
 
     try {
-      const res = await fetch(`${targetUrl}/bot/start`, {
+      const res = await fetch(`${targetUrl}/api/bots`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-api-key': apiKey,
         },
-        body: JSON.stringify({ tenantId }),
+        body: JSON.stringify({
+          tenantId,
+          name: `Bot Tenant ${tenantId}`,
+          flowIds: ['default_ai_flow'],
+        }),
       });
 
-      if (!res.ok) {
+      if (!res.ok && res.status !== 409) {
         const errorText = await res.text();
         const errDetail = `HTTP ${res.status}: ${res.statusText} (${errorText || 'Sin detalle'})`;
-        console.warn(`Respuesta ${res.status} al solicitar QR en ${targetUrl}`);
+        console.warn(`Respuesta ${res.status} al solicitar bot en ${targetUrl}`);
         setErrorMessage(`Falla HTTP al conectar con bot-engine: ${errDetail}`);
-        addLog(`❌ Error HTTP en /bot/start: ${errDetail}`);
+        addLog(`❌ Error HTTP en /api/bots: ${errDetail}`);
       } else {
-        const data = await res.json();
-        addLog(`✅ Petición /bot/start exitosa. Esperando emisión de evento QR vía WebSocket...`);
+        addLog(`✅ Instancia del bot creada/activa (${res.status === 409 ? 'Ya existía' : 'Nueva'}). Esperando emisión de evento QR vía WebSocket...`);
       }
     } catch (error) {
       const err = error as Error;
