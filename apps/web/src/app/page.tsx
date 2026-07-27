@@ -1,12 +1,14 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Bot, QrCode, Sparkles, CreditCard, Shield, CheckCircle2, FileText, Send, RefreshCw, Loader2, Settings2 } from 'lucide-react';
+import { Bot, QrCode, Sparkles, CreditCard, Shield, CheckCircle2, FileText, Send, RefreshCw, Loader2, Settings2, AlertTriangle, Terminal } from 'lucide-react';
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<'qr' | 'prompt' | 'rag' | 'billing'>('qr');
   const [qrCodeData, setQrCodeData] = useState<string | null>(null);
   const [botStatus, setBotStatus] = useState<'DISCONNECTED' | 'GENERATING' | 'CONNECTED'>('DISCONNECTED');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [logs, setLogs] = useState<string[]>([]);
   const tenantId = 'tenant-demo-01';
   const [systemPrompt, setSystemPrompt] = useState<string>(
     'Eres un asistente virtual profesional especializado en atención al cliente. Responde de manera concisa y amable.'
@@ -20,6 +22,11 @@ export default function Dashboard() {
   // RAG document state
   const [documentText, setDocumentText] = useState<string>('');
   const [ragStatus, setRagStatus] = useState<string | null>(null);
+
+  const addLog = useCallback((msg: string) => {
+    const timestamp = new Date().toLocaleTimeString();
+    setLogs((prev) => [`[${timestamp}] ${msg}`, ...prev.slice(0, 19)]);
+  }, []);
 
   // Detect endpoints (env variables > fallback automatico > edicion manual)
   useEffect(() => {
@@ -35,7 +42,6 @@ export default function Dashboard() {
         if (hostname === 'localhost' || hostname === '127.0.0.1') {
           apiHost = 'http://localhost:3005';
         } else {
-          // Intentar reemplazar 'web' o 'frontend' por 'bot-engine' en el dominio de Railway
           let botHost = hostname;
           if (botHost.includes('frontend')) {
             botHost = botHost.replace('frontend', 'bot-engine');
@@ -67,15 +73,18 @@ export default function Dashboard() {
 
     setBotEngineUrl(apiHost || '');
     setWsUrl(websocketUrl || '');
-  }, []);
+    addLog(`Configuración de URLs inicial: API=${apiHost} | WS=${websocketUrl}`);
+  }, [addLog]);
 
   const handleRequestQr = useCallback(async (overrideUrl?: string) => {
     setBotStatus('GENERATING');
-    try {
-      const targetUrl = overrideUrl || botEngineUrl || process.env.NEXT_PUBLIC_BOT_ENGINE_URL || 'http://localhost:3005';
-      const apiKey = process.env.NEXT_PUBLIC_INTERNAL_API_KEY || 'skale-saas-secret-key';
+    setErrorMessage(null);
+    const targetUrl = overrideUrl || botEngineUrl || process.env.NEXT_PUBLIC_BOT_ENGINE_URL || 'http://localhost:3005';
+    const apiKey = process.env.NEXT_PUBLIC_INTERNAL_API_KEY || 'skale-saas-secret-key';
 
-      // Petición al BotManagerApi para inicializar la instancia del tenant
+    addLog(`Iniciando solicitud automática de QR a ${targetUrl}/bot/start...`);
+
+    try {
       const res = await fetch(`${targetUrl}/bot/start`, {
         method: 'POST',
         headers: {
@@ -86,12 +95,22 @@ export default function Dashboard() {
       });
 
       if (!res.ok) {
+        const errorText = await res.text();
+        const errDetail = `HTTP ${res.status}: ${res.statusText} (${errorText || 'Sin detalle'})`;
         console.warn(`Respuesta ${res.status} al solicitar QR en ${targetUrl}`);
+        setErrorMessage(`Falla HTTP al conectar con bot-engine: ${errDetail}`);
+        addLog(`❌ Error HTTP en /bot/start: ${errDetail}`);
+      } else {
+        const data = await res.json();
+        addLog(`✅ Petición /bot/start exitosa. Esperando emisión de evento QR vía WebSocket...`);
       }
     } catch (error) {
-      console.error('Error solicitando QR automáticamente:', error);
+      const err = error as Error;
+      console.error('Error solicitando QR automáticamente:', err);
+      setErrorMessage(`Error de red al conectar con Bot Engine (${targetUrl}): ${err.message}`);
+      addLog(`❌ Excepción de red fetch(): ${err.message}`);
     }
-  }, [botEngineUrl, tenantId]);
+  }, [botEngineUrl, tenantId, addLog]);
 
   // Solicitud automática del código QR al tener la URL del motor
   useEffect(() => {
@@ -105,11 +124,14 @@ export default function Dashboard() {
     if (!wsUrl) return;
 
     let socket: WebSocket;
+    addLog(`Intentando conexión WebSocket a ${wsUrl}...`);
+
     try {
       socket = new WebSocket(wsUrl);
 
       socket.onopen = () => {
         console.log('📡 Conectado al WebSockets de Bot Engine en:', wsUrl);
+        addLog(`📡 Canal WebSocket conectado exitosamente a ${wsUrl}`);
       };
 
       socket.onmessage = (event) => {
@@ -118,28 +140,44 @@ export default function Dashboard() {
           if (data.event === 'bot:qr') {
             setQrCodeData(data.qr);
             setBotStatus('GENERATING');
+            setErrorMessage(null);
+            addLog(`⚡ Código QR recibido en tiempo real vía WebSocket.`);
           } else if (data.event === 'bot:connected') {
             setBotStatus('CONNECTED');
             setQrCodeData(null);
+            setErrorMessage(null);
+            addLog(`🎉 WhatsApp vinculado y conectado exitosamente.`);
           } else if (data.event === 'bot:disconnected') {
             setBotStatus('DISCONNECTED');
+            addLog(`⚠️ Sesión de WhatsApp desconectada.`);
+          } else if (data.event === 'bot:error') {
+            setErrorMessage(`Error reportado por BotManager: ${data.error}`);
+            addLog(`💥 Error servidor: ${data.error}`);
           }
         } catch (e) {
           console.error('Error parseando mensaje WS:', e);
+          addLog(`❌ Error procesando mensaje WS recibido`);
         }
       };
 
       socket.onerror = (err) => {
         console.log('WS Connection error:', err);
+        addLog(`❌ Fallo de conexión WebSocket en ${wsUrl}`);
+      };
+
+      socket.onclose = () => {
+        addLog(`🔌 Conexión WebSocket cerrada.`);
       };
     } catch (e) {
+      const err = e as Error;
       console.log('No se pudo establecer reconexión WS inmediata');
+      addLog(`❌ Excepción al crear socket WS: ${err.message}`);
     }
 
     return () => {
       if (socket) socket.close();
     };
-  }, [wsUrl]);
+  }, [wsUrl, addLog]);
 
   const handleProcessRag = async () => {
     if (!documentText) return;
@@ -288,7 +326,7 @@ export default function Dashboard() {
       {/* Main Content Area */}
       <main className="flex-1 p-10 overflow-y-auto">
         {activeTab === 'qr' && (
-          <div className="max-w-2xl mx-auto space-y-6">
+          <div className="max-w-3xl mx-auto space-y-6">
             <div>
               <h2 className="text-2xl font-bold">Vincular WhatsApp</h2>
               <p className="text-slate-400 text-sm">Escanea el código QR generado automáticamente para conectar tu bot a WhatsApp Web.</p>
@@ -318,30 +356,75 @@ export default function Dashboard() {
                   </button>
                 </div>
               ) : (
-                <div className="text-center space-y-4">
+                <div className="text-center space-y-4 w-full max-w-md">
                   <div className="relative inline-block">
                     <QrCode className="w-16 h-16 text-slate-600 mx-auto opacity-50" />
                     <Loader2 className="w-8 h-8 text-emerald-400 animate-spin absolute inset-0 m-auto" />
                   </div>
                   <p className="text-slate-300 text-sm font-medium">Generando código QR automáticamente...</p>
-                  <p className="text-xs text-slate-500 max-w-sm">Inicializando la sesión de WhatsApp para la empresa. No necesitas presionar ningún botón.</p>
-                  
+
+                  {errorMessage && (
+                    <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-start gap-2 text-left">
+                      <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-semibold">Error al generar QR</p>
+                        <p className="text-[11px] text-red-300/80 mt-0.5">{errorMessage}</p>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-center gap-3 pt-2">
                     <button
                       onClick={() => handleRequestQr()}
                       className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition-all flex items-center gap-2"
                     >
-                      <RefreshCw className="w-3.5 h-3.5" /> Reintentar
+                      <RefreshCw className="w-3.5 h-3.5" /> Reintentar Petición
                     </button>
                     <button
                       onClick={() => setShowConfig(true)}
                       className="px-4 py-2 rounded-xl bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 text-xs font-semibold transition-all flex items-center gap-2 border border-emerald-500/20"
                     >
-                      <Settings2 className="w-3.5 h-3.5" /> Editar URL Bot Engine
+                      <Settings2 className="w-3.5 h-3.5" /> Cambiar Servidor
                     </button>
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Panel de Logs en Tiempo Real */}
+            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 font-mono text-xs space-y-2">
+              <div className="flex items-center justify-between text-slate-400 pb-2 border-b border-slate-900">
+                <div className="flex items-center gap-2">
+                  <Terminal className="w-4 h-4 text-emerald-400" />
+                  <span className="font-semibold text-slate-300">Registro de Diagnóstico (Logs en Tiempo Real)</span>
+                </div>
+                <button
+                  onClick={() => setLogs([])}
+                  className="text-[10px] text-slate-500 hover:text-slate-300 transition-colors"
+                >
+                  Limpiar Logs
+                </button>
+              </div>
+              <div className="h-32 overflow-y-auto space-y-1 scrollbar-thin scrollbar-thumb-slate-800 pr-2">
+                {logs.length === 0 ? (
+                  <p className="text-slate-600 italic">Esperando eventos de conexión...</p>
+                ) : (
+                  logs.map((log, index) => (
+                    <div
+                      key={index}
+                      className={`text-[11px] ${
+                        log.includes('❌') || log.includes('Error') || log.includes('Fallo')
+                          ? 'text-red-400'
+                          : log.includes('✅') || log.includes('🎉') || log.includes('📡')
+                          ? 'text-emerald-400'
+                          : 'text-slate-400'
+                      }`}
+                    >
+                      {log}
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
         )}
