@@ -15,9 +15,12 @@ console.log(`📂 [BotManager] Directorio de sesiones: ${SESSIONS_DIR}`);
 const manager = new BotManager({
   sessionsDir: SESSIONS_DIR,
   defaultProviderClass: BaileysProvider as any,
+  defaultProviderOptions: {
+    writeLog: true,
+  },
 });
 
-// Interceptar eventos de Baileys cuando se crea un bot
+// Interceptar la creación de cada bot para asegurar inicio explícito e instrumentación de eventos
 const originalCreateBot = manager.createBot.bind(manager);
 manager.createBot = async (tenantConfig: any) => {
   console.log(`🚀 [BotEngine] Creando e inicializando proveedor de WhatsApp para Tenant: ${tenantConfig.tenantId}...`);
@@ -25,21 +28,31 @@ manager.createBot = async (tenantConfig: any) => {
 
   const provider = botInstance.provider;
   if (provider) {
-    // Escuchar el evento 'require_action' nativo de BaileysProvider que contiene el QR code
+    // Escuchar el evento 'require_action' nativo de BaileysProvider que entrega el payload del QR
     provider.on('require_action', async (actionData: any) => {
       const qrStr = actionData?.payload?.qr;
-      console.log(`⚡ [Baileys Native Event] 'require_action' recibido para Tenant ${tenantConfig.tenantId}. QR String presente: ${!!qrStr}`);
-      
+      console.log(`⚡ [Baileys Native Event] 'require_action' recibido para Tenant ${tenantConfig.tenantId}. String QR: ${!!qrStr}`);
       if (qrStr) {
         (manager as any).emit('bot:qr', tenantConfig.tenantId, { qr: qrStr });
       }
     });
 
-    // Escuchar directamente 'qr' si lo emite el provider
     provider.on('qr', (qrStr: string) => {
       console.log(`⚡ [Baileys Native Event] 'qr' directo recibido para Tenant ${tenantConfig.tenantId}`);
-      (manager as any).emit('bot:qr', tenantConfig.tenantId, { qr: qrStr });
+      if (qrStr) {
+        (manager as any).emit('bot:qr', tenantConfig.tenantId, { qr: qrStr });
+      }
     });
+
+    // Forzar inicio del proveedor vendor de Baileys si no se inició de forma automática
+    if (typeof provider.initVendor === 'function') {
+      try {
+        console.log(`🔄 [BotEngine] Invocando initVendor() explícitamente para Tenant: ${tenantConfig.tenantId}...`);
+        await provider.initVendor();
+      } catch (err) {
+        console.warn(`⚠️ [BotEngine] Advertencia durante initVendor() para Tenant ${tenantConfig.tenantId}:`, err);
+      }
+    }
   }
 
   return botInstance;
