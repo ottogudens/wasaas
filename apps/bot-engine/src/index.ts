@@ -115,22 +115,26 @@ const broadcast = (data: object) => {
   }
 };
 
-// 5. Registrar Flujo Base de Agente IA con integración NestJS AI
+// 5. Registrar Flujo Base de Agente IA con contexto dinámico desde BD
 const defaultAiFlow = addKeyword(EVENTS.WELCOME)
   .addAction(async (ctx: any, { flowDynamic }: { flowDynamic: any }) => {
     const userPrompt = ctx.body;
-    console.log(`🤖 [BotEngine] Mensaje recibido de ${ctx.from}: "${userPrompt}"`);
+    const customerPhone = ctx.from;
+    // Extraer el tenantId del contexto del bot (inyectado por BotManager)
+    const tenantId = ctx._tenantId || (ctx as any).tenantId || 'unknown';
+    console.log(`🤖 [BotEngine] Mensaje de ${customerPhone} (Tenant: ${tenantId}): "${userPrompt}"`);
     
-    let botReply = '🤖 *Asistente IA*: Hola, recibí tu mensaje. En este momento estoy procesando tu solicitud.';
+    let botReply = 'Lo siento, en este momento no puedo procesar tu solicitud. Intenta más tarde.';
 
     try {
-      // Consultar al microservicio NestJS de IA y RAG
-      const response = await fetch(`${API_URL}/ai/chat`, {
+      // Endpoint con contexto: carga prompt de BD, busca RAG, persiste historial
+      const response = await fetch(`${API_URL}/ai/chat-with-context`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          tenantId,
+          customerPhone,
           message: userPrompt,
-          systemPrompt: 'Eres un asistente de ventas y atención al cliente muy cordial.',
         }),
       });
 
@@ -139,9 +143,11 @@ const defaultAiFlow = addKeyword(EVENTS.WELCOME)
         if (data.reply) {
           botReply = data.reply;
         }
+      } else {
+        console.warn(`⚠️ [BotEngine] Respuesta HTTP ${response.status} desde /ai/chat-with-context`);
       }
     } catch (err) {
-      console.warn('⚠️ Error al consultar el módulo NestJS AI API, usando respuesta por defecto:', err);
+      console.warn('⚠️ Error al consultar el módulo NestJS AI API:', err);
     }
 
     await flowDynamic([{ body: botReply }]);

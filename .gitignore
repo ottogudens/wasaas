@@ -2,6 +2,12 @@ node_modules/
 dist/
 .env
 .env.local
+.env.production
 sessions/
+bot_sessions/
 *.log
+core.class.log
+queue.class.log
+baileys.log
 .DS_Store
+.next/

@@ -1,22 +1,39 @@
-import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, UseGuards, Req } from '@nestjs/common';
 import { MercadoPagoService } from './mercadopago.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { IsString, IsNumber, IsEmail, IsOptional, Min } from 'class-validator';
+
+class CreateSubscriptionDto {
+  @IsOptional()
+  @IsEmail()
+  userEmail?: string;
+
+  @IsString()
+  planName: string;
+
+  @IsNumber()
+  @Min(1)
+  amount: number;
+}
 
 @Controller('mercadopago')
 export class MercadoPagoController {
   constructor(private readonly mercadoPagoService: MercadoPagoService) {}
 
   @Post('create-subscription')
-  async createSubscription(
-    @Body() body: { organizationId: string; userEmail: string; planName: string; amount: number },
-  ) {
+  @UseGuards(JwtAuthGuard)
+  async createSubscription(@Req() req: any, @Body() body: CreateSubscriptionDto) {
     return this.mercadoPagoService.createSubscriptionLink(
-      body.organizationId || 'tenant-demo-01',
-      body.userEmail || 'cliente@ejemplo.com',
-      body.planName || 'Starter',
-      body.amount || 29,
+      req.user.organizationId,
+      body.userEmail || req.user.email,
+      body.planName,
+      body.amount,
     );
   }
 
+  /**
+   * Webhook de MercadoPago — público, sin JWT (MercadoPago no envía tokens)
+   */
   @Post('webhook')
   @HttpCode(HttpStatus.OK)
   async handleWebhook(@Body() body: any) {

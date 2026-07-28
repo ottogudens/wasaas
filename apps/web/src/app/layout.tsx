@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { AuthProvider } from '../lib/auth-context';
 
 export const metadata: Metadata = {
   title: 'WASaaS - Plataforma de Agentes IA de WhatsApp',
@@ -14,7 +15,9 @@ export default function RootLayout({
   return (
     <html lang="es" className="dark">
       <body className="bg-[#090d16] text-slate-100 antialiased selection:bg-emerald-500 selection:text-black">
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

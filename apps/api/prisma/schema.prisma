@@ -35,6 +35,12 @@ enum BotStatus {
   ERROR
 }
 
+enum SenderType {
+  USER
+  BOT
+  AGENT
+}
+
 model Organization {
   id                String         @id @default(uuid())
   name              String
@@ -100,13 +106,15 @@ model Conversation {
   messages      Message[]
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
+
+  @@index([botId, customerPhone])
 }
 
 model Message {
   id             String       @id @default(uuid())
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender         String       // "user" | "bot" | "agent"
+  sender         SenderType
   content        String       @db.Text
   createdAt      DateTime     @default(now())
 }
@@ -129,4 +137,6 @@ model DocumentVectorChunk {
   content    String            @db.Text
   embedding  Unsupported("vector(1536)")?
   createdAt  DateTime          @default(now())
+
+  @@index([documentId])
 }

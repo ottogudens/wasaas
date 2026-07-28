@@ -1,0 +1,122 @@
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+class ApiClient {
+  private getToken(): string | null {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem('wasaas_token');
+  }
+
+  private async request<T>(
+    path: string,
+    options: RequestInit = {},
+  ): Promise<T> {
+    const token = this.getToken();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...(options.headers as Record<string, string> || {}),
+    };
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const res = await fetch(`${API_URL}${path}`, {
+      ...options,
+      headers,
+    });
+
+    if (res.status === 401) {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('wasaas_token');
+        localStorage.removeItem('wasaas_user');
+        localStorage.removeItem('wasaas_org');
+        window.location.href = '/login';
+      }
+      throw new Error('Sesión expirada. Por favor inicia sesión nuevamente.');
+    }
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.message || `Error HTTP ${res.status}`);
+    }
+
+    return data;
+  }
+
+  // ── Auth ──────────────────────────────────────────
+  async register(body: { organizationName: string; email: string; password: string; userName?: string }) {
+    return this.request<{
+      accessToken: string;
+      user: { id: string; email: string; name: string | null; role: string };
+      organization: { id: string; name: string; slug: string };
+    }>('/auth/register', { method: 'POST', body: JSON.stringify(body) });
+  }
+
+  async login(body: { email: string; password: string }) {
+    return this.request<{
+      accessToken: string;
+      user: { id: string; email: string; name: string | null; role: string };
+      organization: { id: string; name: string; slug: string };
+    }>('/auth/login', { method: 'POST', body: JSON.stringify(body) });
+  }
+
+  // ── Bots ──────────────────────────────────────────
+  async listBots() {
+    return this.request<any[]>('/bots');
+  }
+
+  async createBot(body: { name: string; systemPrompt?: string; aiModel?: string }) {
+    return this.request<any>('/bots', { method: 'POST', body: JSON.stringify(body) });
+  }
+
+  async getBot(id: string) {
+    return this.request<any>(`/bots/${id}`);
+  }
+
+  async updateBot(id: string, body: { name?: string; systemPrompt?: string; aiModel?: string }) {
+    return this.request<any>(`/bots/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+  }
+
+  async listConversations(botId: string) {
+    return this.request<any[]>(`/bots/${botId}/conversations`);
+  }
+
+  async getMessages(conversationId: string) {
+    return this.request<any[]>(`/bots/conversations/${conversationId}/messages`);
+  }
+
+  // ── RAG ───────────────────────────────────────────
+  async processDocument(body: { title: string; content: string }) {
+    return this.request<{ documentId: string; totalChunksProcessed: number }>(
+      '/rag/process-text',
+      { method: 'POST', body: JSON.stringify(body) },
+    );
+  }
+
+  async searchKnowledge(query: string, topK?: number) {
+    return this.request<{ results: any[] }>(
+      '/rag/search',
+      { method: 'POST', body: JSON.stringify({ query, topK }) },
+    );
+  }
+
+  async listDocuments() {
+    return this.request<{ documents: any[] }>('/rag/documents');
+  }
+
+  async deleteDocument(id: string) {
+    return this.request<any>(`/rag/documents/${id}`, { method: 'DELETE' });
+  }
+
+  // ── MercadoPago ───────────────────────────────────
+  async createSubscription(body: { planName: string; amount: number; userEmail?: string }) {
+    return this.request<{ initPoint: string; subscriptionId: string }>(
+      '/mercadopago/create-subscription',
+      { method: 'POST', body: JSON.stringify(body) },
+    );
+  }
+}
+
+export const api = new ApiClient();
+export { API_URL };
