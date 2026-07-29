@@ -31,8 +31,11 @@ async function bootstrap() {
   );
 
   const port = process.env.PORT || 3001;
+  console.log(`[BOOT] Intentando escuchar en el puerto ${port}...`);
   await app.listen(port, '0.0.0.0');
   console.log(`🚀 API Central ejecutándose en el puerto ${port}`);
   console.log(`🔒 Helmet habilitado | CORS: ${process.env.FRONTEND_URL || 'localhost:3000'}`);
 }
-bootstrap();
+bootstrap().catch((err) => {
+  console.error('❌ Error fatal al arrancar NestJS:', err);
+});
