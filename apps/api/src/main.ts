@@ -30,7 +30,7 @@ async function bootstrap() {
     }),
   );
 
-  const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3001;
+  const port = process.env.PORT || 3001;
   console.log(`[BOOT] Intentando escuchar en el puerto ${port}...`);
   await app.listen(port, '0.0.0.0');
   console.log(`🚀 API Central ejecutándose en el puerto ${port}`);
