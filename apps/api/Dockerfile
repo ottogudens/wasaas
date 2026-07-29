@@ -12,8 +12,8 @@ COPY . .
 
 RUN npx prisma generate
 
-RUN npm run build
+RUN npx tsc -p tsconfig.json
 
 EXPOSE 3001
 
-CMD ["sh", "-c", "node dist/main.js"]
+CMD ["npm", "run", "start"]

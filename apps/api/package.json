@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "tsc --watch",
-    "build": "tsc",
+    "build": "npx tsc -p tsconfig.json",
     "start": "node dist/main.js"
   },
   "dependencies": {
