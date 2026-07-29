@@ -5,10 +5,11 @@ RUN apk add --no-cache openssl
 
 WORKDIR /app
 
-COPY package.json .npmrc ./
+# Copiar solo los archivos de la API
+COPY apps/api/package.json apps/api/.npmrc* ./
 RUN npm install --legacy-peer-deps
 
-COPY . .
+COPY apps/api/ .
 
 RUN npx prisma generate
 
