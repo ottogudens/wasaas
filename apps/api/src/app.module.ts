@@ -43,13 +43,13 @@ import { McpService } from './mcp/mcp.service';
     AiController,
     RagController,
     MercadoPagoController,
-    McpController,
+    // McpController,
   ],
   providers: [
     AiService,
     RagService,
     MercadoPagoService,
-    McpService,
+    // McpService,
     // Aplicar rate limiting globalmente
     {
       provide: APP_GUARD,
