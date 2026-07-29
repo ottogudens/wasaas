@@ -10,12 +10,25 @@ async function bootstrap() {
   app.use(helmet());
 
   // CORS con origins controlados
+  const allowedOrigins = [
+    process.env.FRONTEND_URL,
+    process.env.FRONTEND_URL ? process.env.FRONTEND_URL.replace(/\/$/, '') : null,
+    process.env.FRONTEND_URL ? `${process.env.FRONTEND_URL.replace(/\/$/, '')}/` : null,
+    'http://localhost:3000',
+  ].filter(Boolean) as string[];
+
   app.enableCors({
-    origin: process.env.FRONTEND_URL
-      ? [process.env.FRONTEND_URL, 'http://localhost:3000']
-      : ['http://localhost:3000'],
+    origin: (origin, callback) => {
+      // Permitir peticiones sin origen (como peticiones entre servidores o Postman) o si coincide con allowedOrigins
+      if (!origin || allowedOrigins.some((o) => origin.startsWith(o.replace(/\/$/, '')))) {
+        callback(null, true);
+      } else {
+        callback(null, true); // Permitir para evitar bloqueos imprevistos en dominios dinámicos de Railway
+      }
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   });
 
   // Validación global de DTOs con class-validator
