@@ -5,14 +5,22 @@ RUN apk add --no-cache openssl
 
 WORKDIR /app
 
-# Copiar solo los archivos de la API
-COPY apps/api/package.json apps/api/.npmrc* ./
+# Copiar package.json raíz y de los workspaces necesarios
+COPY package*.json ./
+COPY apps/api/package.json ./apps/api/
+COPY packages/database/package.json ./packages/database/
+
+# Instalar dependencias a nivel raíz (reconoce workspaces)
 RUN npm install --legacy-peer-deps
 
-COPY apps/api/ .
+# Copiar código fuente
+COPY apps/api/ ./apps/api/
+COPY packages/database/ ./packages/database/
 
+WORKDIR /app/apps/api
+
+# Generar Prisma Client y compilar NestJS
 RUN npx prisma generate
-
 RUN npx tsc -p tsconfig.json
 
 EXPOSE 3001
