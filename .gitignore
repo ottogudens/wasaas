@@ -11,3 +11,4 @@ queue.class.log
 baileys.log
 .DS_Store
 .next/
+*.tsbuildinfo
