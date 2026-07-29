@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+import { Server } from '@modelcontextprotocol/sdk/server/index';
+import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse';
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
