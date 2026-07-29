@@ -8,6 +8,8 @@ WORKDIR /app
 # Copiar package.json raíz y de los workspaces necesarios
 COPY package*.json ./
 COPY apps/api/package.json ./apps/api/
+COPY apps/web/package.json ./apps/web/
+COPY apps/bot-engine/package.json ./apps/bot-engine/
 COPY packages/database/package.json ./packages/database/
 
 # Instalar dependencias a nivel raíz (reconoce workspaces)
