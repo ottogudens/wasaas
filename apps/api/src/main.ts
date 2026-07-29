@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
+  console.log('[BOOTSTART] Iniciando ejecucion de bootstrap NestJS...');
   const app = await NestFactory.create(AppModule);
 
   // Security headers (configurar helmet para no bloquear CORS/preflight)
