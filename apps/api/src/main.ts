@@ -6,29 +6,19 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Security headers
-  app.use(helmet());
+  // Security headers (configurar helmet para no bloquear CORS/preflight)
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }),
+  );
 
-  // CORS con origins controlados
-  const allowedOrigins = [
-    process.env.FRONTEND_URL,
-    process.env.FRONTEND_URL ? process.env.FRONTEND_URL.replace(/\/$/, '') : null,
-    process.env.FRONTEND_URL ? `${process.env.FRONTEND_URL.replace(/\/$/, '')}/` : null,
-    'http://localhost:3000',
-  ].filter(Boolean) as string[];
-
+  // CORS totalmente abierto para peticiones del frontend y preflights OPTIONS
   app.enableCors({
-    origin: (origin, callback) => {
-      // Permitir peticiones sin origen (como peticiones entre servidores o Postman) o si coincide con allowedOrigins
-      if (!origin || allowedOrigins.some((o) => origin.startsWith(o.replace(/\/$/, '')))) {
-        callback(null, true);
-      } else {
-        callback(null, true); // Permitir para evitar bloqueos imprevistos en dominios dinámicos de Railway
-      }
-    },
+    origin: true,
     credentials: true,
-    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    allowedHeaders: 'Content-Type,Accept,Authorization,X-Requested-With',
   });
 
   // Validación global de DTOs con class-validator
