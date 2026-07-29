@@ -16,4 +16,4 @@ RUN npx tsc -p tsconfig.json
 
 EXPOSE 3001
 
-CMD ["node", "dist/main.js"]
+CMD ["sh", "-c", "echo '[CONTAINER LOG] Starting NestJS...' && node dist/main.js"]
