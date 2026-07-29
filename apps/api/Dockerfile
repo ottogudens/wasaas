@@ -16,4 +16,4 @@ RUN npx tsc || npm run build
 
 EXPOSE 3001
 
-CMD ["sh", "-c", "npx prisma db push --skip-generate || true && node dist/main.js"]
+CMD ["node", "dist/main.js"]
