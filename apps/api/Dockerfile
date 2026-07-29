@@ -16,4 +16,4 @@ RUN npx tsc -p tsconfig.json
 
 EXPOSE 3001
 
-CMD ["npm", "run", "start"]
+CMD ["node", "dist/main.js"]
