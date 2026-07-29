@@ -14,6 +14,6 @@ RUN npx prisma generate
 
 RUN npx tsc -p tsconfig.json
 
-EXPOSE 3000
+EXPOSE 3001
 
 CMD ["node", "dist/main.js"]
