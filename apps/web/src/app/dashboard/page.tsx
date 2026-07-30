@@ -215,24 +215,7 @@ export default function DashboardPage() {
     addLog(`📱 Solicitando código de vinculación para ${phoneNumber}...`);
 
     try {
-      // First make sure bot is created
-      await fetch(`${targetUrl}/api/bots`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          tenantId: selectedBot.tenantId,
-          name: selectedBot.name,
-          flowIds: ['default_ai_flow'],
-        }),
-      });
-
-      // Wait a moment for the bot to initialize
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Request pairing code
+      // Request pairing code directly
       const res = await fetch(`${targetUrl}/internal/pair-phone`, {
         method: 'POST',
         headers: {
@@ -247,8 +230,12 @@ export default function DashboardPage() {
 
       if (res.ok) {
         const data = await res.json();
-        setPairingCode(data.code);
-        addLog(`✅ Código de vinculación generado: ${data.code}`);
+        if (data.code) {
+          setPairingCode(data.code);
+          addLog(`✅ Código de vinculación recibido: ${data.code}`);
+        } else {
+          addLog(`⏳ Solicitud enviada. Esperando código por WebSocket...`);
+        }
       } else {
         const errorData = await res.json().catch(() => ({ error: 'Error desconocido' }));
         setErrorMessage(errorData.error || `Error HTTP ${res.status}`);
@@ -312,6 +299,11 @@ export default function DashboardPage() {
             setBotStatus('QR_READY');
             setErrorMessage(null);
             addLog(`⚡ Código QR recibido para ${selectedBot.name}`);
+          } else if (data.event === 'bot:code') {
+            setPairingCode(data.code);
+            setRequestingPairing(false);
+            setErrorMessage(null);
+            addLog(`📱 Código de vinculación recibido: ${data.code}`);
           } else if (data.event === 'bot:connected') {
             setBotStatus('CONNECTED');
             setQrCodeData(null);

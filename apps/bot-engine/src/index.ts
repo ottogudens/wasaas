@@ -96,12 +96,16 @@ manager.createBot = async (tenantConfig: any) => {
 
   const provider = botInstance.provider;
   if (provider) {
-    // Escuchar el evento 'require_action' nativo de BaileysProvider que entrega el payload del QR
+    // Escuchar el evento 'require_action' nativo de BaileysProvider que entrega el payload del QR o Pairing Code
     provider.on('require_action', async (actionData: any) => {
       const qrStr = actionData?.payload?.qr;
-      console.log(`⚡ [Baileys Native Event] 'require_action' recibido para Tenant ${tenantConfig.tenantId}. String QR: ${!!qrStr}`);
+      const codeStr = actionData?.payload?.code;
+      console.log(`⚡ [Baileys Native Event] 'require_action' recibido para Tenant ${tenantConfig.tenantId}. String QR: ${!!qrStr}, Code: ${codeStr || 'N/A'}`);
       if (qrStr) {
         (manager as any).emit('bot:qr', tenantConfig.tenantId, { qr: qrStr });
+      }
+      if (codeStr) {
+        (manager as any).emit('bot:code', tenantConfig.tenantId, { code: codeStr });
       }
     });
 
@@ -223,6 +227,15 @@ manager.on('bot:qr', async (tenantId: string, data: any) => {
     qr: qrImageBase64,
   });
   console.log(`📡 [BotManager WebSocket] Evento 'bot:qr' emitido a ${connectedClients.size} clientes WebSocket activos.`);
+});
+
+(manager as any).on('bot:code', (tenantId: string, data: any) => {
+  console.log(`📱 [BotManager Event] Evento 'bot:code' disparado para Tenant: ${tenantId}, Code: ${data?.code}`);
+  broadcast({
+    event: 'bot:code',
+    tenantId,
+    code: data?.code,
+  });
 });
 
 manager.on('bot:connected', (tenantId: string) => {
