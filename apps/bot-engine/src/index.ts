@@ -126,6 +126,10 @@ manager.createBot = async (tenantConfig: any) => {
       (manager as any).emit('bot:connected', tenantConfig.tenantId);
     });
 
+    provider.on('message', (payload: any) => {
+      console.log(`📩 [Baileys Raw Message] Tenant: ${tenantConfig.tenantId}, From: ${payload?.from || payload?.key?.remoteJid}, Body: ${payload?.body || payload?.message?.conversation}`);
+    });
+
     // Forzar inicio del proveedor vendor de Baileys
     if (typeof provider.initVendor === 'function') {
       try {
