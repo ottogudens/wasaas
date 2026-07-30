@@ -77,6 +77,7 @@ export default function DashboardPage() {
         setSelectedBot(data[0]);
         setSystemPrompt(data[0].systemPrompt || '');
         setAiModel(data[0].aiModel || 'gpt-4o-mini');
+        setBotStatus(data[0].status || 'DISCONNECTED');
       }
     } catch (err: any) {
       addLog(`❌ Error al cargar bots: ${err.message}`);
@@ -173,6 +174,31 @@ export default function DashboardPage() {
       addLog(`❌ Excepción de red: ${error.message}`);
     }
   }, [selectedBot, botEngineUrl, addLog]);
+
+  const handleDisconnectBot = async () => {
+    if (!selectedBot) return;
+    try {
+      const targetUrl = botEngineUrl || 'https://whatsapp-service-production-e6f2.up.railway.app';
+      const apiKey = process.env.NEXT_PUBLIC_INTERNAL_API_KEY || 'skale-saas-secret-key';
+      
+      const res = await fetch(`${targetUrl}/api/bots/${selectedBot.tenantId}/stop`, {
+        method: 'POST',
+        headers: {
+          'x-api-key': apiKey,
+        },
+      });
+      
+      if (!res.ok) {
+        throw new Error('Fallo al detener bot en el engine');
+      }
+      
+      setBotStatus('DISCONNECTED');
+      addLog(`Agente desconectado exitosamente.`);
+      await loadBots();
+    } catch (err: any) {
+      addLog(`❌ Error al desconectar: ${err.message}`);
+    }
+  };
 
   // WebSocket listener for QR
   useEffect(() => {
@@ -507,6 +533,7 @@ export default function DashboardPage() {
                       setSelectedBot(b);
                       setSystemPrompt(b.systemPrompt || '');
                       setAiModel(b.aiModel || 'gpt-4o-mini');
+                      setBotStatus(b.status || 'DISCONNECTED');
                     }}
                     className={`p-6 rounded-2xl border cursor-pointer transition-all ${
                       selectedBot?.id === b.id
@@ -640,6 +667,12 @@ export default function DashboardPage() {
                   <CheckCircle2 className="w-16 h-16 text-emerald-400 mx-auto animate-bounce" />
                   <h3 className="text-xl font-bold text-slate-100">¡WhatsApp Conectado!</h3>
                   <p className="text-slate-400 text-sm">Tu agente de IA está activo y respondiendo mensajes en tiempo real.</p>
+                  <button
+                    onClick={() => handleDisconnectBot()}
+                    className="mt-6 px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 rounded-xl transition-all flex items-center gap-2 mx-auto text-sm font-medium"
+                  >
+                    <LogOut className="w-4 h-4" /> Desconectar Agente
+                  </button>
                 </div>
               ) : qrCodeData ? (
                 <div className="text-center space-y-4">
