@@ -152,7 +152,21 @@ const managerApi = new BotManagerApi(manager, {
 
 // Sobrescribir POST /api/bots para reiniciar suavemente si ya existía y evitar errores HTTP 409 Conflict
 if ((managerApi as any).app) {
-  (managerApi as any).app.post('/api/bots', async (req: any, res: any) => {
+  const app = (managerApi as any).app;
+
+  // Habilitar CORS global para permitir peticiones directas desde el Frontend (ej. generar QR o desconectar)
+  app.use((req: any, res: any, next: any) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key');
+    if (req.method === 'OPTIONS') {
+      res.statusCode = 200;
+      return res.end();
+    }
+    if (typeof next === 'function') next();
+  });
+
+  app.post('/api/bots', async (req: any, res: any) => {
     let body = '';
     req.on('data', (chunk: any) => body += chunk.toString());
     req.on('end', async () => {
