@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Bot, QrCode, Sparkles, CreditCard, Shield, CheckCircle2, FileText, Send, 
-  RefreshCw, Loader2, Settings2, AlertTriangle, Terminal, LogOut, Plus, Trash2, User, Building
+  RefreshCw, Loader2, Settings2, AlertTriangle, Terminal, LogOut, Plus, Trash2, User, Building, MessageSquare
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../../lib/auth-context';
@@ -14,7 +14,14 @@ export default function DashboardPage() {
   const { user, org, token, isLoading: authLoading, logout } = useAuth();
   const router = useRouter();
 
-  const [activeTab, setActiveTab] = useState<'qr' | 'prompt' | 'rag' | 'billing' | 'bots'>('qr');
+  const [activeTab, setActiveTab] = useState<'qr' | 'prompt' | 'rag' | 'billing' | 'bots' | 'chat'>('qr');
+  // Chat state
+  const [conversations, setConversations] = useState<any[]>([]);
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
   
   // Bot instances state
   const [bots, setBots] = useState<any[]>([]);
@@ -212,6 +219,60 @@ export default function DashboardPage() {
   }, [wsUrl, selectedBot, addLog]);
 
   // Actions
+  
+  // Chat methods
+  const loadConversations = useCallback(async () => {
+    if (!selectedBot || activeTab !== 'chat') return;
+    try {
+      const data = await api.listConversations(selectedBot.id);
+      setConversations(data);
+    } catch (err) {
+      console.error(err);
+    }
+  }, [selectedBot, activeTab]);
+
+  const loadMessages = useCallback(async () => {
+    if (!selectedConversationId) return;
+    try {
+      const data = await api.getMessages(selectedConversationId);
+      setMessages(data);
+    } catch (err) {
+      console.error(err);
+    }
+  }, [selectedConversationId]);
+
+  // Polling chat
+  useEffect(() => {
+    loadConversations();
+    const interval = setInterval(loadConversations, 5000);
+    return () => clearInterval(interval);
+  }, [loadConversations]);
+
+  useEffect(() => {
+    loadMessages();
+    const interval = setInterval(loadMessages, 5000);
+    return () => clearInterval(interval);
+  }, [loadMessages]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim() || !selectedConversationId) return;
+    const msg = chatInput.trim();
+    setChatInput('');
+    try {
+      // Optimistic update
+      setMessages(prev => [...prev, { content: msg, sender: 'AGENT', createdAt: new Date().toISOString() }]);
+      await api.sendManualMessage(selectedConversationId, msg);
+      await loadMessages();
+    } catch (err: any) {
+      addLog(`❌ Error enviando mensaje: ${err.message}`);
+    }
+  };
+
   const handleCreateBot = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newBotName.trim()) return;
@@ -342,7 +403,18 @@ export default function DashboardPage() {
             >
               <QrCode className="w-4 h-4" /> Vincular WhatsApp
             </button>
+            
             <button
+              onClick={() => setActiveTab('chat')}
+              className={`w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 transition-all duration-300 ${
+                activeTab === 'chat'
+                  ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-400 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.15)]'
+                  : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+              }`}
+            >
+              <MessageSquare className="w-4 h-4" /> Chat en Vivo
+            </button>
+<button
               onClick={() => setActiveTab('prompt')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
                 activeTab === 'prompt'
@@ -456,6 +528,99 @@ export default function DashboardPage() {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        
+        {/* Chat Tab */}
+        {activeTab === 'chat' && (
+          <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl transition-all duration-500 min-h-[600px] flex gap-6">
+            
+            {/* Lista de Conversaciones */}
+            <div className="w-1/3 flex flex-col gap-4 border-r border-slate-800 pr-6">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <MessageSquare className="w-6 h-6 text-emerald-400" /> Conversaciones
+              </h2>
+              <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                {conversations.length === 0 ? (
+                  <p className="text-sm text-slate-500 text-center py-8">No hay conversaciones</p>
+                ) : (
+                  conversations.map(conv => (
+                    <div 
+                      key={conv.id} 
+                      onClick={() => setSelectedConversationId(conv.id)}
+                      className={`p-4 rounded-xl cursor-pointer border transition-all ${
+                        selectedConversationId === conv.id 
+                        ? 'bg-slate-800 border-emerald-500/50 shadow-md' 
+                        : 'bg-slate-800/30 border-transparent hover:bg-slate-800/80'
+                      }`}
+                    >
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="font-semibold text-slate-200">{conv.customerPhone}</span>
+                        {conv.isHumanMode && <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full">Handoff</span>}
+                      </div>
+                      <p className="text-xs text-slate-400 truncate">
+                        {conv.messages?.[0]?.content || 'Sin mensajes'}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Chat Box */}
+            <div className="w-2/3 flex flex-col bg-slate-950/50 rounded-2xl border border-slate-800 relative overflow-hidden">
+              {!selectedConversationId ? (
+                <div className="flex-1 flex items-center justify-center text-slate-500 flex-col gap-3">
+                  <MessageSquare className="w-12 h-12 opacity-20" />
+                  <p>Selecciona una conversación</p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+                    {messages.map(msg => {
+                      const isUser = msg.sender === 'USER';
+                      const isAgent = msg.sender === 'AGENT';
+                      return (
+                        <div key={msg.id || Math.random()} className={`flex ${isUser ? 'justify-start' : 'justify-end'}`}>
+                          <div className={`max-w-[70%] rounded-2xl px-5 py-3 text-sm shadow-sm ${
+                            isUser ? 'bg-slate-800 text-slate-200 rounded-tl-sm' 
+                            : isAgent ? 'bg-blue-600 text-white rounded-tr-sm'
+                            : 'bg-emerald-600 text-white rounded-tr-sm'
+                          }`}>
+                            <p className="whitespace-pre-wrap">{msg.content}</p>
+                            <span className="text-[10px] opacity-50 mt-1 block text-right">
+                              {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              {isAgent ? ' • Agente' : !isUser ? ' • IA' : ''}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div ref={messagesEndRef} />
+                  </div>
+                  <div className="p-4 border-t border-slate-800 bg-slate-900/80">
+                    <form onSubmit={handleSendMessage} className="flex gap-3">
+                      <input 
+                        type="text"
+                        value={chatInput}
+                        onChange={e => setChatInput(e.target.value)}
+                        placeholder="Escribe un mensaje como agente (pausará la IA)..."
+                        className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-emerald-500/50"
+                      />
+                      <button 
+                        type="submit"
+                        disabled={!chatInput.trim()}
+                        className="bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed text-white px-5 py-3 rounded-xl flex items-center justify-center transition-colors shadow-lg"
+                      >
+                        <Send className="w-4 h-4" />
+                      </button>
+                    </form>
+                  </div>
+                </>
+              )}
+            </div>
+
           </div>
         )}
 

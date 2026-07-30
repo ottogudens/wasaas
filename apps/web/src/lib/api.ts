@@ -86,6 +86,13 @@ class ApiClient {
     return this.request<any[]>(`/bots/conversations/${conversationId}/messages`);
   }
 
+  async sendManualMessage(conversationId: string, content: string) {
+    return this.request<any>(`/bots/conversations/${conversationId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    });
+  }
+
   // ── RAG ───────────────────────────────────────────
   async processDocument(body: { title: string; content: string }) {
     return this.request<{ documentId: string; totalChunksProcessed: number }>(
