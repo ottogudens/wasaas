@@ -896,7 +896,7 @@ export default function DashboardPage() {
               ) : (
                 <>
                   {/* Mode toggle */}
-                  {selectedBot && botStatus !== 'CONNECTED' && (
+                  {selectedBot && (
                     <div className="flex items-center gap-2 mb-6">
                       <button
                         onClick={() => setPairingMode('qr')}
