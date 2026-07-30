@@ -10,7 +10,7 @@ import QRCode from 'qrcode';
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : (process.env.BOT_ENGINE_PORT ? parseInt(process.env.BOT_ENGINE_PORT) : 3005);
 const SESSIONS_DIR = process.env.SESSIONS_DIR || './sessions';
 const API_KEY = process.env.INTERNAL_API_KEY || 'skale-saas-secret-key';
-const API_URL = process.env.API_URL || 'http://localhost:3001';
+const API_URL = process.env.API_URL || 'https://wasaas-production.up.railway.app';
 
 // Obtenemos dinámicamente la última versión soportada por las APIs de WhatsApp Web
 const { version } = await fetchLatestBaileysVersion();
@@ -107,6 +107,16 @@ manager.createBot = async (tenantConfig: any) => {
       if (qrStr) {
         (manager as any).emit('bot:qr', tenantConfig.tenantId, { qr: qrStr });
       }
+    });
+
+    provider.on('ready', (data: any) => {
+      console.log(`🎉 [Baileys Native Event] 'ready' recibido para Tenant ${tenantConfig.tenantId}:`, data);
+      (manager as any).emit('bot:connected', tenantConfig.tenantId);
+    });
+
+    provider.on('host', (data: any) => {
+      console.log(`🎉 [Baileys Native Event] 'host' recibido para Tenant ${tenantConfig.tenantId}:`, data);
+      (manager as any).emit('bot:connected', tenantConfig.tenantId);
     });
 
     // Forzar inicio del proveedor vendor de Baileys
