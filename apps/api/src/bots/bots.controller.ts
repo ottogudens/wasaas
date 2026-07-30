@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Param, Body, UseGuards, Req, UnauthorizedException, Headers } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, Req, UnauthorizedException, Headers } from '@nestjs/common';
 import { BotsService } from './bots.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { IsString, IsOptional, MinLength, MaxLength } from 'class-validator';
@@ -87,6 +87,11 @@ export class BotsController {
   @Patch(':id')
   async updateBot(@Param('id') id: string, @Req() req: any, @Body() dto: UpdateBotDto) {
     return this.botsService.updateBot(id, req.user.organizationId, dto);
+  }
+
+  @Delete(':id')
+  async deleteBot(@Param('id') id: string, @Req() req: any) {
+    return this.botsService.deleteBot(id, req.user.organizationId);
   }
 
   @Get(':id/conversations')

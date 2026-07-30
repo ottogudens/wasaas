@@ -78,6 +78,10 @@ class ApiClient {
     return this.request<any>(`/bots/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
   }
 
+  async deleteBot(id: string) {
+    return this.request<any>(`/bots/${id}`, { method: 'DELETE' });
+  }
+
   async listConversations(botId: string) {
     return this.request<any[]>(`/bots/${botId}/conversations`);
   }

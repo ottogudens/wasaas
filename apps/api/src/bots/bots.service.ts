@@ -21,6 +21,7 @@ export class BotsService {
         phoneNumber: true,
         status: true,
         aiModel: true,
+        systemPrompt: true,
         createdAt: true,
         updatedAt: true,
         _count: { select: { conversations: true } },
@@ -96,6 +97,38 @@ export class BotsService {
 
     this.logger.log(`✏️ Bot actualizado: "${updated.name}" (${updated.id})`);
     return updated;
+  }
+
+  /**
+   * Eliminar un bot y detenerlo en el engine
+   */
+  async deleteBot(botId: string, organizationId: string) {
+    const bot = await this.getBot(botId, organizationId);
+
+    // Intentar detener el bot en el engine
+    try {
+      const botEngineUrl = process.env.BOT_ENGINE_URL || 'http://localhost:3005';
+      const apiKey = process.env.INTERNAL_API_KEY || 'skale-saas-secret-key';
+
+      await fetch(`${botEngineUrl}/internal/disconnect`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+        },
+        body: JSON.stringify({ tenantId: bot.tenantId }),
+      });
+    } catch (err) {
+      this.logger.warn(`⚠️ No se pudo detener el bot en el engine: ${err}`);
+    }
+
+    // Eliminar de la BD (cascade eliminará conversaciones y mensajes)
+    await this.prisma.botInstance.delete({
+      where: { id: bot.id },
+    });
+
+    this.logger.log(`🗑️ Bot eliminado: "${bot.name}" (${bot.tenantId})`);
+    return { success: true, deletedId: bot.id };
   }
 
   /**
@@ -255,4 +288,3 @@ export class BotsService {
     return message;
   }
 }
-

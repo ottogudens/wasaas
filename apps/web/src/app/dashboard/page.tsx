@@ -3,8 +3,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
-  Bot, QrCode, Sparkles, CreditCard, Shield, CheckCircle2, FileText, Send, 
-  RefreshCw, Loader2, Settings2, AlertTriangle, Terminal, LogOut, Plus, Trash2, User, Building, MessageSquare
+  Bot, QrCode, Sparkles, CreditCard, Shield, CheckCircle2, FileText, Send, Phone,
+  RefreshCw, Loader2, Settings2, AlertTriangle, Terminal, LogOut, Plus, Trash2, User, Building, MessageSquare, Pencil, X, Wifi, WifiOff
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../../lib/auth-context';
@@ -14,7 +14,7 @@ export default function DashboardPage() {
   const { user, org, token, isLoading: authLoading, logout } = useAuth();
   const router = useRouter();
 
-  const [activeTab, setActiveTab] = useState<'qr' | 'prompt' | 'rag' | 'billing' | 'bots' | 'chat'>('qr');
+  const [activeTab, setActiveTab] = useState<'qr' | 'prompt' | 'rag' | 'billing' | 'bots' | 'chat'>('bots');
   // Chat state
   const [conversations, setConversations] = useState<any[]>([]);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
@@ -22,7 +22,6 @@ export default function DashboardPage() {
   const [chatInput, setChatInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  
   // Bot instances state
   const [bots, setBots] = useState<any[]>([]);
   const [selectedBot, setSelectedBot] = useState<any | null>(null);
@@ -30,11 +29,22 @@ export default function DashboardPage() {
   const [loadingBots, setLoadingBots] = useState(false);
   const [creatingBot, setCreatingBot] = useState(false);
 
+  // Edit bot state
+  const [editingBotId, setEditingBotId] = useState<string | null>(null);
+  const [editBotName, setEditBotName] = useState('');
+  const [deletingBotId, setDeletingBotId] = useState<string | null>(null);
+
   // QR & Bot connection state
   const [qrCodeData, setQrCodeData] = useState<string | null>(null);
-  const [botStatus, setBotStatus] = useState<'DISCONNECTED' | 'GENERATING' | 'CONNECTED'>('DISCONNECTED');
+  const [botStatus, setBotStatus] = useState<'DISCONNECTED' | 'GENERATING' | 'CONNECTED' | 'QR_READY' | 'CONNECTING' | 'ERROR'>('DISCONNECTED');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
+
+  // Phone pairing state
+  const [pairingMode, setPairingMode] = useState<'qr' | 'phone'>('qr');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [pairingCode, setPairingCode] = useState<string | null>(null);
+  const [requestingPairing, setRequestingPairing] = useState(false);
 
   // Prompt state
   const [systemPrompt, setSystemPrompt] = useState<string>('');
@@ -52,7 +62,6 @@ export default function DashboardPage() {
   // Endpoint config
   const [botEngineUrl, setBotEngineUrl] = useState<string>('');
   const [wsUrl, setWsUrl] = useState<string>('');
-  const [showConfig, setShowConfig] = useState<boolean>(false);
 
   const addLog = useCallback((msg: string) => {
     const timestamp = new Date().toLocaleTimeString();
@@ -74,10 +83,18 @@ export default function DashboardPage() {
       const data = await api.listBots();
       setBots(data);
       if (data.length > 0 && !selectedBot) {
-        setSelectedBot(data[0]);
-        setSystemPrompt(data[0].systemPrompt || '');
-        setAiModel(data[0].aiModel || 'gpt-4o-mini');
-        setBotStatus(data[0].status || 'DISCONNECTED');
+        const first = data[0];
+        setSelectedBot(first);
+        setSystemPrompt(first.systemPrompt || '');
+        setAiModel(first.aiModel || 'gpt-4o-mini');
+        setBotStatus(first.status || 'DISCONNECTED');
+      }
+      // Also update the selected bot's status if it still exists
+      if (selectedBot) {
+        const updated = data.find((b: any) => b.id === selectedBot.id);
+        if (updated) {
+          setBotStatus(updated.status || 'DISCONNECTED');
+        }
       }
     } catch (err: any) {
       addLog(`❌ Error al cargar bots: ${err.message}`);
@@ -102,6 +119,14 @@ export default function DashboardPage() {
       loadDocuments();
     }
   }, [token, loadBots, loadDocuments]);
+
+  // Poll bot status every 10s
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (token) loadBots();
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [token, loadBots]);
 
   // Detect endpoints
   useEffect(() => {
@@ -143,6 +168,7 @@ export default function DashboardPage() {
     if (!selectedBot) return;
     setBotStatus('GENERATING');
     setErrorMessage(null);
+    setPairingCode(null);
     const targetUrl = overrideUrl || botEngineUrl || 'https://whatsapp-service-production-e6f2.up.railway.app';
     const apiKey = process.env.NEXT_PUBLIC_INTERNAL_API_KEY || 'skale-saas-secret-key';
 
@@ -166,34 +192,98 @@ export default function DashboardPage() {
         const errorText = await res.text();
         setErrorMessage(`Error HTTP ${res.status}: ${errorText}`);
         addLog(`❌ Error HTTP en bot-engine: ${res.status}`);
+        setBotStatus('DISCONNECTED');
       } else {
         addLog(`✅ Instancia solicitada. Esperando QR...`);
       }
     } catch (error: any) {
       setErrorMessage(`Error de red con Bot Engine: ${error.message}`);
       addLog(`❌ Excepción de red: ${error.message}`);
+      setBotStatus('DISCONNECTED');
     }
   }, [selectedBot, botEngineUrl, addLog]);
+
+  // Phone pairing
+  const handleRequestPairingCode = async () => {
+    if (!selectedBot || !phoneNumber.trim()) return;
+    setRequestingPairing(true);
+    setPairingCode(null);
+    setErrorMessage(null);
+    const targetUrl = botEngineUrl || 'https://whatsapp-service-production-e6f2.up.railway.app';
+    const apiKey = process.env.NEXT_PUBLIC_INTERNAL_API_KEY || 'skale-saas-secret-key';
+
+    addLog(`📱 Solicitando código de vinculación para ${phoneNumber}...`);
+
+    try {
+      // First make sure bot is created
+      await fetch(`${targetUrl}/api/bots`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          tenantId: selectedBot.tenantId,
+          name: selectedBot.name,
+          flowIds: ['default_ai_flow'],
+        }),
+      });
+
+      // Wait a moment for the bot to initialize
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Request pairing code
+      const res = await fetch(`${targetUrl}/internal/pair-phone`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+        },
+        body: JSON.stringify({
+          tenantId: selectedBot.tenantId,
+          phoneNumber: phoneNumber.trim(),
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setPairingCode(data.code);
+        addLog(`✅ Código de vinculación generado: ${data.code}`);
+      } else {
+        const errorData = await res.json().catch(() => ({ error: 'Error desconocido' }));
+        setErrorMessage(errorData.error || `Error HTTP ${res.status}`);
+        addLog(`❌ Error: ${errorData.error}`);
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message);
+      addLog(`❌ Error: ${err.message}`);
+    } finally {
+      setRequestingPairing(false);
+    }
+  };
 
   const handleDisconnectBot = async () => {
     if (!selectedBot) return;
     try {
       const targetUrl = botEngineUrl || 'https://whatsapp-service-production-e6f2.up.railway.app';
       const apiKey = process.env.NEXT_PUBLIC_INTERNAL_API_KEY || 'skale-saas-secret-key';
-      
-      const res = await fetch(`${targetUrl}/api/bots/${selectedBot.tenantId}/stop`, {
+
+      const res = await fetch(`${targetUrl}/internal/disconnect`, {
         method: 'POST',
         headers: {
+          'Content-Type': 'application/json',
           'x-api-key': apiKey,
         },
+        body: JSON.stringify({ tenantId: selectedBot.tenantId }),
       });
-      
+
       if (!res.ok) {
         throw new Error('Fallo al detener bot en el engine');
       }
-      
+
       setBotStatus('DISCONNECTED');
-      addLog(`Agente desconectado exitosamente.`);
+      setQrCodeData(null);
+      addLog(`✅ Agente desconectado exitosamente.`);
       await loadBots();
     } catch (err: any) {
       addLog(`❌ Error al desconectar: ${err.message}`);
@@ -219,17 +309,21 @@ export default function DashboardPage() {
 
           if (data.event === 'bot:qr') {
             setQrCodeData(data.qr);
-            setBotStatus('GENERATING');
+            setBotStatus('QR_READY');
             setErrorMessage(null);
             addLog(`⚡ Código QR recibido para ${selectedBot.name}`);
           } else if (data.event === 'bot:connected') {
             setBotStatus('CONNECTED');
             setQrCodeData(null);
+            setPairingCode(null);
             setErrorMessage(null);
             addLog(`🎉 Bot "${selectedBot.name}" conectado a WhatsApp.`);
+            loadBots(); // Refresh DB status
           } else if (data.event === 'bot:disconnected') {
             setBotStatus('DISCONNECTED');
+            setQrCodeData(null);
             addLog(`⚠️ Bot "${selectedBot.name}" desconectado.`);
+            loadBots();
           }
         } catch (e) {
           console.error(e);
@@ -244,8 +338,6 @@ export default function DashboardPage() {
     };
   }, [wsUrl, selectedBot, addLog]);
 
-  // Actions
-  
   // Chat methods
   const loadConversations = useCallback(async () => {
     if (!selectedBot || activeTab !== 'chat') return;
@@ -290,7 +382,6 @@ export default function DashboardPage() {
     const msg = chatInput.trim();
     setChatInput('');
     try {
-      // Optimistic update
       setMessages(prev => [...prev, { content: msg, sender: 'AGENT', createdAt: new Date().toISOString() }]);
       await api.sendManualMessage(selectedConversationId, msg);
       await loadMessages();
@@ -309,10 +400,39 @@ export default function DashboardPage() {
       addLog(`🤖 Bot "${created.name}" creado exitosamente.`);
       await loadBots();
       setSelectedBot(created);
+      setBotStatus('DISCONNECTED');
     } catch (err: any) {
       addLog(`❌ Error al crear bot: ${err.message}`);
     } finally {
       setCreatingBot(false);
+    }
+  };
+
+  const handleEditBot = async (botId: string) => {
+    if (!editBotName.trim()) return;
+    try {
+      await api.updateBot(botId, { name: editBotName });
+      setEditingBotId(null);
+      setEditBotName('');
+      addLog(`✏️ Bot renombrado exitosamente.`);
+      await loadBots();
+    } catch (err: any) {
+      addLog(`❌ Error al editar: ${err.message}`);
+    }
+  };
+
+  const handleDeleteBot = async (botId: string) => {
+    try {
+      await api.deleteBot(botId);
+      setDeletingBotId(null);
+      if (selectedBot?.id === botId) {
+        setSelectedBot(null);
+        setBotStatus('DISCONNECTED');
+      }
+      addLog(`🗑️ Bot eliminado exitosamente.`);
+      await loadBots();
+    } catch (err: any) {
+      addLog(`❌ Error al eliminar: ${err.message}`);
     }
   };
 
@@ -373,6 +493,22 @@ export default function DashboardPage() {
     }
   };
 
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'CONNECTED':
+        return { className: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30', label: '● Conectado', icon: <Wifi className="w-3 h-3" /> };
+      case 'QR_READY':
+        return { className: 'bg-amber-500/20 text-amber-400 border-amber-500/30', label: '◌ QR Listo', icon: <QrCode className="w-3 h-3" /> };
+      case 'CONNECTING':
+      case 'GENERATING':
+        return { className: 'bg-blue-500/20 text-blue-400 border-blue-500/30', label: '◎ Vinculando...', icon: <Loader2 className="w-3 h-3 animate-spin" /> };
+      case 'ERROR':
+        return { className: 'bg-red-500/20 text-red-400 border-red-500/30', label: '✕ Error', icon: <AlertTriangle className="w-3 h-3" /> };
+      default:
+        return { className: 'bg-slate-700/50 text-slate-400 border-slate-600/30', label: '○ Desconectado', icon: <WifiOff className="w-3 h-3" /> };
+    }
+  };
+
   if (authLoading || !user || !org) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-950">
@@ -429,10 +565,9 @@ export default function DashboardPage() {
             >
               <QrCode className="w-4 h-4" /> Vincular WhatsApp
             </button>
-            
             <button
               onClick={() => setActiveTab('chat')}
-              className={`w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 transition-all duration-300 ${
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
                 activeTab === 'chat'
                   ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-400 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.15)]'
                   : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
@@ -440,7 +575,7 @@ export default function DashboardPage() {
             >
               <MessageSquare className="w-4 h-4" /> Chat en Vivo
             </button>
-<button
+            <button
               onClick={() => setActiveTab('prompt')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
                 activeTab === 'prompt'
@@ -526,39 +661,90 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="grid md:grid-cols-2 gap-4">
-                {bots.map((b) => (
+                {bots.map((b) => {
+                  const badge = getStatusBadge(b.status);
+                  return (
                   <div
                     key={b.id}
-                    onClick={() => {
-                      setSelectedBot(b);
-                      setSystemPrompt(b.systemPrompt || '');
-                      setAiModel(b.aiModel || 'gpt-4o-mini');
-                      setBotStatus(b.status || 'DISCONNECTED');
-                    }}
-                    className={`p-6 rounded-2xl border cursor-pointer transition-all ${
+                    className={`p-6 rounded-2xl border transition-all ${
                       selectedBot?.id === b.id
                         ? 'bg-slate-900 border-emerald-500/50 shadow-lg shadow-emerald-500/10'
                         : 'bg-slate-900/40 border-slate-800 hover:border-slate-700'
                     }`}
                   >
                     <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-bold text-lg">{b.name}</h3>
-                      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
-                        b.status === 'CONNECTED' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-400'
-                      }`}>
-                        {b.status}
+                      {editingBotId === b.id ? (
+                        <div className="flex items-center gap-2 flex-1">
+                          <input
+                            value={editBotName}
+                            onChange={(e) => setEditBotName(e.target.value)}
+                            className="flex-1 px-2 py-1 rounded-lg bg-slate-950 border border-slate-700 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+                            autoFocus
+                            onKeyDown={(e) => e.key === 'Enter' && handleEditBot(b.id)}
+                          />
+                          <button onClick={() => handleEditBot(b.id)} className="text-emerald-400 hover:text-emerald-300">
+                            <CheckCircle2 className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => setEditingBotId(null)} className="text-slate-400 hover:text-slate-300">
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <h3 className="font-bold text-lg cursor-pointer" onClick={() => {
+                          setSelectedBot(b);
+                          setSystemPrompt(b.systemPrompt || '');
+                          setAiModel(b.aiModel || 'gpt-4o-mini');
+                          setBotStatus(b.status || 'DISCONNECTED');
+                        }}>{b.name}</h3>
+                      )}
+                      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 border ${badge.className}`}>
+                        {badge.icon} {badge.label}
                       </span>
                     </div>
                     <p className="text-xs text-slate-400 font-mono mb-2">Tenant: {b.tenantId}</p>
-                    <p className="text-xs text-slate-500">Modelo: {b.aiModel || 'gpt-4o-mini'}</p>
+                    <p className="text-xs text-slate-500 mb-3">Modelo: {b.aiModel || 'gpt-4o-mini'}</p>
+                    <div className="flex items-center gap-2 pt-3 border-t border-slate-800">
+                      <button
+                        onClick={() => {
+                          setSelectedBot(b);
+                          setSystemPrompt(b.systemPrompt || '');
+                          setAiModel(b.aiModel || 'gpt-4o-mini');
+                          setBotStatus(b.status || 'DISCONNECTED');
+                          setActiveTab('qr');
+                        }}
+                        className="text-xs px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-all flex items-center gap-1.5"
+                      >
+                        <QrCode className="w-3 h-3" /> Vincular
+                      </button>
+                      <button
+                        onClick={() => { setEditingBotId(b.id); setEditBotName(b.name); }}
+                        className="text-xs px-3 py-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-700 transition-all flex items-center gap-1.5"
+                      >
+                        <Pencil className="w-3 h-3" /> Editar
+                      </button>
+                      {deletingBotId === b.id ? (
+                        <div className="flex items-center gap-2 ml-auto">
+                          <span className="text-xs text-red-400">¿Seguro?</span>
+                          <button onClick={() => handleDeleteBot(b.id)} className="text-xs px-2 py-1 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30">Sí</button>
+                          <button onClick={() => setDeletingBotId(null)} className="text-xs px-2 py-1 rounded-lg bg-slate-800 text-slate-400 hover:bg-slate-700">No</button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setDeletingBotId(b.id)}
+                          className="text-xs px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all flex items-center gap-1.5 ml-auto"
+                        >
+                          <Trash2 className="w-3 h-3" /> Eliminar
+                        </button>
+                      )}
+                    </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
         )}
 
-        
         {/* Chat Tab */}
         {activeTab === 'chat' && (
           <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl transition-all duration-500 min-h-[600px] flex gap-6">
@@ -661,65 +847,179 @@ export default function DashboardPage() {
               </p>
             </div>
 
+            {/* Connection status banner */}
+            {selectedBot && (
+              <div className={`p-4 rounded-2xl border flex items-center justify-between ${
+                botStatus === 'CONNECTED' 
+                  ? 'bg-emerald-500/5 border-emerald-500/20' 
+                  : 'bg-slate-900/40 border-slate-800'
+              }`}>
+                <div className="flex items-center gap-3">
+                  {(() => {
+                    const badge = getStatusBadge(botStatus);
+                    return (
+                      <>
+                        <div className={`p-2 rounded-lg ${badge.className}`}>{badge.icon}</div>
+                        <div>
+                          <p className="text-sm font-semibold text-slate-200">Estado: {badge.label}</p>
+                          <p className="text-xs text-slate-400">{selectedBot.name} • {selectedBot.tenantId}</p>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+                {botStatus === 'CONNECTED' && (
+                  <button
+                    onClick={handleDisconnectBot}
+                    className="px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 rounded-xl transition-all flex items-center gap-2 text-sm font-medium"
+                  >
+                    <LogOut className="w-4 h-4" /> Desconectar
+                  </button>
+                )}
+              </div>
+            )}
+
             <div className="p-8 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col items-center justify-center min-h-[380px] shadow-2xl relative overflow-hidden">
               {botStatus === 'CONNECTED' ? (
                 <div className="text-center space-y-4">
                   <CheckCircle2 className="w-16 h-16 text-emerald-400 mx-auto animate-bounce" />
-                  <h3 className="text-xl font-bold text-slate-100">¡WhatsApp Conectado!</h3>
+                  <h3 className="text-xl font-bold text-slate-100">¡WhatsApp Vinculado!</h3>
                   <p className="text-slate-400 text-sm">Tu agente de IA está activo y respondiendo mensajes en tiempo real.</p>
+                  <p className="text-slate-500 text-xs">Si necesitas vincular a otro número, primero desconecta la sesión actual.</p>
                   <button
-                    onClick={() => handleDisconnectBot()}
-                    className="mt-6 px-4 py-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 rounded-xl transition-all flex items-center gap-2 mx-auto text-sm font-medium"
+                    onClick={handleDisconnectBot}
+                    className="mt-4 px-5 py-2.5 bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 rounded-xl transition-all flex items-center gap-2 mx-auto text-sm font-medium"
                   >
-                    <LogOut className="w-4 h-4" /> Desconectar Agente
-                  </button>
-                </div>
-              ) : qrCodeData ? (
-                <div className="text-center space-y-4">
-                  <div className="p-4 bg-white rounded-2xl shadow-xl inline-block relative group">
-                    {qrCodeData.startsWith('data:image') ? (
-                      <img src={qrCodeData} alt="WhatsApp QR Code" className="w-64 h-64 border border-slate-200 rounded-lg shadow-inner" />
-                    ) : (
-                      <QRCodeSVG value={qrCodeData} size={256} className="w-64 h-64 border border-slate-200 rounded-lg shadow-inner" />
-                    )}
-                  </div>
-                  <div className="flex items-center justify-center gap-2 text-xs text-slate-400 font-medium">
-                    <RefreshCw className="w-3.5 h-3.5 text-emerald-400 animate-spin" />
-                    <span>Escanea desde WhatsApp -&gt; Dispositivos Vinculados</span>
-                  </div>
-                  <button
-                    onClick={() => handleRequestQr()}
-                    className="mt-2 text-xs text-slate-400 hover:text-emerald-400 underline transition-colors"
-                  >
-                    Regenerar Código QR
+                    <LogOut className="w-4 h-4" /> Cerrar sesión de WhatsApp
                   </button>
                 </div>
               ) : (
-                <div className="text-center space-y-4 w-full max-w-md">
-                  <QrCode className="w-16 h-16 text-slate-600 mx-auto opacity-50" />
-                  <p className="text-slate-300 text-sm font-medium">
-                    {selectedBot ? `Generando código QR para ${selectedBot.name}...` : 'Crea un agente para comenzar.'}
-                  </p>
-
-                  {errorMessage && (
-                    <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-start gap-2 text-left">
-                      <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-semibold">Error al generar QR</p>
-                        <p className="text-[11px] text-red-300/80 mt-0.5">{errorMessage}</p>
-                      </div>
+                <>
+                  {/* Mode toggle */}
+                  {selectedBot && botStatus !== 'CONNECTED' && (
+                    <div className="flex items-center gap-2 mb-6">
+                      <button
+                        onClick={() => setPairingMode('qr')}
+                        className={`px-4 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-2 ${
+                          pairingMode === 'qr'
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                            : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <QrCode className="w-4 h-4" /> Código QR
+                      </button>
+                      <button
+                        onClick={() => setPairingMode('phone')}
+                        className={`px-4 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-2 ${
+                          pairingMode === 'phone'
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                            : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <Phone className="w-4 h-4" /> Número de Teléfono
+                      </button>
                     </div>
                   )}
 
-                  {selectedBot && (
-                    <button
-                      onClick={() => handleRequestQr()}
-                      className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition-all inline-flex items-center gap-2"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5" /> Solicitar QR
-                    </button>
+                  {pairingMode === 'qr' ? (
+                    /* QR mode */
+                    qrCodeData ? (
+                      <div className="text-center space-y-4">
+                        <div className="p-4 bg-white rounded-2xl shadow-xl inline-block relative group">
+                          {qrCodeData.startsWith('data:image') ? (
+                            <img src={qrCodeData} alt="WhatsApp QR Code" className="w-64 h-64 border border-slate-200 rounded-lg shadow-inner" />
+                          ) : (
+                            <QRCodeSVG value={qrCodeData} size={256} className="w-64 h-64 border border-slate-200 rounded-lg shadow-inner" />
+                          )}
+                        </div>
+                        <div className="flex items-center justify-center gap-2 text-xs text-slate-400 font-medium">
+                          <RefreshCw className="w-3.5 h-3.5 text-emerald-400 animate-spin" />
+                          <span>Escanea desde WhatsApp -&gt; Dispositivos Vinculados</span>
+                        </div>
+                        <button
+                          onClick={() => handleRequestQr()}
+                          className="mt-2 text-xs text-slate-400 hover:text-emerald-400 underline transition-colors"
+                        >
+                          Regenerar Código QR
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="text-center space-y-4 w-full max-w-md">
+                        <QrCode className="w-16 h-16 text-slate-600 mx-auto opacity-50" />
+                        <p className="text-slate-300 text-sm font-medium">
+                          {selectedBot ? `Presiona el botón para generar el código QR.` : 'Crea un agente para comenzar.'}
+                        </p>
+
+                        {errorMessage && (
+                          <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-start gap-2 text-left">
+                            <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                            <div>
+                              <p className="font-semibold">Error al generar QR</p>
+                              <p className="text-[11px] text-red-300/80 mt-0.5">{errorMessage}</p>
+                            </div>
+                          </div>
+                        )}
+
+                        {selectedBot && (
+                          <button
+                            onClick={() => handleRequestQr()}
+                            disabled={botStatus === 'GENERATING'}
+                            className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-sm font-semibold transition-all inline-flex items-center gap-2 disabled:opacity-50"
+                          >
+                            {botStatus === 'GENERATING' ? <Loader2 className="w-4 h-4 animate-spin" /> : <QrCode className="w-4 h-4" />}
+                            Generar Código QR
+                          </button>
+                        )}
+                      </div>
+                    )
+                  ) : (
+                    /* Phone pairing mode */
+                    <div className="text-center space-y-4 w-full max-w-md">
+                      <Phone className="w-16 h-16 text-slate-600 mx-auto opacity-50" />
+                      <p className="text-slate-300 text-sm font-medium">
+                        Ingresa tu número de teléfono para recibir un código de vinculación.
+                      </p>
+
+                      <div className="flex gap-3">
+                        <input
+                          type="tel"
+                          value={phoneNumber}
+                          onChange={(e) => setPhoneNumber(e.target.value)}
+                          placeholder="Ej: 5491112345678 (sin +)"
+                          className="flex-1 px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-sm focus:outline-none focus:border-emerald-500"
+                        />
+                        <button
+                          onClick={handleRequestPairingCode}
+                          disabled={requestingPairing || !phoneNumber.trim()}
+                          className="px-5 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-sm font-semibold transition-all inline-flex items-center gap-2 disabled:opacity-50"
+                        >
+                          {requestingPairing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                          Solicitar
+                        </button>
+                      </div>
+
+                      {pairingCode && (
+                        <div className="p-6 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
+                          <p className="text-sm text-emerald-400 font-medium mb-2">Tu código de vinculación:</p>
+                          <p className="text-4xl font-mono font-bold text-white tracking-[0.3em]">{pairingCode}</p>
+                          <p className="text-xs text-slate-400 mt-3">
+                            Ingresa este código en WhatsApp → Dispositivos Vinculados → Vincular con número de teléfono
+                          </p>
+                        </div>
+                      )}
+
+                      {errorMessage && (
+                        <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-start gap-2 text-left">
+                          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="font-semibold">Error</p>
+                            <p className="text-[11px] text-red-300/80 mt-0.5">{errorMessage}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   )}
-                </div>
+                </>
               )}
             </div>
 
