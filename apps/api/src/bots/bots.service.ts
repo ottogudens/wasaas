@@ -135,11 +135,19 @@ export class BotsService {
     }
 
     // 2. Eliminar de la BD
-    await this.prisma.botInstance.delete({
-      where: { id: bot.id },
-    });
-
-    this.logger.log(`🗑️ Bot eliminado: "${bot.name}" (${bot.tenantId})`);
+    try {
+      await this.prisma.botInstance.delete({
+        where: { id: bot.id },
+      });
+      this.logger.log(`🗑️ Bot eliminado: "${bot.name}" (${bot.tenantId})`);
+    } catch (err: any) {
+      if (err.code === 'P2025') {
+        this.logger.warn(`⚠️ El bot ${bot.id} ya fue eliminado de la BD.`);
+      } else {
+        throw err;
+      }
+    }
+    
     return { success: true, deletedId: bot.id };
   }
 
