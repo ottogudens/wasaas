@@ -107,7 +107,7 @@ export class BotsService {
 
     // Intentar detener el bot en el engine
     try {
-      const botEngineUrl = process.env.BOT_ENGINE_URL || 'http://localhost:3005';
+      const botEngineUrl = process.env.BOT_ENGINE_URL || 'https://whatsapp-service-production-e6f2.up.railway.app';
       const apiKey = process.env.INTERNAL_API_KEY || 'skale-saas-secret-key';
 
       await fetch(`${botEngineUrl}/internal/disconnect`, {
@@ -262,7 +262,7 @@ export class BotsService {
 
     // Enviar mensaje real a WhatsApp a través del bot-engine
     try {
-      const botEngineUrl = process.env.BOT_ENGINE_URL || 'http://localhost:3005';
+      const botEngineUrl = process.env.BOT_ENGINE_URL || 'https://whatsapp-service-production-e6f2.up.railway.app';
       const apiKey = process.env.INTERNAL_API_KEY || 'skale-saas-secret-key';
       
       const res = await fetch(`${botEngineUrl}/internal/send-message`, {

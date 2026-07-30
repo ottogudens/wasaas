@@ -6,6 +6,9 @@ import { fetchLatestBaileysVersion } from 'baileys';
 import { WebSocketServer, WebSocket } from 'ws';
 import QRCode from 'qrcode';
 
+import fs from 'fs';
+import path from 'path';
+
 // En Railway se expone un único puerto público (PORT).
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : (process.env.BOT_ENGINE_PORT ? parseInt(process.env.BOT_ENGINE_PORT) : 3005);
 const SESSIONS_DIR = process.env.SESSIONS_DIR || './sessions';
@@ -379,6 +382,23 @@ if ((managerApi as any).app) {
     }
   });
 
+  // Helper para eliminar archivos de sesión en disco
+  const cleanSessionFiles = (tenantId: string) => {
+    try {
+      if (!fs.existsSync(SESSIONS_DIR)) return;
+      const files = fs.readdirSync(SESSIONS_DIR);
+      for (const file of files) {
+        if (file.includes(tenantId)) {
+          const fullPath = path.join(SESSIONS_DIR, file);
+          fs.rmSync(fullPath, { recursive: true, force: true });
+          console.log(`🗑️ [SessionClean] Sesión borrada de disco: ${fullPath}`);
+        }
+      }
+    } catch (err) {
+      console.warn(`⚠️ Error borrando sesión en disco para ${tenantId}:`, err);
+    }
+  };
+
   // Endpoint de pairing code (vincular por teléfono)
   app.post('/internal/pair-phone', async (req: any, res: any) => {
     let body = '';
@@ -399,26 +419,37 @@ if ((managerApi as any).app) {
           return res.end(JSON.stringify({ error: 'Missing tenantId or phoneNumber' }));
         }
 
-        const botInstance = manager.getBot(tenantId);
+        const cleanNumber = phoneNumber.replace(/[\s\-\+]/g, '');
+
+        let botInstance = manager.getBot(tenantId);
         if (!botInstance) {
-          res.statusCode = 404;
-          return res.end(JSON.stringify({ error: 'Bot not found. Create the bot first via /api/bots' }));
+          console.log(`📱 [BotEngine] Creando instancia con pairing code para ${tenantId}...`);
+          botInstance = await manager.createBot({
+            tenantId,
+            flows: [createAiFlow(tenantId)],
+            providerOptions: { usePairingCode: true }
+          });
         }
 
         const provider = botInstance.provider as any;
-        // BaileysProvider expone el socket de Baileys que soporta pairing code
-        const sock = provider?.vendor || provider?.socket || provider?.sock;
+        
+        // Esperar brevemente a que el socket de Baileys esté instanciado
+        let sock = provider?.vendor || provider?.globalVendorArgs || provider?.socket || provider?.sock;
+        let attempts = 0;
+        while (!sock && attempts < 10) {
+          await new Promise(r => setTimeout(r, 500));
+          sock = provider?.vendor || provider?.globalVendorArgs || provider?.socket || provider?.sock;
+          attempts++;
+        }
 
         if (!sock || typeof sock.requestPairingCode !== 'function') {
           res.statusCode = 400;
-          return res.end(JSON.stringify({ error: 'Pairing code not supported by this provider version' }));
+          return res.end(JSON.stringify({ error: 'El socket de Baileys aún no está listo. Intenta de nuevo en unos segundos.' }));
         }
 
-        // Formatear número: quitar + y espacios
-        const cleanNumber = phoneNumber.replace(/[\s\-\+]/g, '');
-        console.log(`📱 [BotEngine] Solicitando pairing code para ${cleanNumber} (Tenant: ${tenantId})...`);
-
-        const code = await sock.requestPairingCode(cleanNumber);
+        console.log(`📱 [BotEngine] Generando pairing code para ${cleanNumber} (Tenant: ${tenantId})...`);
+        const rawCode = await sock.requestPairingCode(cleanNumber);
+        const code = rawCode?.match(/.{1,4}/g)?.join('-') || rawCode;
         console.log(`✅ [BotEngine] Pairing code generado para ${tenantId}: ${code}`);
 
         res.statusCode = 200;
@@ -451,7 +482,22 @@ if ((managerApi as any).app) {
           return res.end(JSON.stringify({ error: 'Missing tenantId' }));
         }
 
+        const botInstance = manager.getBot(tenantId);
+        if (botInstance) {
+          const provider = botInstance.provider as any;
+          const sock = provider?.vendor || provider?.globalVendorArgs || provider?.socket || provider?.sock;
+          if (sock && typeof sock.logout === 'function') {
+            try {
+              console.log(`🚪 [BotEngine] Cerrando sesión WhatsApp (logout) para ${tenantId}...`);
+              await sock.logout();
+            } catch (e) {
+              console.warn(`⚠️ Error durante sock.logout() para ${tenantId}:`, e);
+            }
+          }
+        }
+
         const removed = await manager.removeBot(tenantId);
+        cleanSessionFiles(tenantId);
 
         // Notificar a la API que se desconectó
         await notifyWebhook({ event: 'disconnected', tenantId });
