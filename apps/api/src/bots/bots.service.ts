@@ -122,7 +122,19 @@ export class BotsService {
       this.logger.warn(`⚠️ No se pudo detener el bot en el engine: ${err}`);
     }
 
-    // Eliminar de la BD (cascade eliminará conversaciones y mensajes)
+    // 1. Eliminar mensajes y conversaciones asociadas para evitar errores de clave foránea en Postgres
+    try {
+      await this.prisma.message.deleteMany({
+        where: { conversation: { botId: bot.id } },
+      });
+      await this.prisma.conversation.deleteMany({
+        where: { botId: bot.id },
+      });
+    } catch (err) {
+      this.logger.warn(`⚠️ Error al limpiar conversaciones previas del bot ${bot.id}: ${err}`);
+    }
+
+    // 2. Eliminar de la BD
     await this.prisma.botInstance.delete({
       where: { id: bot.id },
     });
