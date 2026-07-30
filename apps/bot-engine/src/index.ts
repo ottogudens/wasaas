@@ -52,11 +52,18 @@ manager.createBot = async (tenantConfig: any) => {
     });
 
     provider.on('qr', (qrStr: string) => {
-      console.log(`âš¡ [Baileys Native Event] 'qr' directo recibido para Tenant ${tenantConfig.tenantId}`);
+      console.log(`⚡ [Baileys Native Event] 'qr' directo recibido para Tenant ${tenantConfig.tenantId}`);
       if (qrStr) {
         (manager as any).emit('bot:qr', tenantConfig.tenantId, { qr: qrStr });
       }
     });
+
+    provider.on('message', (payload: any) => {
+      if (payload) {
+        payload._tenantId = tenantConfig.tenantId;
+      }
+    });
+
 
     // Forzar inicio del proveedor vendor de Baileys
     if (typeof provider.initVendor === 'function') {
@@ -269,7 +276,7 @@ const rehydrateBots = async () => {
         if (bot.tenantId) {
           try {
             console.log(`🔄 [BotEngine] Rehidratando ${bot.tenantId}...`);
-            await manager.createBot({ tenantId: bot.tenantId, flows: [] });
+            await manager.createBot({ tenantId: bot.tenantId, flows: [defaultAiFlow] });
           } catch (err) {
             console.error(`❌ [BotEngine] Error rehidratando ${bot.tenantId}:`, err);
           }
