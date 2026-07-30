@@ -146,8 +146,50 @@ const managerApi = new BotManagerApi(manager, {
   apiKey: API_KEY,
 } as any);
 
-// Registrar un flujo "placeholder" en el registry de la API (los flujos reales se crean dinámicamente)
-managerApi.registerFlow('default_ai_flow', 'Flujo IA Multitenant', createAiFlow('_placeholder_'));
+// Sobrescribir POST /api/bots para reiniciar suavemente si ya existía y evitar errores HTTP 409 Conflict
+if ((managerApi as any).app) {
+  (managerApi as any).app.post('/api/bots', async (req: any, res: any) => {
+    let body = '';
+    req.on('data', (chunk: any) => body += chunk.toString());
+    req.on('end', async () => {
+      try {
+        const authHeader = req.headers['authorization'] || '';
+        const apiKey = authHeader.replace('Bearer ', '').trim() || req.headers['x-api-key'];
+        if (apiKey !== API_KEY) {
+          res.statusCode = 401;
+          return res.end(JSON.stringify({ error: 'Unauthorized' }));
+        }
+
+        const data = JSON.parse(body || '{}');
+        const { tenantId, name } = data;
+
+        if (!tenantId) {
+          res.statusCode = 400;
+          return res.end(JSON.stringify({ error: 'Missing tenantId' }));
+        }
+
+        // Si ya existe la instancia, la removemos en lugar de retornar 409
+        if (manager.getBot(tenantId)) {
+          console.log(`🔄 [BotEngine] Bot ${tenantId} ya existía. Removiendo previa para generar QR nuevo (evitando 409)...`);
+          await manager.removeBot(tenantId).catch(() => {});
+        }
+
+        await manager.createBot({
+          tenantId,
+          name: name || tenantId,
+          flows: [createAiFlow(tenantId)],
+        });
+
+        res.statusCode = 200;
+        return res.end(JSON.stringify({ success: true, tenantId }));
+      } catch (err: any) {
+        console.error('❌ [BotEngine /api/bots Error]:', err);
+        res.statusCode = 500;
+        return res.end(JSON.stringify({ error: err?.message || String(err) }));
+      }
+    });
+  });
+}
 
 // 3. Iniciar el servidor HTTP Polka
 managerApi.start();
