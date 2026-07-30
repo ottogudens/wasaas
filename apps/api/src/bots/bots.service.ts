@@ -137,4 +137,122 @@ export class BotsService {
       orderBy: { createdAt: 'asc' },
     });
   }
+
+  /**
+   * Internal: Get all active bots (not disconnected)
+   */
+  async getActiveBots() {
+    return this.prisma.botInstance.findMany({
+      where: {
+        status: {
+          not: 'DISCONNECTED',
+        },
+      },
+      select: { tenantId: true },
+    });
+  }
+
+  /**
+   * Internal: Handle webhook events from bot-engine
+   */
+  async handleWebhook(data: any) {
+    const { event, tenantId, qr, error } = data;
+    if (!tenantId) return { success: false, message: 'Missing tenantId' };
+
+    const bot = await this.prisma.botInstance.findUnique({ where: { tenantId } });
+    if (!bot) return { success: false, message: 'Bot not found' };
+
+    let newStatus = bot.status;
+    let newQr = bot.qrCode;
+
+    switch (event) {
+      case 'bot:qr':
+        newStatus = 'QR_READY';
+        newQr = qr;
+        break;
+      case 'bot:ready':
+      case 'connected':
+        newStatus = 'CONNECTED';
+        newQr = null; // Clear QR once connected
+        break;
+      case 'bot:disconnected':
+      case 'disconnected':
+        newStatus = 'DISCONNECTED';
+        newQr = null;
+        break;
+      case 'bot:error':
+      case 'error':
+        newStatus = 'ERROR';
+        break;
+    }
+
+    await this.prisma.botInstance.update({
+      where: { id: bot.id },
+      data: {
+        status: newStatus as any,
+        qrCode: newQr,
+      },
+    });
+
+    this.logger.log(`🔄 Webhook status update: Bot ${bot.name} (${tenantId}) -> ${newStatus}`);
+    return { success: true };
+  }
+
+  /**
+   * Send a manual message as an agent
+   */
+  async sendManualMessage(conversationId: string, organizationId: string, content: string) {
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: { bot: true },
+    });
+
+    if (!conversation) throw new NotFoundException('Conversación no encontrada.');
+    if (conversation.bot.organizationId !== organizationId) {
+      throw new ForbiddenException('No tienes acceso a esta conversación.');
+    }
+
+    // Activar modo humano (Handoff)
+    await this.prisma.conversation.update({
+      where: { id: conversation.id },
+      data: { isHumanMode: true, updatedAt: new Date() },
+    });
+
+    // Guardar mensaje en DB
+    const message = await this.prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        sender: 'AGENT',
+        content,
+      },
+    });
+
+    // Enviar mensaje real a WhatsApp a través del bot-engine
+    try {
+      const botEngineUrl = process.env.BOT_ENGINE_URL || 'http://localhost:3005';
+      const apiKey = process.env.INTERNAL_API_KEY || 'skale-saas-secret-key';
+      
+      const res = await fetch(`${botEngineUrl}/internal/send-message`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+        },
+        body: JSON.stringify({
+          tenantId: conversation.bot.tenantId,
+          customerPhone: conversation.customerPhone,
+          message: content,
+        }),
+      });
+
+      if (!res.ok) {
+        this.logger.error(`Error enviando mensaje manual a bot-engine: HTTP ${res.status}`);
+      }
+    } catch (err) {
+      this.logger.error('Excepción enviando mensaje a bot-engine:', err);
+    }
+
+    return message;
+  }
 }
+

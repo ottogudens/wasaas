@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { BotsService } from './bots.service';
-import { BotsController } from './bots.controller';
+import { BotsController, InternalBotsController } from './bots.controller';
 
 @Module({
-  controllers: [BotsController],
+  controllers: [BotsController, InternalBotsController],
   providers: [BotsService],
   exports: [BotsService],
 })

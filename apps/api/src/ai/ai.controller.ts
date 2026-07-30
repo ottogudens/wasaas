@@ -42,6 +42,7 @@ export class AiController {
       status: 'success',
       reply: result.reply,
       conversationId: result.conversationId,
+      isHumanMode: (result as any).isHumanMode || false,
     };
   }
 }

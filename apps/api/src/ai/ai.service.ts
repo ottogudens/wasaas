@@ -63,7 +63,7 @@ export class AiService {
     tenantId: string,
     customerPhone: string,
     userMessage: string,
-  ): Promise<{ reply: string; conversationId: string }> {
+  ): Promise<{ reply: string; conversationId: string; isHumanMode?: boolean }> {
     // 1. Obtener BotInstance desde BD
     const bot = await this.prisma.botInstance.findUnique({
       where: { tenantId },
@@ -100,6 +100,17 @@ export class AiService {
         content: userMessage,
       },
     });
+
+    // 3.5. Si está en modo humano, abortar respuesta de IA
+    if (conversation.isHumanMode) {
+      this.logger.log(`✋ Modo humano activo en conv ${conversation.id}. Ignorando IA.`);
+      // Actualizar timestamp
+      await this.prisma.conversation.update({
+        where: { id: conversation.id },
+        data: { updatedAt: new Date() },
+      });
+      return { reply: '', conversationId: conversation.id, isHumanMode: true };
+    }
 
     // 4. Cargar historial de conversación (últimos 20 mensajes)
     const history = await this.prisma.message.findMany({
