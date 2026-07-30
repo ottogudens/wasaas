@@ -335,21 +335,42 @@ manager.on('bot:connected', (tenantId) => notifyWebhook({ event: 'connected', te
 manager.on('bot:disconnected', (tenantId) => notifyWebhook({ event: 'disconnected', tenantId }));
 (manager as any).on('error', (err: any) => notifyWebhook({ event: 'error', error: err?.message || 'Error' }));
 
-// 7. Rehidratación (Arranque de Bots Activos)
+// 7. Rehidratación (Arranque de Bots Activos) y Limpieza de Caché Huérfano
+const cleanOrphanSessions = (activeTenantIds: string[]) => {
+  try {
+    if (!fs.existsSync(SESSIONS_DIR)) return;
+    const files = fs.readdirSync(SESSIONS_DIR);
+    for (const file of files) {
+      const isTenantActive = activeTenantIds.some(id => file.includes(id));
+      if (!isTenantActive) {
+        const fullPath = path.join(SESSIONS_DIR, file);
+        fs.rmSync(fullPath, { recursive: true, force: true });
+        console.log(`🧹 [CleanCache] Sesión huérfana o eliminada borrada de disco: ${fullPath}`);
+      }
+    }
+  } catch (err) {
+    console.warn('⚠️ Error al limpiar sesiones huérfanas:', err);
+  }
+};
+
 const rehydrateBots = async () => {
-  console.log('🔄 [BotEngine] Iniciando rehidratación de bots...');
+  console.log('🔄 [BotEngine] Iniciando rehidratación de bots y limpieza de caché...');
   try {
     const res = await fetch(`${API_URL}/bots/internal/active-bots`, {
       headers: { 'x-api-key': API_KEY },
     });
     if (res.ok) {
       const bots = await res.json();
+      const activeTenantIds = bots.map((b: any) => b.tenantId).filter(Boolean);
+      
+      // Limpiar de disco cualquier sesión de bots que ya fueron eliminados de la BD
+      cleanOrphanSessions(activeTenantIds);
+
       console.log(`🔄 [BotEngine] Encontrados ${bots.length} bots activos para rehidratar.`);
       for (const bot of bots) {
         if (bot.tenantId) {
           try {
             console.log(`🔄 [BotEngine] Rehidratando ${bot.tenantId}...`);
-            // Cada bot recibe su propio flujo con tenantId en closure
             await manager.createBot({ tenantId: bot.tenantId, flows: [createAiFlow(bot.tenantId)] });
           } catch (err) {
             console.error(`❌ [BotEngine] Error rehidratando ${bot.tenantId}:`, err);

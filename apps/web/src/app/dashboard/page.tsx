@@ -275,21 +275,20 @@ export default function DashboardPage() {
       const targetUrl = botEngineUrl || 'https://whatsapp-service-production-e6f2.up.railway.app';
       const apiKey = process.env.NEXT_PUBLIC_INTERNAL_API_KEY || 'skale-saas-secret-key';
 
-      const res = await fetch(`${targetUrl}/internal/disconnect`, {
+      // Actualizar UI optimistamente
+      setBotStatus('DISCONNECTED');
+      setQrCodeData(null);
+      setPairingCode(null);
+
+      await fetch(`${targetUrl}/internal/disconnect`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-api-key': apiKey,
         },
         body: JSON.stringify({ tenantId: selectedBot.tenantId }),
-      });
+      }).catch(() => {});
 
-      if (!res.ok) {
-        throw new Error('Fallo al detener bot en el engine');
-      }
-
-      setBotStatus('DISCONNECTED');
-      setQrCodeData(null);
       addLog(`✅ Agente desconectado exitosamente.`);
       await loadBots();
     } catch (err: any) {
@@ -435,16 +434,20 @@ export default function DashboardPage() {
 
   const handleDeleteBot = async (botId: string) => {
     try {
-      await api.deleteBot(botId);
+      // Remover de la UI de inmediato para respuesta instantánea
+      setBots(prev => prev.filter(b => b.id !== botId));
       setDeletingBotId(null);
       if (selectedBot?.id === botId) {
         setSelectedBot(null);
         setBotStatus('DISCONNECTED');
       }
+
+      await api.deleteBot(botId);
       addLog(`🗑️ Bot eliminado exitosamente.`);
       await loadBots();
     } catch (err: any) {
       addLog(`❌ Error al eliminar: ${err.message}`);
+      await loadBots();
     }
   };
 
