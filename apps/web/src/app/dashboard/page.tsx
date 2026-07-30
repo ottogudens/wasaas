@@ -175,6 +175,16 @@ export default function DashboardPage() {
     addLog(`Iniciando bot "${selectedBot.name}" (Tenant: ${selectedBot.tenantId})...`);
 
     try {
+      // Limpiar instancia previa si ya existía para evitar 409 y forzar QR nuevo
+      await fetch(`${targetUrl}/internal/disconnect`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+        },
+        body: JSON.stringify({ tenantId: selectedBot.tenantId }),
+      }).catch(() => {});
+
       const res = await fetch(`${targetUrl}/api/bots`, {
         method: 'POST',
         headers: {
@@ -188,7 +198,7 @@ export default function DashboardPage() {
         }),
       });
 
-      if (!res.ok && res.status !== 409) {
+      if (!res.ok) {
         const errorText = await res.text();
         setErrorMessage(`Error HTTP ${res.status}: ${errorText}`);
         addLog(`❌ Error HTTP en bot-engine: ${res.status}`);
@@ -215,6 +225,16 @@ export default function DashboardPage() {
     addLog(`📱 Solicitando código de vinculación para ${phoneNumber}...`);
 
     try {
+      // Limpiar instancia previa si ya existía para generar pairing code limpio
+      await fetch(`${targetUrl}/internal/disconnect`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+        },
+        body: JSON.stringify({ tenantId: selectedBot.tenantId }),
+      }).catch(() => {});
+
       // Request pairing code directly
       const res = await fetch(`${targetUrl}/internal/pair-phone`, {
         method: 'POST',
