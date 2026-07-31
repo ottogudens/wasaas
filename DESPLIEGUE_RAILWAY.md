@@ -39,21 +39,28 @@ Este documento detalla las instrucciones exactas para realizar el despliegue de 
   - `REDIS_URL`: `${Redis.REDIS_URL}`
   - `OPENAI_API_KEY`: Tu API key de OpenAI (`sk-...`)
   - `MERCADOPAGO_ACCESS_TOKEN`: Tu Access Token de MercadoPago
-  - `PORT`: `3001`
+  - `JWT_SECRET`: Una clave secreta para firmar tokens JWT (ej. una cadena aleatoria y segura)
+  - `INTERNAL_API_KEY`: `skale-saas-secret-key` (Debe coincidir con la del bot-engine)
+  - `BOT_ENGINE_URL`: URL pública de tu servicio bot-engine (ej. `https://whatsapp-service-production.up.railway.app`)
+  - `FRONTEND_URL`: URL pública de tu frontend (ej. `https://mibot.skale.cl`)
 
 ### Servicio 2: Bot Engine Worker (`apps/bot-engine`)
 - **Root Directory**: `apps/bot-engine`
 - **Build Command**: `npm run build`
 - **Start Command**: `npm run dev`
 - **Railway Volume (Persistencia)**:
-  - En la pestaña **Settings** -> **Volumes**, añade un nuevo Volumen montado en la ruta: `/app/apps/bot-engine/sessions` (para mantener las sesiones de WhatsApp activas tras reinicios).
+  - En la pestaña **Settings** -> **Volumes**, añade un nuevo Volumen montado en la ruta: `/app/apps/bot-engine/sessions`
 - **Variables de Entorno**:
-  - `BOT_ENGINE_PORT`: `3005`
-  - `WS_PORT`: `3006`
   - `INTERNAL_API_KEY`: `skale-saas-secret-key`
+  - `API_URL`: URL pública de tu NestJS API Central (ej. `https://api-production.up.railway.app`)
+  - `SESSIONS_DIR`: `/app/apps/bot-engine/sessions`
 
 ### Servicio 3: Admin Web Dashboard (`apps/web`)
 - **Root Directory**: `apps/web`
 - **Build Command**: `npm run build`
 - **Start Command**: `npm run start`
 - **Networking**: En **Settings** -> **Networking**, haz clic en **Generate Domain** para obtener la URL pública de la aplicación.
+- **Variables de Entorno**:
+  - `NEXT_PUBLIC_API_URL`: URL pública de tu NestJS API Central (ej. `https://api-production.up.railway.app`)
+  - `NEXT_PUBLIC_BOT_ENGINE_URL`: URL pública de tu bot-engine (ej. `https://whatsapp-service-production.up.railway.app`)
+  - `NEXT_PUBLIC_WS_URL`: URL WebSocket pública de tu bot-engine (ej. `wss://whatsapp-service-production.up.railway.app`)

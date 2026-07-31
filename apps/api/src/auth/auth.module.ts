@@ -13,7 +13,7 @@ import { JwtStrategy } from './jwt.strategy';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET'),
+        secret: configService.get<string>('JWT_SECRET') || 'wasaas-jwt-default-super-secret-key-change-me',
         signOptions: { expiresIn: '7d' },
       }),
     }),
