@@ -8,6 +8,7 @@ import QRCode from 'qrcode';
 
 import fs from 'fs';
 import path from 'path';
+import cors from 'cors';
 
 // En Railway se expone un único puerto público (PORT).
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : (process.env.BOT_ENGINE_PORT ? parseInt(process.env.BOT_ENGINE_PORT) : 3005);
@@ -155,21 +156,14 @@ if ((managerApi as any).app) {
   const app = (managerApi as any).app;
 
   // Habilitar CORS global para permitir peticiones directas desde el Frontend (ej. generar QR o desconectar)
-  app.use((req: any, res: any, next: any) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key');
-    if (req.method === 'OPTIONS') {
-      res.statusCode = 200;
-      return res.end();
-    }
-    if (typeof next === 'function') next();
-  });
+  app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'OPTIONS', 'PUT', 'PATCH', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key']
+  }));
 
   app.post('/api/bots', async (req: any, res: any) => {
-    let body = '';
-    req.on('data', (chunk: any) => body += chunk.toString());
-    req.on('end', async () => {
+    const processRequest = async (bodyStr: string) => {
       try {
         const authHeader = req.headers['authorization'] || '';
         const apiKey = authHeader.replace('Bearer ', '').trim() || req.headers['x-api-key'];
@@ -178,7 +172,7 @@ if ((managerApi as any).app) {
           return res.end(JSON.stringify({ error: 'Unauthorized' }));
         }
 
-        const data = JSON.parse(body || '{}');
+        const data = req.body && Object.keys(req.body).length > 0 ? req.body : JSON.parse(bodyStr || '{}');
         const { tenantId, name } = data;
 
         if (!tenantId) {
@@ -205,7 +199,15 @@ if ((managerApi as any).app) {
         res.statusCode = 500;
         return res.end(JSON.stringify({ error: err?.message || String(err) }));
       }
-    });
+    };
+
+    if (req.body && Object.keys(req.body).length > 0) {
+      await processRequest('');
+    } else {
+      let body = '';
+      req.on('data', (chunk: any) => body += chunk.toString());
+      req.on('end', () => processRequest(body));
+    }
   });
 }
 
@@ -495,9 +497,7 @@ if ((managerApi as any).app) {
 
   // Endpoint de pairing code (vincular por teléfono)
   app.post('/internal/pair-phone', async (req: any, res: any) => {
-    let body = '';
-    req.on('data', (chunk: any) => body += chunk.toString());
-    req.on('end', async () => {
+    const processRequest = async (bodyStr: string) => {
       try {
         const apiKey = req.headers['x-api-key'];
         if (apiKey !== API_KEY) {
@@ -505,7 +505,7 @@ if ((managerApi as any).app) {
           return res.end(JSON.stringify({ error: 'Unauthorized' }));
         }
 
-        const data = JSON.parse(body);
+        const data = req.body && Object.keys(req.body).length > 0 ? req.body : JSON.parse(bodyStr || '{}');
         const { tenantId, phoneNumber } = data;
 
         if (!tenantId || !phoneNumber) {
@@ -553,14 +553,20 @@ if ((managerApi as any).app) {
         res.statusCode = 500;
         return res.end(JSON.stringify({ error: err?.message || String(err) }));
       }
-    });
+    };
+
+    if (req.body && Object.keys(req.body).length > 0) {
+      await processRequest('');
+    } else {
+      let body = '';
+      req.on('data', (chunk: any) => body += chunk.toString());
+      req.on('end', () => processRequest(body));
+    }
   });
 
   // Endpoint para desconectar un bot y notificar a la API
   app.post('/internal/disconnect', async (req: any, res: any) => {
-    let body = '';
-    req.on('data', (chunk: any) => body += chunk.toString());
-    req.on('end', async () => {
+    const processRequest = async (bodyStr: string) => {
       try {
         const apiKey = req.headers['x-api-key'];
         if (apiKey !== API_KEY) {
@@ -568,7 +574,7 @@ if ((managerApi as any).app) {
           return res.end(JSON.stringify({ error: 'Unauthorized' }));
         }
 
-        const data = JSON.parse(body);
+        const data = req.body && Object.keys(req.body).length > 0 ? req.body : JSON.parse(bodyStr || '{}');
         const { tenantId } = data;
 
         if (!tenantId) {
@@ -602,6 +608,14 @@ if ((managerApi as any).app) {
         res.statusCode = 500;
         return res.end(JSON.stringify({ error: String(err) }));
       }
-    });
+    };
+
+    if (req.body && Object.keys(req.body).length > 0) {
+      await processRequest('');
+    } else {
+      let body = '';
+      req.on('data', (chunk: any) => body += chunk.toString());
+      req.on('end', () => processRequest(body));
+    }
   });
 }
