@@ -162,7 +162,7 @@ if ((managerApi as any).app) {
     allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key']
   }));
 
-  app.post('/api/bots', async (req: any, res: any) => {
+  app.post('/internal/start', async (req: any, res: any) => {
     const processRequest = async (bodyStr: string) => {
       try {
         const authHeader = req.headers['authorization'] || '';
@@ -195,7 +195,7 @@ if ((managerApi as any).app) {
         res.statusCode = 200;
         return res.end(JSON.stringify({ success: true, tenantId }));
       } catch (err: any) {
-        console.error('❌ [BotEngine /api/bots Error]:', err);
+        console.error('❌ [BotEngine /internal/start Error]:', err);
         res.statusCode = 500;
         return res.end(JSON.stringify({ error: err?.message || String(err) }));
       }

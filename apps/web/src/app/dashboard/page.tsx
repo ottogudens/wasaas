@@ -185,11 +185,11 @@ export default function DashboardPage() {
         body: JSON.stringify({ tenantId: selectedBot.tenantId }),
       }).catch(() => {});
 
-      const res = await fetch(`${targetUrl}/api/bots`, {
+      const res = await fetch(`${targetUrl}/internal/start`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
+          'x-api-key': apiKey,
         },
         body: JSON.stringify({
           tenantId: selectedBot.tenantId,
