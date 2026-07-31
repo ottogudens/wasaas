@@ -335,6 +335,11 @@ export default function DashboardPage() {
             setQrCodeData(null);
             addLog(`⚠️ Bot "${selectedBot.name}" desconectado.`);
             loadBots();
+          } else if (data.event === 'bot:message') {
+            // Un mensaje nuevo acaba de llegar, recargamos el chat o lo inyectamos optimísticamente
+            if (activeTab === 'chat') {
+              loadMessages();
+            }
           }
         } catch (e) {
           console.error(e);

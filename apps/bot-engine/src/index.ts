@@ -24,7 +24,7 @@ console.log(`🌐 [Baileys] Versión de WhatsApp Web obtenida de servidores ofic
 // Cada bot obtiene su propio flujo con el tenantId capturado en la closure.
 // Esto garantiza que cuando llega un mensaje, el tenantId correcto se envía a la API.
 const createAiFlow = (tenantId: string) => {
-  return addKeyword(EVENTS.WELCOME)
+  return addKeyword([EVENTS.WELCOME, '.*'], { regex: true })
     .addAction(async (ctx: any, { flowDynamic }: { flowDynamic: any }) => {
       const userPrompt = ctx.body;
       const customerPhone = ctx.from;
@@ -129,6 +129,13 @@ manager.createBot = async (tenantConfig: any) => {
 
     provider.on('message', (payload: any) => {
       console.log(`📩 [Baileys Raw Message] Tenant: ${tenantConfig.tenantId}, From: ${payload?.from || payload?.key?.remoteJid}, Body: ${payload?.body || payload?.message?.conversation}`);
+      // Propagate message to Frontend Live Chat via WebSocket
+      (manager as any).emit('bot:message', tenantConfig.tenantId, {
+        from: payload?.from || payload?.key?.remoteJid,
+        body: payload?.body || payload?.message?.conversation,
+        name: payload?.name,
+        timestamp: Date.now()
+      });
     });
 
     // Forzar inicio del proveedor vendor de Baileys
@@ -439,6 +446,37 @@ if ((managerApi as any).app) {
           res.statusCode = 500;
           return res.end(JSON.stringify({ error: 'Provider does not support sendMessage directly' }));
         }
+      } catch (err) {
+        res.statusCode = 500;
+        return res.end(JSON.stringify({ error: String(err) }));
+      }
+    });
+  });
+
+  // Endpoint de Prueba Simulación de Mensaje Entrante
+  app.post('/internal/test-message', async (req: any, res: any) => {
+    let body = '';
+    req.on('data', (chunk: any) => body += chunk.toString());
+    req.on('end', async () => {
+      try {
+        const apiKey = req.headers['x-api-key'];
+        if (apiKey !== API_KEY) {
+          res.statusCode = 401;
+          return res.end(JSON.stringify({ error: 'Unauthorized' }));
+        }
+        const data = JSON.parse(body || '{}');
+        const botInstance = manager.getBot(data.tenantId);
+        if (botInstance && botInstance.provider) {
+          botInstance.provider.emit('message', {
+            from: data.phone || '1234567890',
+            body: data.message || 'hola',
+            message: { conversation: data.message || 'hola' }
+          });
+          res.statusCode = 200;
+          return res.end(JSON.stringify({ success: true, text: 'emitted' }));
+        }
+        res.statusCode = 404;
+        return res.end(JSON.stringify({ error: 'Bot not found' }));
       } catch (err) {
         res.statusCode = 500;
         return res.end(JSON.stringify({ error: String(err) }));
