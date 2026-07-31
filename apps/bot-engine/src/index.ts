@@ -151,65 +151,7 @@ const managerApi = new BotManagerApi(manager, {
   apiKey: API_KEY,
 } as any);
 
-// Sobrescribir POST /api/bots para reiniciar suavemente si ya existía y evitar errores HTTP 409 Conflict
-if ((managerApi as any).app) {
-  const app = (managerApi as any).app;
 
-  // Habilitar CORS global para permitir peticiones directas desde el Frontend (ej. generar QR o desconectar)
-  app.use(cors({
-    origin: '*',
-    methods: ['GET', 'POST', 'OPTIONS', 'PUT', 'PATCH', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key']
-  }));
-
-  app.post('/internal/start', async (req: any, res: any) => {
-    const processRequest = async (bodyStr: string) => {
-      try {
-        const authHeader = req.headers['authorization'] || '';
-        const apiKey = authHeader.replace('Bearer ', '').trim() || req.headers['x-api-key'];
-        if (apiKey !== API_KEY) {
-          res.statusCode = 401;
-          return res.end(JSON.stringify({ error: 'Unauthorized' }));
-        }
-
-        const data = req.body && Object.keys(req.body).length > 0 ? req.body : JSON.parse(bodyStr || '{}');
-        const { tenantId, name } = data;
-
-        if (!tenantId) {
-          res.statusCode = 400;
-          return res.end(JSON.stringify({ error: 'Missing tenantId' }));
-        }
-
-        // Si ya existe la instancia, la removemos en lugar de retornar 409
-        if (manager.getBot(tenantId)) {
-          console.log(`🔄 [BotEngine] Bot ${tenantId} ya existía. Removiendo previa para generar QR nuevo (evitando 409)...`);
-          await manager.removeBot(tenantId).catch(() => {});
-        }
-
-        await manager.createBot({
-          tenantId,
-          name: name || tenantId,
-          flows: [createAiFlow(tenantId)],
-        });
-
-        res.statusCode = 200;
-        return res.end(JSON.stringify({ success: true, tenantId }));
-      } catch (err: any) {
-        console.error('❌ [BotEngine /internal/start Error]:', err);
-        res.statusCode = 500;
-        return res.end(JSON.stringify({ error: err?.message || String(err) }));
-      }
-    };
-
-    if (req.body && Object.keys(req.body).length > 0) {
-      await processRequest('');
-    } else {
-      let body = '';
-      req.on('data', (chunk: any) => body += chunk.toString());
-      req.on('end', () => processRequest(body));
-    }
-  });
-}
 
 // 3. Iniciar el servidor HTTP Polka
 managerApi.start();
@@ -406,6 +348,61 @@ setTimeout(rehydrateBots, 3000); // Esperar 3s antes de rehidratar
 // 8. Endpoints Custom sobre Polka
 if ((managerApi as any).app) {
   const app = (managerApi as any).app;
+
+  // Habilitar CORS global para permitir peticiones directas desde el Frontend (ej. generar QR o desconectar)
+  app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'OPTIONS', 'PUT', 'PATCH', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key']
+  }));
+
+  app.post('/internal/start', async (req: any, res: any) => {
+    const processRequest = async (bodyStr: string) => {
+      try {
+        const authHeader = req.headers['authorization'] || '';
+        const apiKey = authHeader.replace('Bearer ', '').trim() || req.headers['x-api-key'];
+        if (apiKey !== API_KEY) {
+          res.statusCode = 401;
+          return res.end(JSON.stringify({ error: 'Unauthorized' }));
+        }
+
+        const data = req.body && Object.keys(req.body).length > 0 ? req.body : JSON.parse(bodyStr || '{}');
+        const { tenantId, name } = data;
+
+        if (!tenantId) {
+          res.statusCode = 400;
+          return res.end(JSON.stringify({ error: 'Missing tenantId' }));
+        }
+
+        // Si ya existe la instancia, la removemos en lugar de retornar 409
+        if (manager.getBot(tenantId)) {
+          console.log(`🔄 [BotEngine] Bot ${tenantId} ya existía. Removiendo previa para generar QR nuevo (evitando 409)...`);
+          await manager.removeBot(tenantId).catch(() => {});
+        }
+
+        await manager.createBot({
+          tenantId,
+          name: name || tenantId,
+          flows: [createAiFlow(tenantId)],
+        });
+
+        res.statusCode = 200;
+        return res.end(JSON.stringify({ success: true, tenantId }));
+      } catch (err: any) {
+        console.error('❌ [BotEngine /internal/start Error]:', err);
+        res.statusCode = 500;
+        return res.end(JSON.stringify({ error: err?.message || String(err) }));
+      }
+    };
+
+    if (req.body && Object.keys(req.body).length > 0) {
+      await processRequest('');
+    } else {
+      let body = '';
+      req.on('data', (chunk: any) => body += chunk.toString());
+      req.on('end', () => processRequest(body));
+    }
+  });
 
   // Endpoint Manual Send Message
   app.post('/internal/send-message', async (req: any, res: any) => {
