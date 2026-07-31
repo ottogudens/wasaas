@@ -24,7 +24,7 @@ console.log(`🌐 [Baileys] Versión de WhatsApp Web obtenida de servidores ofic
 // Cada bot obtiene su propio flujo con el tenantId capturado en la closure.
 // Esto garantiza que cuando llega un mensaje, el tenantId correcto se envía a la API.
 const createAiFlow = (tenantId: string) => {
-  return addKeyword([EVENTS.WELCOME, '.*'], { regex: true })
+  return addKeyword(EVENTS.WELCOME)
     .addAction(async (ctx: any, { flowDynamic }: { flowDynamic: any }) => {
       const userPrompt = ctx.body;
       const customerPhone = ctx.from;
@@ -264,6 +264,15 @@ manager.on('bot:disconnected', (tenantId: string) => {
     event: 'bot:disconnected',
     tenantId,
     status: 'DISCONNECTED',
+  });
+});
+
+(manager as any).on('bot:message', (tenantId: string, data: any) => {
+  console.log(`📡 [BotManager Event] bot:message para ${tenantId}:`, data);
+  broadcast({
+    event: 'bot:message',
+    tenantId,
+    ...data,
   });
 });
 
