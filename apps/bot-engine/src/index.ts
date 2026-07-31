@@ -551,38 +551,52 @@ if ((managerApi as any).app) {
         const cleanNumber = phoneNumber.replace(/[\s\-\+]/g, '');
 
         let botInstance = manager.getBot(tenantId);
-        if (!botInstance) {
-          console.log(`📱 [BotEngine] Creando instancia con pairing code para ${tenantId}...`);
-          botInstance = await manager.createBot({
-            tenantId,
-            flows: [createAiFlow(tenantId)],
-            providerOptions: { usePairingCode: true }
-          });
+        if (botInstance) {
+          console.log(`📱 [BotEngine] Removiendo bot anterior para pairing code...`);
+          await manager.removeBot(tenantId).catch(() => {});
         }
+        cleanSessionFiles(tenantId);
+
+        console.log(`📱 [BotEngine] Creando instancia con pairing code para ${cleanNumber} (Tenant: ${tenantId})...`);
+        
+        botInstance = await manager.createBot({
+          tenantId,
+          flows: [createAiFlow(tenantId)],
+          providerOptions: { usePairingCode: true, phoneNumber: cleanNumber }
+        });
 
         const provider = botInstance.provider as any;
-        
-        // Esperar brevemente a que el socket de Baileys esté instanciado
-        let sock = provider?.vendor || provider?.globalVendorArgs || provider?.socket || provider?.sock;
-        let attempts = 0;
-        while (!sock && attempts < 10) {
-          await new Promise(r => setTimeout(r, 500));
-          sock = provider?.vendor || provider?.globalVendorArgs || provider?.socket || provider?.sock;
-          attempts++;
-        }
 
-        if (!sock || typeof sock.requestPairingCode !== 'function') {
-          res.statusCode = 400;
-          return res.end(JSON.stringify({ error: 'El socket de Baileys aún no está listo. Intenta de nuevo en unos segundos.' }));
-        }
+        const code = await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('Timeout esperando código de Baileys')), 25000);
+          
+          const onRequireAction = (event: any) => {
+            clearTimeout(timeout);
+            provider.off('require_action', onRequireAction);
+            if (event?.instructions && event.instructions[0]) {
+              const rawCode = event.instructions[0].replace('Code:', '').trim();
+              resolve(rawCode);
+            } else if (event?.code) {
+              resolve(event.code);
+            } else {
+              reject(new Error('Formato de código inválido'));
+            }
+          };
 
-        console.log(`📱 [BotEngine] Generando pairing code para ${cleanNumber} (Tenant: ${tenantId})...`);
-        const rawCode = await sock.requestPairingCode(cleanNumber);
-        const code = rawCode?.match(/.{1,4}/g)?.join('-') || rawCode;
+          const onError = (err: any) => {
+            clearTimeout(timeout);
+            provider.off('error', onError);
+            reject(err);
+          };
+
+          provider.on('require_action', onRequireAction);
+          provider.on('error', onError);
+        });
+
         console.log(`✅ [BotEngine] Pairing code generado para ${tenantId}: ${code}`);
-
         res.statusCode = 200;
         return res.end(JSON.stringify({ success: true, code }));
+
       } catch (err: any) {
         console.error('❌ [BotEngine] Error generando pairing code:', err);
         res.statusCode = 500;
