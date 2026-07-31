@@ -300,6 +300,25 @@ manager.on('bot:connected', (tenantId) => notifyWebhook({ event: 'connected', te
 manager.on('bot:disconnected', (tenantId) => notifyWebhook({ event: 'disconnected', tenantId }));
 (manager as any).on('error', (err: any) => notifyWebhook({ event: 'error', error: err?.message || 'Error' }));
 
+// --- 6.5 Configurar manejo de error de auth para BotInstances
+const setupProviderListeners = (botInstance: any, tenantId: string) => {
+  if (!botInstance || !botInstance.provider) return;
+  botInstance.provider.on('auth_failure', async (err: any) => {
+    console.error(`💥 [BotEngine] Error crítico de Auth (auth_failure) para ${tenantId}:`, err);
+    try {
+      await manager.removeBot(tenantId).catch(() => {});
+      const tenantSessionDir = path.join(SESSIONS_DIR, tenantId);
+      if (fs.existsSync(tenantSessionDir)) {
+        fs.rmSync(tenantSessionDir, { recursive: true, force: true });
+        console.log(`🧹 [BotEngine] Caché limpia para ${tenantId} debido a auth_failure.`);
+      }
+      notifyWebhook({ event: 'disconnected', tenantId });
+    } catch (e) {
+      console.error(`Error al limpiar sesión tras auth_failure de ${tenantId}:`, e);
+    }
+  });
+};
+
 // 7. Rehidratación (Arranque de Bots Activos) y Limpieza de Caché Huérfano
 const cleanOrphanSessions = (activeTenantIds: string[]) => {
   try {
@@ -336,7 +355,8 @@ const rehydrateBots = async () => {
         if (bot.tenantId) {
           try {
             console.log(`🔄 [BotEngine] Rehidratando ${bot.tenantId}...`);
-            await manager.createBot({ tenantId: bot.tenantId, flows: [createAiFlow(bot.tenantId)] });
+            const botInstance = await manager.createBot({ tenantId: bot.tenantId, flows: [createAiFlow(bot.tenantId)] });
+            setupProviderListeners(botInstance, bot.tenantId);
           } catch (err) {
             console.error(`❌ [BotEngine] Error rehidratando ${bot.tenantId}:`, err);
           }
@@ -387,11 +407,12 @@ if ((managerApi as any).app) {
           await manager.removeBot(tenantId).catch(() => {});
         }
 
-        await manager.createBot({
+        const botInstance = await manager.createBot({
           tenantId,
           name: name || tenantId,
           flows: [createAiFlow(tenantId)],
         });
+        setupProviderListeners(botInstance, tenantId);
 
         res.statusCode = 200;
         return res.end(JSON.stringify({ success: true, tenantId }));
@@ -562,35 +583,29 @@ if ((managerApi as any).app) {
         botInstance = await manager.createBot({
           tenantId,
           flows: [createAiFlow(tenantId)],
-          providerOptions: { usePairingCode: true, phoneNumber: cleanNumber }
         });
+        setupProviderListeners(botInstance, tenantId);
 
         const provider = botInstance.provider as any;
 
         const code = await new Promise((resolve, reject) => {
           const timeout = setTimeout(() => reject(new Error('Timeout esperando código de Baileys')), 25000);
           
-          const onRequireAction = (event: any) => {
-            clearTimeout(timeout);
-            provider.off('require_action', onRequireAction);
-            if (event?.instructions && event.instructions[0]) {
-              const rawCode = event.instructions[0].replace('Code:', '').trim();
-              resolve(rawCode);
-            } else if (event?.code) {
-              resolve(event.code);
-            } else {
-              reject(new Error('Formato de código inválido'));
+          setTimeout(async () => {
+            try {
+               const sock = provider.vendor || provider.socket || provider.sock;
+               if (!sock || !sock.requestPairingCode) {
+                 clearTimeout(timeout);
+                 return reject(new Error('El proveedor de WhatsApp no soporta pairing code'));
+               }
+               const rawCode = await sock.requestPairingCode(cleanNumber);
+               clearTimeout(timeout);
+               resolve(rawCode);
+            } catch (err) {
+               clearTimeout(timeout);
+               reject(err);
             }
-          };
-
-          const onError = (err: any) => {
-            clearTimeout(timeout);
-            provider.off('error', onError);
-            reject(err);
-          };
-
-          provider.on('require_action', onRequireAction);
-          provider.on('error', onError);
+          }, 3000); // Wait for Baileys WS to connect
         });
 
         console.log(`✅ [BotEngine] Pairing code generado para ${tenantId}: ${code}`);
