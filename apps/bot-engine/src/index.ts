@@ -481,77 +481,89 @@ if ((managerApi as any).app) {
     }
   });
 
-  // Endpoint Manual Send Message
-  app.post('/internal/send-message', async (req: any, res: any) => {
-    let body = '';
-    req.on('data', (chunk: any) => body += chunk.toString());
-    req.on('end', async () => {
-      try {
-        const apiKey = req.headers['x-api-key'];
-        if (apiKey !== API_KEY) {
-          res.statusCode = 401;
-          return res.end(JSON.stringify({ error: 'Unauthorized' }));
-        }
-
-        const data = JSON.parse(body);
-        const { tenantId, customerPhone, message } = data;
-
-        if (!tenantId || !customerPhone || !message) {
-          res.statusCode = 400;
-          return res.end(JSON.stringify({ error: 'Missing params' }));
-        }
-
-        const botInstance = manager.getBot(tenantId);
-        if (!botInstance) {
-          res.statusCode = 404;
-          return res.end(JSON.stringify({ error: 'Bot not found or not connected' }));
-        }
-
-        const provider = botInstance.provider as any;
-        if (typeof provider.sendMessage === 'function') {
-          await provider.sendMessage(customerPhone, message, {});
-          res.statusCode = 200;
-          return res.end(JSON.stringify({ success: true }));
-        } else {
-          res.statusCode = 500;
-          return res.end(JSON.stringify({ error: 'Provider does not support sendMessage directly' }));
-        }
-      } catch (err) {
-        res.statusCode = 500;
-        return res.end(JSON.stringify({ error: String(err) }));
+  // Helper para leer body de req dinámicamente
+  const getParsedBody = async (req: any) => {
+    if (req.body && typeof req.body === 'object' && Object.keys(req.body).length > 0) {
+      return req.body;
+    }
+    if (typeof req.body === 'string' && req.body.trim()) {
+      try { return JSON.parse(req.body); } catch (e) {}
+    }
+    return new Promise<any>((resolve) => {
+      let raw = '';
+      req.on('data', (chunk: any) => raw += chunk.toString());
+      req.on('end', () => {
+        try { resolve(JSON.parse(raw || '{}')); } catch (e) { resolve({}); }
+      });
+      if (req.readableEnded || req.complete) {
+        try { resolve(JSON.parse(raw || '{}')); } catch (e) { resolve({}); }
       }
     });
+  };
+
+  // Endpoint Manual Send Message
+  app.post('/internal/send-message', async (req: any, res: any) => {
+    try {
+      const apiKey = req.headers['x-api-key'];
+      if (apiKey !== API_KEY) {
+        res.statusCode = 401;
+        return res.end(JSON.stringify({ error: 'Unauthorized' }));
+      }
+
+      const data = await getParsedBody(req);
+      const { tenantId, customerPhone, message } = data;
+
+      if (!tenantId || !customerPhone || !message) {
+        res.statusCode = 400;
+        return res.end(JSON.stringify({ error: 'Missing params', received: data }));
+      }
+
+      const botInstance = manager.getBot(tenantId);
+      if (!botInstance) {
+        res.statusCode = 404;
+        return res.end(JSON.stringify({ error: 'Bot not found or not connected' }));
+      }
+
+      const provider = botInstance.provider as any;
+      if (typeof provider.sendMessage === 'function') {
+        await provider.sendMessage(customerPhone, message, {});
+        res.statusCode = 200;
+        return res.end(JSON.stringify({ success: true }));
+      } else {
+        res.statusCode = 500;
+        return res.end(JSON.stringify({ error: 'Provider does not support sendMessage directly' }));
+      }
+    } catch (err) {
+      res.statusCode = 500;
+      return res.end(JSON.stringify({ error: String(err) }));
+    }
   });
 
   // Endpoint de Prueba Simulación de Mensaje Entrante
   app.post('/internal/test-message', async (req: any, res: any) => {
-    let body = '';
-    req.on('data', (chunk: any) => body += chunk.toString());
-    req.on('end', async () => {
-      try {
-        const apiKey = req.headers['x-api-key'];
-        if (apiKey !== API_KEY) {
-          res.statusCode = 401;
-          return res.end(JSON.stringify({ error: 'Unauthorized' }));
-        }
-        const data = JSON.parse(body || '{}');
-        const botInstance = manager.getBot(data.tenantId);
-        if (botInstance && botInstance.provider) {
-          botInstance.provider.emit('message', {
-            from: data.phone || '1234567890',
-            body: data.message || 'hola',
-            message: { conversation: data.message || 'hola' }
-          });
-          res.statusCode = 200;
-          return res.end(JSON.stringify({ success: true, text: 'emitted' }));
-        }
-        res.statusCode = 404;
-        return res.end(JSON.stringify({ error: 'Bot not found' }));
-      } catch (err) {
-        res.statusCode = 500;
-        return res.end(JSON.stringify({ error: String(err) }));
+    try {
+      const apiKey = req.headers['x-api-key'];
+      if (apiKey !== API_KEY) {
+        res.statusCode = 401;
+        return res.end(JSON.stringify({ error: 'Unauthorized' }));
       }
-    });
+      const data = await getParsedBody(req);
+      const botInstance = manager.getBot(data.tenantId);
+      if (botInstance && botInstance.provider) {
+        botInstance.provider.emit('message', {
+          from: data.phone || '1234567890',
+          body: data.message || 'hola',
+          message: { conversation: data.message || 'hola' }
+        });
+        res.statusCode = 200;
+        return res.end(JSON.stringify({ success: true, text: 'emitted' }));
+      }
+      res.statusCode = 404;
+      return res.end(JSON.stringify({ error: 'Bot not found' }));
+    } catch (err) {
+      res.statusCode = 500;
+      return res.end(JSON.stringify({ error: String(err) }));
+    }
   });
 
   // Endpoint para obtener estado de un bot
