@@ -3,7 +3,7 @@ import './globals.css';
 import { AuthProvider } from '../lib/auth-context';
 
 export const metadata: Metadata = {
-  title: 'WASaaS - Plataforma de Agentes IA de WhatsApp',
+  title: 'miBot - Plataforma de Agentes IA de WhatsApp',
   description: 'Crea, entrena y gestiona tus bots inteligentes de WhatsApp para tu negocio.',
 };
 

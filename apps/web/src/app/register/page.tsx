@@ -3,9 +3,10 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Bot, Loader2, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Eye, EyeOff } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth-context';
+import { MiBotLogo } from '../../components/MiBotLogo';
 
 export default function RegisterPage() {
   const [orgName, setOrgName] = useState('');
@@ -49,16 +50,10 @@ export default function RegisterPage() {
       <div className="w-full max-w-md relative z-10">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-3 mb-4">
-            <div className="p-3 rounded-2xl bg-gradient-to-tr from-emerald-500 to-cyan-500 text-slate-950 shadow-lg shadow-emerald-500/20">
-              <Bot className="w-7 h-7" />
-            </div>
-            <div className="text-left">
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">WASaaS</h1>
-              <span className="text-xs text-emerald-400 font-medium">AI Agents Suite</span>
-            </div>
+          <div className="flex justify-center mb-3">
+            <MiBotLogo className="w-12 h-12" textClassName="text-3xl" />
           </div>
-          <p className="text-slate-400 text-sm">Crea tu cuenta y comienza a automatizar WhatsApp con IA</p>
+          <p className="text-slate-400 text-sm mt-2">Crea tu cuenta y comienza a automatizar WhatsApp con IA</p>
         </div>
 
         {/* Form */}

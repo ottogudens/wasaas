@@ -4,23 +4,60 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Bot, QrCode, Sparkles, CreditCard, Shield, CheckCircle2, FileText, Send, Phone,
-  RefreshCw, Loader2, Settings2, AlertTriangle, Terminal, LogOut, Plus, Trash2, User, Building, MessageSquare, Pencil, X, Wifi, WifiOff
+  RefreshCw, Loader2, Settings2, AlertTriangle, Terminal, LogOut, Plus, Trash2, User, Building, MessageSquare, Pencil, X, Wifi, WifiOff,
+  Cpu, Key, Sliders, Check, Eye, EyeOff
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../../lib/auth-context';
 import { api } from '../../lib/api';
+import { MiBotLogo } from '../../components/MiBotLogo';
+
+const AVAILABLE_MODELS: Record<string, Array<{ id: string; name: string; description: string; speed: string; intelligence: string; recommended?: boolean }>> = {
+  openai: [
+    { id: 'gpt-4o-mini', name: 'GPT-4o-mini', description: 'Ultrarrápido y altamente eficiente. Recomendado para atención al cliente y respuestas ágiles.', speed: '⚡⚡⚡ Muy Alta', intelligence: '🧠🧠 Alta', recommended: true },
+    { id: 'gpt-4o', name: 'GPT-4o Omnimodal', description: 'Capacidad cognitiva superior, razonamiento complejo y soporte de visión.', speed: '⚡⚡ Alta', intelligence: '🧠🧠🧠 Superior' },
+    { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', description: 'Excelente seguimiento de instrucciones complejas y estructuradas.', speed: '⚡ Media', intelligence: '🧠🧠🧠 Superior' },
+    { id: 'o3-mini', name: 'OpenAI o3-mini', description: 'Razonamiento lógico intensivo para soporte técnico y tareas analíticas.', speed: '⚡⚡ Alta', intelligence: '🧠🧠🧠 Razonador' },
+  ],
+  anthropic: [
+    { id: 'claude-3-5-sonnet', name: 'Claude 3.5 Sonnet', description: 'Redacción humana natural fluida, código y análisis conceptual fino.', speed: '⚡⚡ Alta', intelligence: '🧠🧠🧠 Superior', recommended: true },
+    { id: 'claude-3-5-haiku', name: 'Claude 3.5 Haiku', description: 'Baja latencia con respuestas ágiles para interacciones directas.', speed: '⚡⚡⚡ Muy Alta', intelligence: '🧠🧠 Media-Alta' },
+  ],
+  google: [
+    { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', description: 'Modelo ligero optimizado para velocidad extrema y gran volumen de chats.', speed: '⚡⚡⚡ Máxima', intelligence: '🧠🧠 Alta', recommended: true },
+    { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', description: 'Ventana de contexto extendida ideal para catálogos extensos.', speed: '⚡ Media', intelligence: '🧠🧠🧠 Superior' },
+    { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', description: 'Siguiente generación de Google con razonamiento rápido en tiempo real.', speed: '⚡⚡⚡ Máxima', intelligence: '🧠🧠🧠 Alta' },
+  ],
+  deepseek: [
+    { id: 'deepseek-chat', name: 'DeepSeek-V3 Chat', description: 'Modelo ultra eficiente con respuestas precisas a un costo mínimo.', speed: '⚡⚡⚡ Muy Alta', intelligence: '🧠🧠 Alta', recommended: true },
+    { id: 'deepseek-r1', name: 'DeepSeek-R1', description: 'Especializado en cadena de pensamiento y razonamiento lógico profundo.', speed: '⚡ Media', intelligence: '🧠🧠🧠 Razonador' },
+  ],
+};
 
 export default function DashboardPage() {
   const { user, org, token, isLoading: authLoading, logout } = useAuth();
   const router = useRouter();
 
-  const [activeTab, setActiveTab] = useState<'qr' | 'prompt' | 'rag' | 'billing' | 'bots' | 'chat'>('bots');
+  const [activeTab, setActiveTab] = useState<'qr' | 'prompt' | 'ai-config' | 'rag' | 'billing' | 'bots' | 'chat'>('bots');
   // Chat state
   const [conversations, setConversations] = useState<any[]>([]);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [chatInput, setChatInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // AI Config state
+  const [aiProvider, setAiProvider] = useState<'openai' | 'anthropic' | 'google' | 'deepseek'>('openai');
+  const [customApiKey, setCustomApiKey] = useState('');
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [temperature, setTemperature] = useState(0.7);
+  const [maxTokens, setMaxTokens] = useState(800);
+  const [aiSaveMessage, setAiSaveMessage] = useState<string | null>(null);
+
+  // AI Playground test state
+  const [testInput, setTestInput] = useState('');
+  const [testMessages, setTestMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
+  const [testingAi, setTestingAi] = useState(false);
 
   // Bot instances state
   const [bots, setBots] = useState<any[]>([]);
@@ -472,6 +509,42 @@ export default function DashboardPage() {
     }
   };
 
+  const handleSaveAiConfig = async () => {
+    if (!selectedBot) return;
+    setSavingPrompt(true);
+    setAiSaveMessage(null);
+    try {
+      const updated = await api.updateBot(selectedBot.id, {
+        systemPrompt,
+        aiModel,
+      });
+      setSelectedBot(updated);
+      setAiSaveMessage('✅ Configuración de IA guardada exitosamente');
+      addLog(`💾 Configuración de IA actualizada para bot "${selectedBot.name}" (Modelo: ${aiModel})`);
+    } catch (err: any) {
+      setAiSaveMessage(`❌ Error: ${err.message}`);
+    } finally {
+      setSavingPrompt(false);
+    }
+  };
+
+  const handleRunAiTest = async () => {
+    if (!testInput.trim()) return;
+    const userMsg = testInput.trim();
+    setTestInput('');
+    setTestMessages((prev) => [...prev, { role: 'user', content: userMsg }]);
+    setTestingAi(true);
+
+    try {
+      const res = await api.chatAi(userMsg, systemPrompt || 'Eres miBot, un asistente inteligente de atención al cliente.');
+      setTestMessages((prev) => [...prev, { role: 'assistant', content: res.reply || 'Sin respuesta' }]);
+    } catch (err: any) {
+      setTestMessages((prev) => [...prev, { role: 'assistant', content: `❌ Error al probar modelo ${aiModel}: ${err.message}` }]);
+    } finally {
+      setTestingAi(false);
+    }
+  };
+
   const handleProcessRag = async () => {
     if (!documentTitle || !documentContent) return;
     setProcessingRag(true);
@@ -540,13 +613,7 @@ export default function DashboardPage() {
       <aside className="w-64 border-r border-slate-800 bg-slate-900/50 backdrop-blur-md p-6 flex flex-col justify-between">
         <div>
           <div className="flex items-center gap-3 mb-8">
-            <div className="p-2.5 rounded-xl bg-gradient-to-tr from-emerald-500 to-cyan-500 text-slate-950 font-bold shadow-lg shadow-emerald-500/20">
-              <Bot className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="font-bold text-lg leading-none bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">WASaaS</h1>
-              <span className="text-xs text-emerald-400 font-medium">AI Agents Suite</span>
-            </div>
+            <MiBotLogo className="w-9 h-9" textClassName="text-xl" />
           </div>
 
           {/* Org & User card */}
@@ -601,6 +668,16 @@ export default function DashboardPage() {
               }`}
             >
               <Sparkles className="w-4 h-4" /> Prompt y Personalidad
+            </button>
+            <button
+              onClick={() => setActiveTab('ai-config')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                activeTab === 'ai-config'
+                  ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-400 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.15)]'
+                  : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+              }`}
+            >
+              <Cpu className="w-4 h-4" /> Configuración de IA
             </button>
             <button
               onClick={() => setActiveTab('rag')}
@@ -1122,6 +1199,282 @@ export default function DashboardPage() {
             ) : (
               <p className="text-slate-500">Selecciona un agente en el menú de la izquierda.</p>
             )}
+          </div>
+        )}
+
+        {/* AI Config Tab */}
+        {activeTab === 'ai-config' && (
+          <div className="max-w-5xl mx-auto space-y-8">
+            <div>
+              <h2 className="text-2xl font-bold text-slate-100 flex items-center gap-3">
+                <Cpu className="w-7 h-7 text-emerald-400" />
+                Configuración y Selección de Motor IA
+              </h2>
+              <p className="text-slate-400 text-sm mt-1">
+                Personaliza el proveedor de Inteligencia Artificial, el modelo y los parámetros de respuesta para tus agentes.
+              </p>
+            </div>
+
+            {/* Target Bot Bar */}
+            {selectedBot ? (
+              <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex items-center justify-between flex-wrap gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                    <Bot className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="text-xs text-slate-400 font-medium">Agente seleccionado</div>
+                    <div className="text-slate-100 font-bold text-base flex items-center gap-2">
+                      {selectedBot.name}
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
+                        {selectedBot.tenantId}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-400 font-medium">Modelo Activo:</span>
+                  <span className="px-3 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-mono font-bold">
+                    {aiModel}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm">
+                ⚠️ Selecciona o crea un agente en la pestaña "Mis Agentes" para aplicar los cambios de IA.
+              </div>
+            )}
+
+            {/* AI Provider & Model Selector */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">1. Selecciona el Proveedor y Modelo de IA</h3>
+              
+              {/* Provider Selector Buttons */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { id: 'openai', name: 'OpenAI', icon: '🤖', badge: 'Popular' },
+                  { id: 'anthropic', name: 'Anthropic Claude', icon: '🧠', badge: 'Razonamiento' },
+                  { id: 'google', name: 'Google Gemini', icon: '✨', badge: 'Ultra Veloz' },
+                  { id: 'deepseek', name: 'DeepSeek', icon: '⚡', badge: 'Económico' },
+                ].map((prov) => (
+                  <button
+                    key={prov.id}
+                    onClick={() => {
+                      setAiProvider(prov.id as any);
+                      const defaultMod = AVAILABLE_MODELS[prov.id][0]?.id;
+                      if (defaultMod) setAiModel(defaultMod);
+                    }}
+                    className={`p-4 rounded-2xl border text-left transition-all relative overflow-hidden flex flex-col justify-between ${
+                      aiProvider === prov.id
+                        ? 'bg-emerald-500/10 border-emerald-500/40 shadow-lg shadow-emerald-500/10'
+                        : 'bg-slate-900/40 border-slate-800 hover:border-slate-700 hover:bg-slate-900/70'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-2xl">{prov.icon}</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                        {prov.badge}
+                      </span>
+                    </div>
+                    <div className="mt-3">
+                      <div className="font-bold text-slate-100 text-sm">{prov.name}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              {/* Model Cards Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                {AVAILABLE_MODELS[aiProvider]?.map((model) => (
+                  <div
+                    key={model.id}
+                    onClick={() => setAiModel(model.id)}
+                    className={`p-5 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between relative group ${
+                      aiModel === model.id
+                        ? 'bg-gradient-to-br from-emerald-500/15 via-slate-900 to-slate-900 border-emerald-500/50 shadow-xl shadow-emerald-500/10'
+                        : 'bg-slate-900/40 border-slate-800 hover:border-slate-700 hover:bg-slate-900/80'
+                    }`}
+                  >
+                    {aiModel === model.id && (
+                      <div className="absolute top-3 right-3 text-emerald-400 bg-emerald-500/20 p-1 rounded-full border border-emerald-500/40">
+                        <Check className="w-4 h-4" />
+                      </div>
+                    )}
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-bold text-slate-100 text-base">{model.name}</h4>
+                        {model.recommended && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                            Recomendado
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">{model.description}</p>
+                    </div>
+                    <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                      <span>Velocidad: <strong className="text-slate-300">{model.speed}</strong></span>
+                      <span>Inteligencia: <strong className="text-slate-300">{model.intelligence}</strong></span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* API Key & Provider Credentials */}
+            <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                  <Key className="w-4 h-4 text-emerald-400" />
+                  2. Credenciales y Clave de API ({aiProvider.toUpperCase()})
+                </h3>
+                <span className="text-xs text-emerald-400 font-medium flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                  API Key miBot Activa
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-xs text-slate-400 font-medium block">
+                  Clave de API Personal (Opcional - Si la dejas vacía se usará la API Key oficial asignada por miBot):
+                </label>
+                <div className="relative">
+                  <input
+                    type={showApiKey ? "text" : "password"}
+                    value={customApiKey}
+                    onChange={(e) => setCustomApiKey(e.target.value)}
+                    placeholder={`Ej: ${aiProvider === 'openai' ? 'sk-proj-...' : aiProvider === 'anthropic' ? 'sk-ant-...' : 'AIzaSy...'}`}
+                    className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-sm focus:outline-none focus:border-emerald-500 font-mono pr-24"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowApiKey(!showApiKey)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-200 px-2 py-1 rounded bg-slate-900 border border-slate-800"
+                  >
+                    {showApiKey ? 'Ocultar' : 'Mostrar'}
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  🔒 Tus claves privadas se almacenan de forma totalmente aislada y cifrada.
+                </p>
+              </div>
+            </div>
+
+            {/* Hyperparameters */}
+            <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-6">
+              <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                <Sliders className="w-4 h-4 text-emerald-400" />
+                3. Hiperparámetros del Modelo
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Temperature */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center text-xs font-medium">
+                    <span className="text-slate-300">Temperatura (Creatividad):</span>
+                    <span className="text-emerald-400 font-mono font-bold text-sm">{temperature}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={temperature}
+                    onChange={(e) => setTemperature(parseFloat(e.target.value))}
+                    className="w-full accent-emerald-500 cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-500">
+                    <span>0.0 (Preciso / Soporte)</span>
+                    <span>0.5 (Balanceado)</span>
+                    <span>1.0 (Creativo)</span>
+                  </div>
+                </div>
+
+                {/* Max Tokens */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center text-xs font-medium">
+                    <span className="text-slate-300">Límite de Tokens por Respuesta:</span>
+                    <span className="text-emerald-400 font-mono font-bold text-sm">{maxTokens} tokens</span>
+                  </div>
+                  <input
+                    type="number"
+                    min="100"
+                    max="4000"
+                    step="50"
+                    value={maxTokens}
+                    onChange={(e) => setMaxTokens(parseInt(e.target.value) || 500)}
+                    className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-sm focus:outline-none focus:border-emerald-500 font-mono"
+                  />
+                  <p className="text-[11px] text-slate-500">~800 tokens equivale a aproximadamente 600 palabras.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Live Playground / Tester */}
+            <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4">
+              <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-emerald-400" />
+                4. Playground: Prueba de Respuesta del Modelo en Tiempo Real
+              </h3>
+              <p className="text-xs text-slate-400">
+                Envía un mensaje de prueba para verificar cómo responderá el modelo <strong className="text-emerald-400">{aiModel}</strong> con tu prompt actual.
+              </p>
+
+              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3 max-h-60 overflow-y-auto font-sans">
+                {testMessages.length === 0 ? (
+                  <div className="text-center py-6 text-slate-600 text-xs italic">
+                    Escribe una pregunta abajo para probar el comportamiento de la IA en vivo...
+                  </div>
+                ) : (
+                  testMessages.map((msg, idx) => (
+                    <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`max-w-[80%] p-3 rounded-xl text-xs leading-relaxed ${
+                        msg.role === 'user'
+                          ? 'bg-emerald-500/20 text-emerald-200 border border-emerald-500/30'
+                          : 'bg-slate-900 text-slate-200 border border-slate-800'
+                      }`}>
+                        <div className="font-bold text-[10px] opacity-60 mb-1">{msg.role === 'user' ? 'Tú (Prueba)' : `miBot (${aiModel})`}</div>
+                        {msg.content}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={testInput}
+                  onChange={(e) => setTestInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleRunAiTest()}
+                  placeholder="Ej: ¿Cuáles son sus horarios de atención?"
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-xs focus:outline-none focus:border-emerald-500"
+                />
+                <button
+                  onClick={handleRunAiTest}
+                  disabled={testingAi || !testInput.trim()}
+                  className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition-all flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {testingAi ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                  Probar
+                </button>
+              </div>
+            </div>
+
+            {/* Save Action */}
+            <div className="flex items-center justify-between pt-4 border-t border-slate-800">
+              {aiSaveMessage && (
+                <span className="text-xs font-semibold text-emerald-400">{aiSaveMessage}</span>
+              )}
+              <button
+                onClick={handleSaveAiConfig}
+                disabled={savingPrompt || !selectedBot}
+                className="ml-auto px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-bold text-sm transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-2 disabled:opacity-50"
+              >
+                {savingPrompt ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                Guardar Configuración de IA
+              </button>
+            </div>
           </div>
         )}
 
