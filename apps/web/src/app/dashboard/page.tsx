@@ -577,6 +577,23 @@ export default function DashboardPage() {
       addLog(`❌ Error al eliminar: ${err.message}`);
       await loadBots();
     }
+  const handleSavePrompt = async () => {
+    if (!selectedBot) return;
+    setSavingPrompt(true);
+    setPromptMessage(null);
+    try {
+      const updated = await api.updateBot(selectedBot.id, {
+        systemPrompt,
+        aiModel,
+      });
+      setSelectedBot(updated);
+      setPromptMessage('✅ Configuración guardada en la base de datos');
+      addLog(`💾 System prompt actualizado para bot "${selectedBot.name}"`);
+    } catch (err: any) {
+      setPromptMessage(`❌ Error: ${err.message}`);
+    } finally {
+      setSavingPrompt(false);
+    }
   };
 
   // Listen for PWA install prompt
