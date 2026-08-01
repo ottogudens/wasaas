@@ -181,18 +181,58 @@ manager.createBot = async (tenantConfig: any) => {
       (manager as any).emit('bot:connected', tenantConfig.tenantId);
     });
 
-    provider.on('message', (payload: any) => {
+    provider.on('message', async (payload: any) => {
       const bodyText = extractMessageText(payload);
       const rawFrom = payload?.from || payload?.key?.remoteJid || '';
       const cleanFrom = cleanPhoneNumber(rawFrom);
-      console.log(`📩 [Baileys Raw Message] Tenant: ${tenantConfig.tenantId}, From: ${cleanFrom} (${rawFrom}), Body: "${bodyText}"`);
-      // Propagate message to Frontend Live Chat via WebSocket
+
+      // Ignorar mensajes vacíos, estados de broadcast o remite inválido
+      if (!cleanFrom || !bodyText || rawFrom.includes('status@broadcast')) return;
+
+      // Evitar bucles ignorando mensajes salientes generados por la propia instancia
+      if (payload?.key?.fromMe) return;
+
+      console.log(`📩 [Baileys Incoming Message] Tenant: ${tenantConfig.tenantId}, From: ${cleanFrom} (${rawFrom}), Body: "${bodyText}"`);
+
+      // 1. Emitir evento WebSocket para actualizar Live Chat en tiempo real en el Frontend
       (manager as any).emit('bot:message', tenantConfig.tenantId, {
         from: cleanFrom,
         body: bodyText,
-        name: payload?.name || cleanFrom,
+        name: payload?.pushName || payload?.name || cleanFrom,
         timestamp: Date.now()
       });
+
+      // 2. Procesar con NestJS AI API: persiste conversación/mensaje en PostgreSQL, evalúa RAG y genera respuesta
+      try {
+        const response = await fetch(`${API_URL}/ai/chat-with-context`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': API_KEY
+          },
+          body: JSON.stringify({
+            tenantId: tenantConfig.tenantId,
+            customerPhone: cleanFrom,
+            message: bodyText,
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.isHumanMode) {
+            console.log(`✋ [BotEngine] Modo humano activo para ${cleanFrom}. Ignorando IA.`);
+            return;
+          }
+          if (data.reply && typeof provider.sendMessage === 'function') {
+            console.log(`🤖 [BotEngine] Respondiendo a ${cleanFrom}: "${data.reply}"`);
+            await provider.sendMessage(cleanFrom, data.reply, {});
+          }
+        } else {
+          console.warn(`⚠️ [BotEngine] Respuesta HTTP ${response.status} desde /ai/chat-with-context`);
+        }
+      } catch (err) {
+        console.error('❌ Error al enviar mensaje entrante a AI API:', err);
+      }
     });
 
     // Forzar inicio del proveedor vendor de Baileys

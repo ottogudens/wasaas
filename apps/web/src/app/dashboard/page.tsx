@@ -332,8 +332,9 @@ export default function DashboardPage() {
             addLog(`⚠️ Bot "${selectedBot.name}" desconectado.`);
             loadBots();
           } else if (data.event === 'bot:message') {
-            // Un mensaje nuevo acaba de llegar, recargamos el chat o lo inyectamos optimísticamente
+            // Un mensaje nuevo acaba de llegar, recargamos la lista de conversaciones y mensajes
             if (activeTab === 'chat') {
+              loadConversations();
               loadMessages();
             }
           }
