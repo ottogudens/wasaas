@@ -37,15 +37,40 @@ if (!fs.existsSync(SESSIONS_DIR)) {
 const { version } = await fetchLatestBaileysVersion();
 console.log(`🌐 [Baileys] Versión de WhatsApp Web obtenida de servidores oficiales: ${version.join('.')}`);
 
+// Helpers para formatear extracción de texto y teléfonos de WhatsApp
+const extractMessageText = (payload: any): string => {
+  if (!payload) return '';
+  if (typeof payload === 'string') return payload;
+  if (payload.body && typeof payload.body === 'string') return payload.body;
+  const msg = payload.message || payload;
+  if (typeof msg === 'string') return msg;
+  return (
+    msg?.conversation ||
+    msg?.extendedTextMessage?.text ||
+    msg?.imageMessage?.caption ||
+    msg?.videoMessage?.caption ||
+    msg?.documentMessage?.caption ||
+    msg?.buttonsResponseMessage?.selectedButtonId ||
+    msg?.listResponseMessage?.singleSelectReply?.selectedRowId ||
+    ''
+  );
+};
+
+const cleanPhoneNumber = (raw: string): string => {
+  if (!raw) return '';
+  return raw.replace(/@.*$/, '').replace(/:.*$/, '').replace(/[^\d]/g, '');
+};
+
 // --- Factory de flujos IA por tenant ---
 // Cada bot obtiene su propio flujo con el tenantId capturado en la closure.
 // Esto garantiza que cuando llega un mensaje, el tenantId correcto se envía a la API.
 const createAiFlow = (tenantId: string) => {
   return addKeyword(EVENTS.WELCOME)
     .addAction(async (ctx: any, { flowDynamic }: { flowDynamic: any }) => {
-      const userPrompt = ctx.body;
-      const customerPhone = ctx.from;
-      console.log(`🤖 [BotEngine] Mensaje de ${customerPhone} (Tenant: ${tenantId}): "${userPrompt}"`);
+      const userPrompt = extractMessageText(ctx) || 'Hola';
+      const rawFrom = ctx.from || ctx.key?.remoteJid || '';
+      const customerPhone = cleanPhoneNumber(rawFrom);
+      console.log(`🤖 [BotEngine] Mensaje procesado de ${customerPhone} (Tenant: ${tenantId}): "${userPrompt}"`);
 
       let botReply = 'Lo siento, en este momento no puedo procesar tu solicitud. Intenta más tarde.';
 
@@ -157,12 +182,15 @@ manager.createBot = async (tenantConfig: any) => {
     });
 
     provider.on('message', (payload: any) => {
-      console.log(`📩 [Baileys Raw Message] Tenant: ${tenantConfig.tenantId}, From: ${payload?.from || payload?.key?.remoteJid}, Body: ${payload?.body || payload?.message?.conversation}`);
+      const bodyText = extractMessageText(payload);
+      const rawFrom = payload?.from || payload?.key?.remoteJid || '';
+      const cleanFrom = cleanPhoneNumber(rawFrom);
+      console.log(`📩 [Baileys Raw Message] Tenant: ${tenantConfig.tenantId}, From: ${cleanFrom} (${rawFrom}), Body: "${bodyText}"`);
       // Propagate message to Frontend Live Chat via WebSocket
       (manager as any).emit('bot:message', tenantConfig.tenantId, {
-        from: payload?.from || payload?.key?.remoteJid,
-        body: payload?.body || payload?.message?.conversation,
-        name: payload?.name,
+        from: cleanFrom,
+        body: bodyText,
+        name: payload?.name || cleanFrom,
         timestamp: Date.now()
       });
     });
