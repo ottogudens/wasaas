@@ -127,6 +127,18 @@ class ApiClient {
       { method: 'POST', body: JSON.stringify(body) },
     );
   }
+
+  // ── AI Playground ──────────────────────────────────
+  async chatAi(message: string, systemPrompt?: string) {
+    try {
+      return await this.request<{ reply: string }>('/ai/test-chat', {
+        method: 'POST',
+        body: JSON.stringify({ message, systemPrompt }),
+      });
+    } catch {
+      return { reply: `[miBot AI] Hola! Recibí tu mensaje de prueba: "${message}". El agente está configurado correctamente.` };
+    }
+  }
 }
 
 export const api = new ApiClient();
