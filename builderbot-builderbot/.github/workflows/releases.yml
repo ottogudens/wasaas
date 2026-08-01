@@ -1,0 +1,74 @@
+name: 🚀⚡ Liberando versiones
+
+on:
+    push:
+        branches:
+            - builderbot-prod
+jobs:
+    ############ RELEASE ############
+    release-prod:
+        if: ${{ !github.event.act }}
+        name: Release
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+            packages: write
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v3
+              with:
+                  fetch-depth: 0
+                  token: ${{ secrets.GITHUB_TOKEN }}
+
+            - uses: pnpm/action-setup@v4
+
+            - name: Setup Node
+              uses: actions/setup-node@v3
+              with:
+                  node-version: 22.20.0
+                  cache: 'pnpm'
+                  registry-url: https://registry.npmjs.org/
+
+            - run: corepack enable
+
+            - name: Set User
+              run: git config --global user.email "leifer.contacto@gmail.com" && git config --global user.name "Leifer Mendez"
+
+            - name: Install NPM Dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Build Package (before versioning)
+              run: |
+                  echo "🔨 Construyendo paquetes antes de versionar..."
+                  pnpm build:full
+                  echo "✅ Build exitoso"
+
+            - name: Bump version with lerna
+              run: |
+                  echo "📦 Actualizando versiones con lerna..."
+                  npx lerna version patch --force-publish --yes --no-push
+
+                  # Verificar versiones actualizadas
+                  echo "📋 Versiones actualizadas:"
+                  npx lerna ls --json | jq -r '.[] | "  - \(.name): \(.version)"'
+
+            - name: Get npm version
+              id: package-version
+              run: |
+                  VERSION=$(node -p "require('./lerna.json').version")
+                  echo "version=$VERSION" >> $GITHUB_OUTPUT
+                  echo "📦 Versión detectada: $VERSION"
+
+            - name: Push changes and tags
+              run: |
+                  git push origin builderbot-prod --follow-tags --no-verify
+                  echo "✅ Cambios y tags subidos al repositorio"
+
+            - name: Publish packages to npm
+              run: npx lerna publish from-package --yes
+              env:
+                  NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+            - name: Release Github
+              if: success()
+              run: node ./scripts/github.js --version="${{ steps.package-version.outputs.version}}" --token="${{ secrets.GITHUB_TOKEN }}"

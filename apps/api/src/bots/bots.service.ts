@@ -19,6 +19,7 @@ export class BotsService {
         tenantId: true,
         name: true,
         phoneNumber: true,
+        provider: true,
         status: true,
         aiModel: true,
         systemPrompt: true,
@@ -32,7 +33,7 @@ export class BotsService {
   /**
    * Crear una nueva instancia de bot
    */
-  async createBot(organizationId: string, data: { name: string; systemPrompt?: string; aiModel?: string }) {
+  async createBot(organizationId: string, data: { name: string; systemPrompt?: string; aiModel?: string; provider?: string; metaJwtToken?: string; metaNumberId?: string; metaVerifyToken?: string }) {
     // Generar tenantId único basado en org slug + timestamp
     const org = await this.prisma.organization.findUnique({ where: { id: organizationId } });
     if (!org) throw new NotFoundException('Organización no encontrada.');
@@ -43,6 +44,10 @@ export class BotsService {
       data: {
         tenantId,
         name: data.name,
+        provider: data.provider || 'baileys',
+        metaJwtToken: data.metaJwtToken,
+        metaNumberId: data.metaNumberId,
+        metaVerifyToken: data.metaVerifyToken,
         systemPrompt: data.systemPrompt || 'Eres un asistente virtual profesional especializado en atención al cliente. Responde de manera concisa y amable.',
         aiModel: data.aiModel || 'gpt-4o-mini',
         organizationId,
@@ -83,7 +88,7 @@ export class BotsService {
   /**
    * Actualizar configuración de un bot
    */
-  async updateBot(botId: string, organizationId: string, data: { name?: string; systemPrompt?: string; aiModel?: string }) {
+  async updateBot(botId: string, organizationId: string, data: { name?: string; systemPrompt?: string; aiModel?: string; provider?: string; metaJwtToken?: string; metaNumberId?: string; metaVerifyToken?: string }) {
     const bot = await this.getBot(botId, organizationId);
 
     const updated = await this.prisma.botInstance.update({
@@ -92,6 +97,10 @@ export class BotsService {
         ...(data.name && { name: data.name }),
         ...(data.systemPrompt !== undefined && { systemPrompt: data.systemPrompt }),
         ...(data.aiModel && { aiModel: data.aiModel }),
+        ...(data.provider && { provider: data.provider }),
+        ...(data.metaJwtToken !== undefined && { metaJwtToken: data.metaJwtToken }),
+        ...(data.metaNumberId !== undefined && { metaNumberId: data.metaNumberId }),
+        ...(data.metaVerifyToken !== undefined && { metaVerifyToken: data.metaVerifyToken }),
       },
     });
 

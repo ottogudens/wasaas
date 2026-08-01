@@ -1,13 +1,14 @@
 import 'dotenv/config';
+import fs from 'fs';
+import path from 'path';
 import { BotManager, BotManagerApi } from '@builderbot/manager';
 import { BaileysProvider } from '@builderbot/provider-baileys';
+import { MetaProvider } from '@builderbot/provider-meta';
 import { addKeyword, EVENTS } from '@builderbot/bot';
 import { fetchLatestBaileysVersion } from 'baileys';
 import { WebSocketServer, WebSocket } from 'ws';
 import QRCode from 'qrcode';
 
-import fs from 'fs';
-import path from 'path';
 import cors from 'cors';
 
 // En Railway se expone un único puerto público (PORT).
@@ -15,6 +16,14 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT) : (process.env.BOT_EN
 const SESSIONS_DIR = process.env.SESSIONS_DIR || './sessions';
 const API_KEY = process.env.INTERNAL_API_KEY || 'skale-saas-secret-key';
 const API_URL = process.env.API_URL || 'https://wasaas-production.up.railway.app';
+
+// Asegurar la creación del directorio de sesiones para volumen persistente
+if (!fs.existsSync(SESSIONS_DIR)) {
+  fs.mkdirSync(SESSIONS_DIR, { recursive: true });
+  console.log(`📁 [BotEngine] Directorio de volúmenes persistentes creado en: ${path.resolve(SESSIONS_DIR)}`);
+} else {
+  console.log(`📂 [BotEngine] Directorio de sesiones listo en: ${path.resolve(SESSIONS_DIR)}`);
+}
 
 // Obtenemos dinámicamente la última versión soportada por las APIs de WhatsApp Web
 const { version } = await fetchLatestBaileysVersion();
@@ -67,7 +76,6 @@ const createAiFlow = (tenantId: string) => {
 };
 
 // 1. Inicializar Orquestador de Instancias Multi-tenant
-console.log(`📂 [BotManager] Directorio de sesiones: ${SESSIONS_DIR}`);
 const manager = new BotManager({
   sessionsDir: SESSIONS_DIR,
   defaultProviderClass: BaileysProvider as any,
@@ -77,16 +85,29 @@ const manager = new BotManager({
   },
 });
 
-// Interceptar la creación de cada bot para asegurar inicio explícito e instrumentación de eventos
+// Interceptar la creación de cada bot para soporte multi-proveedor (Baileys / Meta Cloud API)
 const originalCreateBot = manager.createBot.bind(manager);
 manager.createBot = async (tenantConfig: any) => {
-  console.log(`🚀 [BotEngine] Creando e inicializando proveedor de WhatsApp para Tenant: ${tenantConfig.tenantId}...`);
+  console.log(`🚀 [BotEngine] Configurando proveedor para Tenant: ${tenantConfig.tenantId} (Proveedor: ${tenantConfig.provider || 'baileys'})...`);
 
-  // Inyectar versión dinámica si no se especifica
-  if (!tenantConfig.providerOptions) {
-    tenantConfig.providerOptions = {};
+  // Selección dinámica de clase de proveedor y opciones
+  if (tenantConfig.provider === 'meta') {
+    tenantConfig.providerClass = MetaProvider as any;
+    tenantConfig.providerOptions = {
+      jwtToken: tenantConfig.metaJwtToken || process.env.META_JWT_TOKEN || '',
+      numberId: tenantConfig.metaNumberId || process.env.META_NUMBER_ID || '',
+      verifyToken: tenantConfig.metaVerifyToken || process.env.META_VERIFY_TOKEN || '',
+      version: tenantConfig.metaVersion || 'v18.0',
+      port: PORT,
+    };
+  } else {
+    // Proveedor por defecto: Baileys (Código QR / Pairing Code)
+    tenantConfig.providerClass = BaileysProvider as any;
+    if (!tenantConfig.providerOptions) {
+      tenantConfig.providerOptions = {};
+    }
+    tenantConfig.providerOptions.version = version;
   }
-  tenantConfig.providerOptions.version = version;
 
   // Inyectar flujo dinámico con tenantId en closure si no trae flujos
   if (!tenantConfig.flows || tenantConfig.flows.length === 0) {
@@ -96,7 +117,7 @@ manager.createBot = async (tenantConfig: any) => {
   const botInstance = await originalCreateBot(tenantConfig);
 
   const provider = botInstance.provider;
-  if (provider) {
+  if (provider && tenantConfig.provider !== 'meta') {
     // Escuchar el evento 'require_action' nativo de BaileysProvider que entrega el payload del QR o Pairing Code
     provider.on('require_action', async (actionData: any) => {
       const qrStr = actionData?.payload?.qr;
@@ -158,24 +179,32 @@ const managerApi = new BotManagerApi(manager, {
   apiKey: API_KEY,
 } as any);
 
-
-
 // 3. Iniciar el servidor HTTP Polka
 managerApi.start();
 
-// 4. Adjuntar el servidor de WebSockets al mismo puerto HTTP (Polka server)
+// 4. Adjuntar el servidor de WebSockets con Aislamiento Multi-tenant
 const httpServer = (managerApi as any).app?.server;
-const connectedClients = new Set<WebSocket>();
+interface TenantWebSocket extends WebSocket {
+  tenantId?: string;
+}
+
+const connectedClients = new Set<TenantWebSocket>();
 
 if (httpServer) {
   const wss = new WebSocketServer({ server: httpServer });
 
-  wss.on('connection', (ws: WebSocket) => {
-    console.log('📡 [WebSocket] Cliente Frontend conectado desde navegador (Puerto Compartido HTTP/WS)');
+  wss.on('connection', (ws: TenantWebSocket, req) => {
+    // Extraer tenantId del URL params (ejemplo: ws://host:port/?tenantId=abc-123)
+    const urlString = req.url || '';
+    const queryParams = new URLSearchParams(urlString.includes('?') ? urlString.split('?')[1] : '');
+    const clientTenantId = queryParams.get('tenantId') || undefined;
+
+    ws.tenantId = clientTenantId;
     connectedClients.add(ws);
+    console.log(`📡 [WebSocket] Cliente conectado (Tenant Scoped: ${clientTenantId || 'Global'})`);
 
     ws.on('close', () => {
-      console.log('📌 [WebSocket] Cliente Frontend desconectado');
+      console.log(`🔌 [WebSocket] Cliente desconectado (Tenant: ${ws.tenantId || 'Global'})`);
       connectedClients.delete(ws);
     });
 
@@ -188,11 +217,14 @@ if (httpServer) {
   console.error('❌ [Bot Engine Error] No se pudo obtener el servidor HTTP para adjuntar WebSockets.');
 }
 
-const broadcast = (data: object) => {
+const broadcast = (data: { tenantId?: string; [key: string]: any }) => {
   const payload = JSON.stringify(data);
   for (const client of connectedClients) {
     if (client.readyState === WebSocket.OPEN) {
-      client.send(payload);
+      // Filtrar el envío: enviar si el mensaje es global o si el tenantId del cliente coincide
+      if (!data.tenantId || !client.tenantId || client.tenantId === data.tenantId) {
+        client.send(payload);
+      }
     }
   }
 };
@@ -203,7 +235,7 @@ manager.on('bot:qr', async (tenantId: string, data: any) => {
   let qrImageBase64 = data.qr;
 
   if (!data || !data.qr) {
-    console.error(`❌ [BotManager Error] Se recibió un evento 'bot:qr' pero el payload 'data.qr' está vacío o indefinido para Tenant: ${tenantId}`);
+    console.error(`❌ [BotManager Error] Se recibió un evento 'bot:qr' pero el payload 'data.qr' está vacío para Tenant: ${tenantId}`);
     broadcast({
       event: 'bot:error',
       tenantId,
@@ -220,9 +252,9 @@ manager.on('bot:qr', async (tenantId: string, data: any) => {
         scale: 8,
         errorCorrectionLevel: 'M',
       });
-      console.log(`✅ [BotManager Success] String de Baileys convertido exitosamente a Base64 PNG para Tenant: ${tenantId}`);
+      console.log(`✅ [BotManager Success] String de Baileys convertido a PNG Base64 para Tenant: ${tenantId}`);
     } catch (err) {
-      console.error(`❌ [BotManager Error] Falló la conversión de QR string a DataURL en QRCode.toDataURL para Tenant ${tenantId}:`, err);
+      console.error(`❌ [BotManager Error] Falló la conversión de QR string a DataURL para Tenant ${tenantId}:`, err);
       broadcast({
         event: 'bot:error',
         tenantId,
@@ -237,7 +269,7 @@ manager.on('bot:qr', async (tenantId: string, data: any) => {
     tenantId,
     qr: qrImageBase64,
   });
-  console.log(`📡 [BotManager WebSocket] Evento 'bot:qr' emitido a ${connectedClients.size} clientes WebSocket activos.`);
+  console.log(`📡 [BotManager WebSocket] Evento 'bot:qr' emitido a clientes autorizados para Tenant ${tenantId}`);
 });
 
 (manager as any).on('bot:code', (tenantId: string, data: any) => {
