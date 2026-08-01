@@ -97,6 +97,13 @@ class ApiClient {
     });
   }
 
+  async toggleHumanMode(conversationId: string, isHumanMode?: boolean) {
+    return this.request<any>(`/bots/conversations/${conversationId}/human-mode`, {
+      method: 'PATCH',
+      body: JSON.stringify({ isHumanMode }),
+    });
+  }
+
   // ── RAG ───────────────────────────────────────────
   async processDocument(body: { title: string; content: string }) {
     return this.request<{ documentId: string; totalChunksProcessed: number }>(

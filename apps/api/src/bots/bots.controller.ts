@@ -109,4 +109,13 @@ export class BotsController {
   async sendMessage(@Param('conversationId') conversationId: string, @Req() req: any, @Body() dto: SendMessageDto) {
     return this.botsService.sendManualMessage(conversationId, req.user.organizationId, dto.content);
   }
+
+  @Patch('conversations/:conversationId/human-mode')
+  async toggleHumanMode(
+    @Param('conversationId') conversationId: string,
+    @Req() req: any,
+    @Body('isHumanMode') isHumanMode?: boolean,
+  ) {
+    return this.botsService.toggleHumanMode(conversationId, req.user.organizationId, isHumanMode);
+  }
 }

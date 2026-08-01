@@ -316,4 +316,28 @@ export class BotsService {
 
     return message;
   }
+
+  /**
+   * Alternar modo humano (isHumanMode) para activar/desactivar mensajes manuales vs IA
+   */
+  async toggleHumanMode(conversationId: string, organizationId: string, isHumanMode?: boolean) {
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: { bot: true },
+    });
+
+    if (!conversation) throw new NotFoundException('Conversación no encontrada.');
+    if (conversation.bot.organizationId !== organizationId) {
+      throw new ForbiddenException('No tienes acceso a esta conversación.');
+    }
+
+    const nextMode = isHumanMode !== undefined ? isHumanMode : !conversation.isHumanMode;
+    const updated = await this.prisma.conversation.update({
+      where: { id: conversation.id },
+      data: { isHumanMode: nextMode, updatedAt: new Date() },
+    });
+
+    this.logger.log(`👤 Modo Humano ${nextMode ? 'ACTIVADO' : 'DESACTIVADO'} para conversación ${conversation.id}`);
+    return updated;
+  }
 }
