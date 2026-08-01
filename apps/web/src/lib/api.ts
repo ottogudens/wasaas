@@ -139,6 +139,30 @@ class ApiClient {
       return { reply: `[miBot AI] Hola! Recibí tu mensaje de prueba: "${message}". El agente está configurado correctamente.` };
     }
   }
+
+  // ── Document Generation & WhatsApp Dispatch ───────
+  async sendGeneratedDocument(botId: string, customerPhone: string, documentTitle: string, documentContent: string) {
+    try {
+      const botEngineUrl = process.env.NEXT_PUBLIC_BOT_ENGINE_URL || 'https://whatsapp-service-production-e6f2.up.railway.app';
+      const bot = await this.getBot(botId);
+      const res = await fetch(`${botEngineUrl}/internal/send-document`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': 'skale-saas-secret-key'
+        },
+        body: JSON.stringify({
+          tenantId: bot.tenantId,
+          customerPhone,
+          documentTitle,
+          documentContent
+        })
+      });
+      return await res.json();
+    } catch (err: any) {
+      throw new Error(`Error al enviar documento por WhatsApp: ${err.message}`);
+    }
+  }
 }
 
 export const api = new ApiClient();

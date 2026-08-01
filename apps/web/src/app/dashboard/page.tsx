@@ -5,12 +5,84 @@ import { useRouter } from 'next/navigation';
 import { 
   Bot, QrCode, Sparkles, CreditCard, Shield, CheckCircle2, FileText, Send, Phone,
   RefreshCw, Loader2, Settings2, AlertTriangle, Terminal, LogOut, Plus, Trash2, User, Building, MessageSquare, Pencil, X, Wifi, WifiOff,
-  Cpu, Key, Sliders, Check, Eye, EyeOff
+  Cpu, Key, Sliders, Check, Eye, EyeOff, Upload, FileCheck, Download, Smartphone, Menu, Share2, Copy
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../../lib/auth-context';
 import { api } from '../../lib/api';
 import { MiBotLogo } from '../../components/MiBotLogo';
+
+const DEFAULT_TEMPLATES = [
+  {
+    id: 'informe-tecnico',
+    title: '📋 Informe de Atención y Diagnóstico Técnico',
+    category: 'informe',
+    fields: [
+      { key: 'cliente', label: 'Nombre del Cliente', placeholder: 'Ej. Juan Pérez' },
+      { key: 'equipo', label: 'Equipo / Dispositivo', placeholder: 'Ej. Servidor Dell PowerEdge / Laptop HP' },
+      { key: 'diagnostico', label: 'Diagnóstico Encontrado', placeholder: 'Ej. Falla en módulo RAM / Error de software' },
+      { key: 'solucion', label: 'Solución Aplicada / Recomendada', placeholder: 'Ej. Reemplazo de módulo DDR4 16GB' },
+      { key: 'costo', label: 'Costo Total Estimado', placeholder: 'Ej. $85.000 CLP' },
+    ],
+    templateContent: (data: any) => `📋 *INFORME TÉCNICO DE ATENCIÓN*
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+👤 *Cliente:* ${data.cliente || '[Nombre Cliente]'}
+💻 *Dispositivo/Equipo:* ${data.equipo || '[Equipo]'}
+📅 *Fecha:* ${new Date().toLocaleDateString('es-CL')}
+
+🔍 *DIAGNÓSTICO TÉCNICO:*
+${data.diagnostico || 'Evaluación técnica completada sin anomalías críticas.'}
+
+🛠️ *SOLUCIÓN APLICADA:*
+${data.solucion || 'Mantenimiento preventivo y actualización de sistema.'}
+
+💰 *COSTO ESTIMADO:* ${data.costo || '$0'}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+_Generado por miBot AI - Skale Software_`
+  },
+  {
+    id: 'formulario-registro',
+    title: '📝 Formulario de Registro de Cliente',
+    category: 'formulario',
+    fields: [
+      { key: 'nombre', label: 'Nombre Completo', placeholder: 'Ej. María González' },
+      { key: 'rut', label: 'RUT / Identificación', placeholder: 'Ej. 12.345.678-9' },
+      { key: 'email', label: 'Correo Electrónico', placeholder: 'Ej. maria@empresa.cl' },
+      { key: 'telefono', label: 'Teléfono de Contacto', placeholder: 'Ej. +56912345678' },
+      { key: 'servicio', label: 'Servicio / Plan Solicitado', placeholder: 'Ej. Plan Pro Agente IA WhatsApp' },
+    ],
+    templateContent: (data: any) => `📝 *FORMULARIO DE REGISTRO DE CLIENTE*
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+👤 *Nombre:* ${data.nombre || '[Nombre]'}
+🆔 *RUT/ID:* ${data.rut || '[RUT]'}
+📧 *Email:* ${data.email || '[Email]'}
+📞 *Teléfono:* ${data.telefono || '[Teléfono]'}
+🚀 *Plan Solicitado:* ${data.servicio || '[Servicio]'}
+📅 *Fecha de Registro:* ${new Date().toLocaleDateString('es-CL')}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+_Confirmación de Registro miBot_`
+  },
+  {
+    id: 'resumen-cotizacion',
+    title: '📊 Resumen de Cotización Comercial',
+    category: 'resumen',
+    fields: [
+      { key: 'empresa', label: 'Empresa / Cliente', placeholder: 'Ej. Innovación SpA' },
+      { key: 'producto', label: 'Producto / Servicio', placeholder: 'Ej. Desarrollo Bot WhatsApp IA' },
+      { key: 'cantidad', label: 'Cantidad / Licencias', placeholder: 'Ej. 1 Año Suscripción' },
+      { key: 'total', label: 'Monto Total + IVA', placeholder: 'Ej. $350.000 CLP' },
+    ],
+    templateContent: (data: any) => `📊 *RESUMEN DE COTIZACIÓN COMERCIAL*
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🏢 *Empresa:* ${data.empresa || '[Empresa]'}
+📦 *Ítem:* ${data.producto || '[Producto]'}
+🔢 *Cantidad:* ${data.cantidad || '1'}
+💰 *Monto Total:* ${data.total || '$0 CLP'}
+📅 *Validez:* 15 días desde ${new Date().toLocaleDateString('es-CL')}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+_Cotización generada automáticamente por miBot_`
+  }
+];
 
 const AVAILABLE_MODELS: Record<string, Array<{ id: string; name: string; description: string; speed: string; intelligence: string; recommended?: boolean }>> = {
   openai: [
@@ -30,7 +102,7 @@ const AVAILABLE_MODELS: Record<string, Array<{ id: string; name: string; descrip
   ],
   deepseek: [
     { id: 'deepseek-chat', name: 'DeepSeek-V3 Chat', description: 'Modelo ultra eficiente con respuestas precisas a un costo mínimo.', speed: '⚡⚡⚡ Muy Alta', intelligence: '🧠🧠 Alta', recommended: true },
-    { id: 'deepseek-r1', name: 'DeepSeek-R1', description: 'Especializado en cadena de pensamiento y razonamiento lógico profundo.', speed: '⚡ Media', intelligence: '🧠🧠🧠 Razonador' },
+    { id: 'deepseek-r1', name: 'DeepSeek-R1', description: 'Especializado en cadena de pensamiento y lógica profunda.', speed: '⚡ Media', intelligence: '🧠🧠🧠 Razonador' },
   ],
 };
 
@@ -38,7 +110,13 @@ export default function DashboardPage() {
   const { user, org, token, isLoading: authLoading, logout } = useAuth();
   const router = useRouter();
 
-  const [activeTab, setActiveTab] = useState<'qr' | 'prompt' | 'ai-config' | 'rag' | 'billing' | 'bots' | 'chat'>('bots');
+  const [activeTab, setActiveTab] = useState<'qr' | 'prompt' | 'ai-config' | 'templates' | 'rag' | 'billing' | 'bots' | 'chat'>('bots');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // PWA Install State
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstallable, setIsInstallable] = useState(false);
+
   // Chat state
   const [conversations, setConversations] = useState<any[]>([]);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
@@ -58,6 +136,17 @@ export default function DashboardPage() {
   const [testInput, setTestInput] = useState('');
   const [testMessages, setTestMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
   const [testingAi, setTestingAi] = useState(false);
+
+  // Templates state
+  const [selectedTemplateId, setSelectedTemplateId] = useState(DEFAULT_TEMPLATES[0].id);
+  const [templateFormData, setTemplateFormData] = useState<Record<string, string>>({});
+  const [targetPhoneForDoc, setTargetPhoneForDoc] = useState('');
+  const [sendingDoc, setSendingDoc] = useState(false);
+  const [docSendStatus, setDocSendStatus] = useState<string | null>(null);
+
+  // RAG File Upload state
+  const [uploadFileName, setUploadFileName] = useState<string | null>(null);
+  const [uploadFileSize, setUploadFileSize] = useState<string | null>(null);
 
   // Bot instances state
   const [bots, setBots] = useState<any[]>([]);
@@ -490,22 +579,84 @@ export default function DashboardPage() {
     }
   };
 
-  const handleSavePrompt = async () => {
-    if (!selectedBot) return;
-    setSavingPrompt(true);
-    setPromptMessage(null);
+  // Listen for PWA install prompt
+  useEffect(() => {
+    const handleBeforeInstall = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setIsInstallable(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+  }, []);
+
+  const handleInstallPwa = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setIsInstallable(false);
+      setDeferredPrompt(null);
+    }
+  };
+
+  // Handler for File Upload to Knowledge Base (RAG)
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const sizeKb = (file.size / 1024).toFixed(1);
+    setUploadFileName(file.name);
+    setUploadFileSize(`${sizeKb} KB`);
+    setDocumentTitle(file.name.replace(/\.[^/.]+$/, "")); // Strip extension for title
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      if (text) {
+        setDocumentContent(text);
+        addLog(`📂 Archivo "${file.name}" cargado (${sizeKb} KB). Listo para almacenamiento en pgvector.`);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // Handler for Sending Generated Document via WhatsApp
+  const handleSendGeneratedDoc = async () => {
+    if (!selectedBot) {
+      setDocSendStatus('⚠️ Selecciona o crea un agente activo primero.');
+      return;
+    }
+    if (!targetPhoneForDoc.trim()) {
+      setDocSendStatus('⚠️ Ingresa el número de teléfono del cliente (ej. 56984205124).');
+      return;
+    }
+
+    const currentTpl = DEFAULT_TEMPLATES.find(t => t.id === selectedTemplateId);
+    if (!currentTpl) return;
+
+    const docContent = currentTpl.templateContent(templateFormData);
+    setSendingDoc(true);
+    setDocSendStatus('Enviando documento formateado por WhatsApp...');
+
     try {
-      const updated = await api.updateBot(selectedBot.id, {
-        systemPrompt,
-        aiModel,
-      });
-      setSelectedBot(updated);
-      setPromptMessage('✅ Configuración guardada en la base de datos');
-      addLog(`💾 System prompt actualizado para bot "${selectedBot.name}"`);
+      const res = await api.sendGeneratedDocument(
+        selectedBot.id,
+        targetPhoneForDoc.trim(),
+        currentTpl.title,
+        docContent
+      );
+      if (res.success || res.message) {
+        setDocSendStatus(`✅ Documento "${currentTpl.title}" enviado exitosamente a ${targetPhoneForDoc}`);
+        addLog(`📄 Documento enviado por WhatsApp a ${targetPhoneForDoc}`);
+      } else {
+        setDocSendStatus(`❌ Error al enviar documento: ${res.error || 'Respuesta fallida'}`);
+      }
     } catch (err: any) {
-      setPromptMessage(`❌ Error: ${err.message}`);
+      setDocSendStatus(`❌ Error: ${err.message}`);
     } finally {
-      setSavingPrompt(false);
+      setSendingDoc(false);
     }
   };
 
@@ -608,9 +759,40 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex font-sans">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col md:flex-row font-sans">
+      {/* Mobile Top Header */}
+      <header className="md:hidden flex items-center justify-between p-4 border-b border-slate-800 bg-slate-900/90 backdrop-blur-md sticky top-0 z-40">
+        <MiBotLogo className="w-8 h-8" textClassName="text-lg" />
+        <div className="flex items-center gap-2">
+          {isInstallable && (
+            <button
+              onClick={handleInstallPwa}
+              className="px-3 py-1.5 rounded-lg bg-emerald-500 text-slate-950 text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-emerald-500/20"
+            >
+              <Smartphone className="w-3.5 h-3.5" /> Instalar
+            </button>
+          )}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="p-2 rounded-lg bg-slate-800 text-slate-300 hover:text-white"
+          >
+            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+        </div>
+      </header>
+
+      {/* Mobile Overlay */}
+      {mobileMenuOpen && (
+        <div
+          onClick={() => setMobileMenuOpen(false)}
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="w-64 border-r border-slate-800 bg-slate-900/50 backdrop-blur-md p-6 flex flex-col justify-between">
+      <aside className={`fixed inset-y-0 left-0 z-50 w-64 border-r border-slate-800 bg-slate-900/95 backdrop-blur-xl p-6 flex flex-col justify-between transition-transform duration-300 md:static md:translate-x-0 ${
+        mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+      }`}>
         <div>
           <div className="flex items-center gap-3 mb-8">
             <MiBotLogo className="w-9 h-9" textClassName="text-xl" />
@@ -628,9 +810,18 @@ export default function DashboardPage() {
             </div>
           </div>
 
+          {isInstallable && (
+            <button
+              onClick={handleInstallPwa}
+              className="w-full mb-4 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 font-extrabold text-xs transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
+            >
+              <Smartphone className="w-4 h-4" /> Instalar miBot App
+            </button>
+          )}
+
           <nav className="space-y-2">
             <button
-              onClick={() => setActiveTab('bots')}
+              onClick={() => { setActiveTab('bots'); setMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
                 activeTab === 'bots'
                   ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
@@ -640,7 +831,7 @@ export default function DashboardPage() {
               <Bot className="w-4 h-4" /> Mis Agentes ({bots.length})
             </button>
             <button
-              onClick={() => setActiveTab('qr')}
+              onClick={() => { setActiveTab('qr'); setMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
                 activeTab === 'qr'
                   ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
@@ -650,7 +841,7 @@ export default function DashboardPage() {
               <QrCode className="w-4 h-4" /> Vincular WhatsApp
             </button>
             <button
-              onClick={() => setActiveTab('chat')}
+              onClick={() => { setActiveTab('chat'); setMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
                 activeTab === 'chat'
                   ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-400 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.15)]'
@@ -660,7 +851,7 @@ export default function DashboardPage() {
               <MessageSquare className="w-4 h-4" /> Chat en Vivo
             </button>
             <button
-              onClick={() => setActiveTab('prompt')}
+              onClick={() => { setActiveTab('prompt'); setMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
                 activeTab === 'prompt'
                   ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
@@ -670,7 +861,7 @@ export default function DashboardPage() {
               <Sparkles className="w-4 h-4" /> Prompt y Personalidad
             </button>
             <button
-              onClick={() => setActiveTab('ai-config')}
+              onClick={() => { setActiveTab('ai-config'); setMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
                 activeTab === 'ai-config'
                   ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-400 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.15)]'
@@ -678,6 +869,16 @@ export default function DashboardPage() {
               }`}
             >
               <Cpu className="w-4 h-4" /> Configuración de IA
+            </button>
+            <button
+              onClick={() => { setActiveTab('templates'); setMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                activeTab === 'templates'
+                  ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-400 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.15)]'
+                  : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+              }`}
+            >
+              <FileCheck className="w-4 h-4" /> Plantillas e Informes
             </button>
             <button
               onClick={() => setActiveTab('rag')}
@@ -1478,12 +1679,156 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {/* Templates & Reports Tab */}
+        {activeTab === 'templates' && (
+          <div className="max-w-5xl mx-auto space-y-8">
+            <div>
+              <h2 className="text-2xl font-bold text-slate-100 flex items-center gap-3">
+                <FileCheck className="w-7 h-7 text-emerald-400" />
+                Plantillas, Informes y Formularios
+              </h2>
+              <p className="text-slate-400 text-sm mt-1">
+                Genera documentos y formularios estructurados y envíalos automáticamente por WhatsApp a tus clientes.
+              </p>
+            </div>
+
+            {/* Template Selector Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {DEFAULT_TEMPLATES.map((tpl) => (
+                <button
+                  key={tpl.id}
+                  onClick={() => {
+                    setSelectedTemplateId(tpl.id);
+                    setTemplateFormData({});
+                  }}
+                  className={`p-5 rounded-2xl border text-left transition-all flex flex-col justify-between ${
+                    selectedTemplateId === tpl.id
+                      ? 'bg-emerald-500/10 border-emerald-500/40 shadow-lg shadow-emerald-500/10'
+                      : 'bg-slate-900/40 border-slate-800 hover:border-slate-700 hover:bg-slate-900/70'
+                  }`}
+                >
+                  <div className="font-bold text-slate-100 text-base mb-2">{tpl.title}</div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-emerald-400 border border-slate-700 uppercase tracking-wider w-fit">
+                    {tpl.category}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            {/* Selected Template Form & Live Preview */}
+            {(() => {
+              const currentTpl = DEFAULT_TEMPLATES.find(t => t.id === selectedTemplateId);
+              if (!currentTpl) return null;
+              const generatedText = currentTpl.templateContent(templateFormData);
+
+              return (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Left: Input Form */}
+                  <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4">
+                    <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                      <Pencil className="w-4 h-4 text-emerald-400" />
+                      Llenar Campos del Documento
+                    </h3>
+
+                    {currentTpl.fields.map((field) => (
+                      <div key={field.key} className="space-y-1">
+                        <label className="text-xs text-slate-400 font-medium">{field.label}</label>
+                        <input
+                          type="text"
+                          value={templateFormData[field.key] || ''}
+                          onChange={(e) => setTemplateFormData({ ...templateFormData, [field.key]: e.target.value })}
+                          placeholder={field.placeholder}
+                          className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-sm focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Right: Document Preview & WhatsApp Send */}
+                  <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4 flex flex-col justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-2 mb-3">
+                        <Eye className="w-4 h-4 text-emerald-400" />
+                        Vista Previa del Documento Generado
+                      </h3>
+
+                      <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-emerald-300 whitespace-pre-wrap leading-relaxed max-h-72 overflow-y-auto">
+                        {generatedText}
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 pt-4 border-t border-slate-800">
+                      <label className="text-xs text-slate-400 font-medium block">
+                        Número de WhatsApp de Destino (Cliente):
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="tel"
+                          value={targetPhoneForDoc}
+                          onChange={(e) => setTargetPhoneForDoc(e.target.value)}
+                          placeholder="Ej: 56984205124"
+                          className="flex-1 px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-xs focus:outline-none focus:border-emerald-500"
+                        />
+                        <button
+                          onClick={handleSendGeneratedDoc}
+                          disabled={sendingDoc || !targetPhoneForDoc.trim()}
+                          className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition-all flex items-center gap-2 disabled:opacity-50"
+                        >
+                          {sendingDoc ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                          Enviar por WhatsApp
+                        </button>
+                      </div>
+                      {docSendStatus && (
+                        <p className={`text-xs font-semibold mt-2 ${docSendStatus.includes('❌') ? 'text-red-400' : docSendStatus.includes('⚠️') ? 'text-amber-400' : 'text-emerald-400'}`}>
+                          {docSendStatus}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
         {/* RAG Tab */}
         {activeTab === 'rag' && (
           <div className="max-w-3xl mx-auto space-y-6">
             <div>
               <h2 className="text-2xl font-bold">Base de Conocimiento (RAG + pgvector)</h2>
               <p className="text-slate-400 text-sm">Almacena información que tus agentes consultarán en tiempo real.</p>
+            </div>
+
+            {/* File Upload Box */}
+            <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4">
+              <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                <Upload className="w-4 h-4 text-emerald-400" />
+                Subir Archivo de Conocimiento (PDF, TXT, CSV, JSON, MD)
+              </h3>
+              <p className="text-xs text-slate-400">
+                Selecciona un archivo para extraer automáticamente su contenido y entrenar a tus agentes.
+              </p>
+
+              <div className="border-2 border-dashed border-slate-800 hover:border-emerald-500/50 rounded-2xl p-6 text-center transition-all bg-slate-950/50 group cursor-pointer relative">
+                <input
+                  type="file"
+                  accept=".txt,.csv,.json,.md,.pdf,.doc,.docx"
+                  onChange={handleFileUpload}
+                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                />
+                <Upload className="w-10 h-10 text-slate-600 group-hover:text-emerald-400 mx-auto transition-colors mb-2" />
+                <p className="text-sm font-medium text-slate-300">
+                  Arrastra tu archivo aquí o <span className="text-emerald-400 underline font-semibold">haz clic para explorar</span>
+                </p>
+                <p className="text-[11px] text-slate-500 mt-1">Soporta .txt, .csv, .json, .md, .pdf</p>
+
+                {uploadFileName && (
+                  <div className="mt-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs inline-flex items-center gap-2">
+                    <FileText className="w-4 h-4" />
+                    <span><strong>{uploadFileName}</strong> ({uploadFileSize})</span>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4">
@@ -1505,7 +1850,7 @@ export default function DashboardPage() {
                   onChange={(e) => setDocumentContent(e.target.value)}
                   placeholder="Pega información del negocio, catálogo de productos, FAQ..."
                   rows={6}
-                  className="w-full p-4 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 focus:outline-none focus:border-emerald-500 text-sm"
+                  className="w-full p-4 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 focus:outline-none focus:border-emerald-500 text-sm font-mono"
                 />
               </div>
 

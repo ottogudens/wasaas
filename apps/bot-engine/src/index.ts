@@ -607,6 +607,46 @@ if ((managerApi as any).app) {
     }
   });
 
+  // Endpoint para enviar Documentos, Informes o Formularios por WhatsApp
+  app.post('/internal/send-document', async (req: any, res: any) => {
+    try {
+      const apiKey = req.headers['x-api-key'];
+      if (apiKey !== API_KEY) {
+        res.statusCode = 401;
+        return res.end(JSON.stringify({ error: 'Unauthorized' }));
+      }
+
+      const data = await getParsedBody(req);
+      const { tenantId, customerPhone, documentTitle, documentContent } = data;
+
+      if (!tenantId || !customerPhone || !documentContent) {
+        res.statusCode = 400;
+        return res.end(JSON.stringify({ error: 'Missing params', received: data }));
+      }
+
+      const botInstance = manager.getBot(tenantId);
+      if (!botInstance) {
+        res.statusCode = 404;
+        return res.end(JSON.stringify({ error: 'Bot not found or not connected' }));
+      }
+
+      const provider = botInstance.provider as any;
+      const formattedDocText = `📄 *DOCUMENTO GENERADO: ${documentTitle || 'Informe / Formulario'}*\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n${documentContent}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n_Generado automáticamente por miBot_`;
+
+      if (typeof provider.sendMessage === 'function') {
+        await provider.sendMessage(customerPhone, formattedDocText, {});
+        res.statusCode = 200;
+        return res.end(JSON.stringify({ success: true, message: 'Documento enviado con éxito por WhatsApp' }));
+      } else {
+        res.statusCode = 500;
+        return res.end(JSON.stringify({ error: 'Provider does not support sendMessage' }));
+      }
+    } catch (err) {
+      res.statusCode = 500;
+      return res.end(JSON.stringify({ error: String(err) }));
+    }
+  });
+
   // Endpoint de Prueba Simulación de Mensaje Entrante
   app.post('/internal/test-message', async (req: any, res: any) => {
     try {
