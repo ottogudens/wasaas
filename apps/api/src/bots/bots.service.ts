@@ -64,6 +64,8 @@ export class BotsService {
       throw new ForbiddenException('El Plan Starter permite 1 agente activo. Actualiza al Plan Pro para agregar más agentes.');
     }
 
+    const tenantId = `${org.slug}-bot-${Date.now().toString(36)}`;
+
     const bot = await this.prisma.botInstance.create({
       data: {
         tenantId,
