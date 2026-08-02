@@ -3,6 +3,7 @@ import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { PrismaService } from './prisma/prisma.service';
+import { json, urlencoded } from 'express';
 import * as bcrypt from 'bcryptjs';
 
 async function seedSuperAdmin(prisma: PrismaService) {
@@ -64,6 +65,10 @@ async function bootstrap() {
 
   const prisma = app.get(PrismaService);
   await seedSuperAdmin(prisma);
+
+  // Aumentar el límite de tamaño de payload para procesamiento RAG, documentos y plantillas
+  app.use(json({ limit: '50mb' }));
+  app.use(urlencoded({ limit: '50mb', extended: true }));
 
   // Security headers (configurar helmet para no bloquear CORS/preflight)
   app.use(
