@@ -17,6 +17,7 @@ enum Role {
 }
 
 enum PlanType {
+  TRIAL
   STARTER
   PRO
   ENTERPRISE
@@ -26,6 +27,7 @@ enum SubscriptionStatus {
   ACTIVE
   PENDING
   CANCELLED
+  TRIAL_EXPIRED
 }
 
 enum BotStatus {

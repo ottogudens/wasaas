@@ -37,10 +37,32 @@ export class BotsService {
    */
   async createBot(organizationId: string, data: { name: string; systemPrompt?: string; aiModel?: string; provider?: string; metaJwtToken?: string; metaNumberId?: string; metaVerifyToken?: string }) {
     // Generar tenantId único basado en org slug + timestamp
-    const org = await this.prisma.organization.findUnique({ where: { id: organizationId } });
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      include: { subscriptions: true, bots: true },
+    });
     if (!org) throw new NotFoundException('Organización no encontrada.');
 
-    const tenantId = `${org.slug}-bot-${Date.now().toString(36)}`;
+    const sub = org.subscriptions?.[0];
+    const botCount = org.bots?.length || 0;
+
+    // Verificar si la prueba gratuita (TRIAL) ha expirado (7 días)
+    if (sub && sub.plan === 'TRIAL') {
+      const now = new Date();
+      if (sub.currentPeriodEnd && now > new Date(sub.currentPeriodEnd)) {
+        // Actualizar estado a TRIAL_EXPIRED
+        await this.prisma.subscription.update({
+          where: { id: sub.id },
+          data: { status: 'TRIAL_EXPIRED' as any },
+        });
+        throw new ForbiddenException('Tu prueba gratuita de 7 días ha finalizado. Por favor adquiere un plan de pago para continuar usando tus agentes.');
+      }
+      if (botCount >= 1) {
+        throw new ForbiddenException('El periodo de prueba gratuita permite un máximo de 1 agente. Elige un plan de pago para crear más agentes.');
+      }
+    } else if (sub && sub.plan === 'STARTER' && botCount >= 1) {
+      throw new ForbiddenException('El Plan Starter permite 1 agente activo. Actualiza al Plan Pro para agregar más agentes.');
+    }
 
     const bot = await this.prisma.botInstance.create({
       data: {

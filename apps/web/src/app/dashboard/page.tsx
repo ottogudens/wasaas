@@ -2091,13 +2091,50 @@ export default function DashboardPage() {
 
         {/* Billing Tab */}
         {activeTab === 'billing' && (
-          <div className="max-w-4xl mx-auto space-y-6">
+          <div className="max-w-5xl mx-auto space-y-6">
             <div>
               <h2 className="text-2xl font-bold">Planes y Suscripciones</h2>
-              <p className="text-slate-400 text-sm">Selecciona un plan recurrente para potenciar tus Agentes con MercadoPago.</p>
+              <p className="text-slate-400 text-sm">Prueba gratuita activa por 7 días. Selecciona un plan recurrente para potenciar tus Agentes con MercadoPago.</p>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-6">
+            {/* Banner de Estado de Suscripción */}
+            <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between flex-wrap gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-slate-100 text-sm">Tu Cuenta Incluye 7 Días Gratis de Prueba</h4>
+                  <p className="text-xs text-slate-400">Disfrutas de 1 Agente de WhatsApp activo durante el periodo de prueba.</p>
+                </div>
+              </div>
+              <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-500/20 px-3 py-1 rounded-full border border-emerald-500/30">
+                PRUEBA GRATUITA 7 DÍAS
+              </span>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-6">
+              {/* Tarjeta Plan Trial */}
+              <div className="p-8 rounded-2xl bg-slate-900/60 border border-emerald-500/30 flex flex-col justify-between space-y-6 relative">
+                <div className="absolute top-0 right-0 bg-emerald-500 text-slate-950 text-[10px] font-extrabold px-3 py-1 rounded-bl-xl uppercase">INCLUIDO</div>
+                <div>
+                  <h3 className="text-xl font-bold text-emerald-400">Prueba Gratuita</h3>
+                  <p className="text-3xl font-extrabold mt-2">$0 <span className="text-sm text-slate-400 font-normal">/ 7 días</span></p>
+                  <ul className="mt-6 space-y-3 text-sm text-slate-300">
+                    <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> 1 Agente de WhatsApp</li>
+                    <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Acceso por 7 Días completos</li>
+                    <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> RAG + pgvector</li>
+                  </ul>
+                </div>
+                <button
+                  disabled
+                  className="w-full py-3 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-bold text-xs cursor-default"
+                >
+                  Plan Actual (Prueba Gratuita)
+                </button>
+              </div>
+
+              {/* Tarjeta Plan Starter */}
               <div className="p-8 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col justify-between space-y-6">
                 <div>
                   <h3 className="text-xl font-bold">Plan Starter</h3>
@@ -2110,14 +2147,15 @@ export default function DashboardPage() {
                 </div>
                 <button
                   onClick={() => handleSubscribe('Starter', 29)}
-                  className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 font-semibold transition-all text-sm"
+                  className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 font-semibold transition-all text-sm text-white"
                 >
                   Suscribirse con MercadoPago
                 </button>
               </div>
 
+              {/* Tarjeta Plan Pro */}
               <div className="p-8 rounded-2xl bg-gradient-to-b from-slate-900 to-slate-950 border border-emerald-500/30 flex flex-col justify-between space-y-6 relative overflow-hidden">
-                <div className="absolute top-0 right-0 bg-emerald-500 text-slate-950 text-xs font-bold px-3 py-1 rounded-bl-xl">POPULAR</div>
+                <div className="absolute top-0 right-0 bg-emerald-500 text-slate-950 text-xs font-bold px-3 py-1 rounded-bl-xl">RECOMENDADO</div>
                 <div>
                   <h3 className="text-xl font-bold text-emerald-400">Plan Pro</h3>
                   <p className="text-3xl font-extrabold mt-2">$79 <span className="text-sm text-slate-400 font-normal">/ mes</span></p>

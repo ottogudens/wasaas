@@ -64,12 +64,18 @@ export class AuthService {
         },
       });
 
-      // Crear suscripción Starter por defecto
+      // Crear suscripción de prueba gratuita de 7 días (Plan TRIAL con 1 agente)
+      const trialStartDate = new Date();
+      const trialEndDate = new Date();
+      trialEndDate.setDate(trialEndDate.getDate() + 7);
+
       await tx.subscription.create({
         data: {
           organizationId: organization.id,
-          plan: 'STARTER',
+          plan: 'TRIAL',
           status: 'ACTIVE',
+          currentPeriodStart: trialStartDate,
+          currentPeriodEnd: trialEndDate,
         },
       });
 
