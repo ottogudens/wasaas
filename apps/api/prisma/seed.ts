@@ -15,13 +15,19 @@ async function main() {
   const userName = 'Super Admin';
 
   // Check if user already exists
+  const passwordHash = await bcrypt.hash(password, 12);
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
-    console.log(`⚠️ User "${email}" already exists. Updating role to SUPER_ADMIN...`);
+    console.log(`⚠️ User "${email}" already exists. Updating role to SUPER_ADMIN, active status and password...`);
     await prisma.user.update({
       where: { email },
-      data: { role: 'SUPER_ADMIN' },
+      data: {
+        role: 'SUPER_ADMIN',
+        passwordHash: passwordHash,
+        isActive: true,
+      },
     });
+    console.log(`✅ Super Admin updated: "${email}" with password "${password}"`);
     return;
   }
 
