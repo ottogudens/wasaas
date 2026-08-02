@@ -1,0 +1,282 @@
+import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, ForbiddenException, Req } from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { PrismaService } from '../prisma/prisma.service';
+import { IsString, IsOptional, IsNumber, IsBoolean, IsArray } from 'class-validator';
+
+class UpdateTenantAiDto {
+  @IsOptional()
+  @IsString()
+  aiModel?: string;
+
+  @IsOptional()
+  @IsString()
+  systemPrompt?: string;
+}
+
+class UpdateSubscriptionDto {
+  @IsString()
+  plan: 'STARTER' | 'PRO' | 'ENTERPRISE';
+
+  @IsOptional()
+  @IsString()
+  customPlanName?: string;
+
+  @IsString()
+  status: 'ACTIVE' | 'PENDING' | 'CANCELLED';
+}
+
+class ToggleTenantStatusDto {
+  @IsBoolean()
+  isActive: boolean;
+}
+
+class CreatePlanDto {
+  @IsString()
+  name: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsNumber()
+  price: number;
+
+  @IsNumber()
+  maxBots: number;
+
+  @IsNumber()
+  maxDocs: number;
+
+  @IsOptional()
+  @IsArray()
+  features?: string[];
+}
+
+class CreateInvoiceDto {
+  @IsNumber()
+  amount: number;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @IsOptional()
+  @IsString()
+  customerPhone?: string;
+}
+
+@Controller('tenants')
+@UseGuards(JwtAuthGuard)
+export class TenantsController {
+  constructor(private readonly prisma: PrismaService) {}
+
+  private checkSuperAdmin(req: any) {
+    if (req.user.role !== 'SUPER_ADMIN') {
+      throw new ForbiddenException('Acceso denegado: Se requieren permisos de Super Administrador.');
+    }
+  }
+
+  // ── TENANTS MANAGEMENT ──────────────────────────────────────────
+  @Get()
+  async listAllTenants(@Req() req: any) {
+    this.checkSuperAdmin(req);
+    const organizations = await this.prisma.organization.findMany({
+      include: {
+        users: {
+          select: { id: true, email: true, name: true, role: true, isActive: true, createdAt: true },
+        },
+        subscriptions: true,
+        invoices: {
+          orderBy: { createdAt: 'desc' },
+        },
+        bots: {
+          select: {
+            id: true,
+            tenantId: true,
+            name: true,
+            status: true,
+            aiModel: true,
+            systemPrompt: true,
+            phoneNumber: true,
+            updatedAt: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return organizations;
+  }
+
+  @Patch(':id/ai-config')
+  async updateTenantAiConfig(
+    @Param('id') id: string,
+    @Req() req: any,
+    @Body() dto: UpdateTenantAiDto,
+  ) {
+    this.checkSuperAdmin(req);
+
+    const updateData: any = {};
+    if (dto.aiModel !== undefined) updateData.aiModel = dto.aiModel;
+    if (dto.systemPrompt !== undefined) updateData.systemPrompt = dto.systemPrompt;
+
+    await this.prisma.botInstance.updateMany({
+      where: { organizationId: id },
+      data: updateData,
+    });
+
+    return { success: true, message: 'Configuración de IA del tenant actualizada exitosamente' };
+  }
+
+  @Patch(':id/subscription')
+  async updateTenantSubscription(
+    @Param('id') id: string,
+    @Req() req: any,
+    @Body() dto: UpdateSubscriptionDto,
+  ) {
+    this.checkSuperAdmin(req);
+
+    const existingSub = await this.prisma.subscription.findFirst({
+      where: { organizationId: id },
+    });
+
+    if (existingSub) {
+      await this.prisma.subscription.update({
+        where: { id: existingSub.id },
+        data: {
+          plan: dto.plan,
+          customPlanName: dto.customPlanName,
+          status: dto.status as any,
+        },
+      });
+    } else {
+      await this.prisma.subscription.create({
+        data: {
+          organizationId: id,
+          plan: dto.plan,
+          customPlanName: dto.customPlanName,
+          status: dto.status as any,
+        },
+      });
+    }
+
+    return { success: true, message: 'Suscripción actualizada exitosamente' };
+  }
+
+  @Patch(':id/status')
+  async toggleTenantStatus(
+    @Param('id') id: string,
+    @Req() req: any,
+    @Body() dto: ToggleTenantStatusDto,
+  ) {
+    this.checkSuperAdmin(req);
+    await this.prisma.organization.update({
+      where: { id },
+      data: { isActive: dto.isActive },
+    });
+
+    // Actualizar también a todos sus usuarios
+    await this.prisma.user.updateMany({
+      where: { organizationId: id },
+      data: { isActive: dto.isActive },
+    });
+
+    return { success: true, message: `Tenant ${dto.isActive ? 'activado' : 'suspendido'} exitosamente` };
+  }
+
+  @Post(':id/invoices')
+  async createInvoice(
+    @Param('id') id: string,
+    @Req() req: any,
+    @Body() dto: CreateInvoiceDto,
+  ) {
+    this.checkSuperAdmin(req);
+
+    const invoice = await this.prisma.invoice.create({
+      data: {
+        organizationId: id,
+        amount: dto.amount,
+        description: dto.description || 'Cobro de servicio miBot SaaS',
+        status: dto.status || 'PAID',
+      },
+      include: { organization: true },
+    });
+
+    // Enviar factura / recibo si se especificó teléfono
+    if (dto.customerPhone) {
+      try {
+        const botEngineUrl = process.env.BOT_ENGINE_URL || 'https://whatsapp-service-production-e6f2.up.railway.app';
+        const bot = await this.prisma.botInstance.findFirst({ where: { organizationId: id } });
+        if (bot) {
+          await fetch(`${botEngineUrl}/internal/send-document`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': process.env.INTERNAL_API_KEY || 'skale-saas-secret-key',
+            },
+            body: JSON.stringify({
+              tenantId: bot.tenantId,
+              customerPhone: dto.customerPhone,
+              documentTitle: `🧾 FACTURA / COMPROBANTE - ${invoice.organization.name}`,
+              documentContent: `🧾 *COMPROBANTE DE COBRO / FACTURA*
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🏢 *Cliente:* ${invoice.organization.name}
+💰 *Monto:* $${invoice.amount} CLP
+📄 *Detalle:* ${invoice.description}
+📅 *Fecha:* ${new Date().toLocaleDateString('es-CL')}
+📌 *Estado:* ${invoice.status === 'PAID' ? '✅ PAGADO' : '⏳ PENDIENTE'}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+_Generado por miBot SaaS_`,
+            }),
+          }).catch(() => {});
+        }
+      } catch (e) {
+        console.error('Error al notificar factura por WhatsApp:', e);
+      }
+    }
+
+    return invoice;
+  }
+
+  @Delete(':id')
+  async deleteTenant(@Param('id') id: string, @Req() req: any) {
+    this.checkSuperAdmin(req);
+    await this.prisma.organization.delete({
+      where: { id },
+    });
+    return { success: true, message: 'Tenant eliminado exitosamente' };
+  }
+
+  // ── PLANS MANAGEMENT ──────────────────────────────────────────────
+  @Get('plans/all')
+  async listPlans() {
+    return this.prisma.plan.findMany({
+      orderBy: { price: 'asc' },
+    });
+  }
+
+  @Post('plans/create')
+  async createPlan(@Req() req: any, @Body() dto: CreatePlanDto) {
+    this.checkSuperAdmin(req);
+    return this.prisma.plan.create({
+      data: {
+        name: dto.name,
+        description: dto.description,
+        price: dto.price,
+        maxBots: dto.maxBots,
+        maxDocs: dto.maxDocs,
+        features: dto.features || [],
+      },
+    });
+  }
+
+  @Delete('plans/:planId')
+  async deletePlan(@Param('planId') planId: string, @Req() req: any) {
+    this.checkSuperAdmin(req);
+    await this.prisma.plan.delete({ where: { id: planId } });
+    return { success: true, message: 'Plan eliminado' };
+  }
+}

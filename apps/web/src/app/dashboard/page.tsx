@@ -110,7 +110,7 @@ export default function DashboardPage() {
   const { user, org, token, isLoading: authLoading, logout } = useAuth();
   const router = useRouter();
 
-  const [activeTab, setActiveTab] = useState<'qr' | 'prompt' | 'ai-config' | 'templates' | 'rag' | 'billing' | 'bots' | 'chat'>('bots');
+  const [activeTab, setActiveTab] = useState<'qr' | 'prompt' | 'ai-config' | 'templates' | 'rag' | 'billing' | 'bots' | 'chat' | 'tenants-admin'>('bots');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // PWA Install State
@@ -185,6 +185,24 @@ export default function DashboardPage() {
   const [processingRag, setProcessingRag] = useState(false);
   const [ragStatus, setRagStatus] = useState<string | null>(null);
 
+  // Tenants Admin state (SUPER_ADMIN)
+  const [tenantsList, setTenantsList] = useState<any[]>([]);
+  const [loadingTenants, setLoadingTenants] = useState(false);
+  const [selectedTenantForEdit, setSelectedTenantForEdit] = useState<any | null>(null);
+  const [tenantAiModel, setTenantAiModel] = useState<string>('gpt-4o-mini');
+  const [tenantPrompt, setTenantPrompt] = useState<string>('');
+  const [savingTenantAi, setSavingTenantAi] = useState(false);
+  const [tenantSaveStatus, setTenantSaveStatus] = useState<string | null>(null);
+
+  // Sales Plans & Invoicing state (SUPER_ADMIN)
+  const [salesPlans, setSalesPlans] = useState<any[]>([]);
+  const [showPlanModal, setShowPlanModal] = useState(false);
+  const [planForm, setPlanForm] = useState({ name: '', description: '', price: 29, maxBots: 1, maxDocs: 50 });
+  const [invoiceModalTenant, setInvoiceModalTenant] = useState<any | null>(null);
+  const [invoiceForm, setInvoiceForm] = useState({ amount: 0, description: '', phone: '' });
+  const [sendingInvoice, setSendingInvoice] = useState(false);
+  const [invoiceStatusMsg, setInvoiceStatusMsg] = useState<string | null>(null);
+
   // Endpoint config
   const [botEngineUrl, setBotEngineUrl] = useState<string>('');
   const [wsUrl, setWsUrl] = useState<string>('');
@@ -239,12 +257,39 @@ export default function DashboardPage() {
     }
   }, [token, addLog]);
 
+  const loadTenants = useCallback(async () => {
+    if (!token || user?.role !== 'SUPER_ADMIN') return;
+    setLoadingTenants(true);
+    try {
+      const data = await api.listTenants();
+      setTenantsList(data);
+    } catch (err: any) {
+      addLog(`❌ Error cargando lista de tenants: ${err.message}`);
+    } finally {
+      setLoadingTenants(false);
+    }
+  }, [token, user, addLog]);
+
+  const loadSalesPlans = useCallback(async () => {
+    if (!token || user?.role !== 'SUPER_ADMIN') return;
+    try {
+      const data = await api.listSalesPlans();
+      setSalesPlans(data);
+    } catch (err: any) {
+      addLog(`❌ Error cargando planes de venta: ${err.message}`);
+    }
+  }, [token, user, addLog]);
+
   useEffect(() => {
     if (token) {
       loadBots();
       loadDocuments();
+      if (user?.role === 'SUPER_ADMIN') {
+        loadTenants();
+        loadSalesPlans();
+      }
     }
-  }, [token, loadBots, loadDocuments]);
+  }, [token, user, loadBots, loadDocuments, loadTenants, loadSalesPlans]);
 
   // Poll bot status every 10s
   useEffect(() => {
@@ -898,16 +943,31 @@ export default function DashboardPage() {
             >
               <Sparkles className="w-4 h-4" /> Prompt y Personalidad
             </button>
-            <button
-              onClick={() => { setActiveTab('ai-config'); setMobileMenuOpen(false); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-                activeTab === 'ai-config'
-                  ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-400 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.15)]'
-                  : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
-              }`}
-            >
-              <Cpu className="w-4 h-4" /> Configuración de IA
-            </button>
+            {/* Configuración de IA exclusiva para SUPER_ADMIN */}
+            {user?.role === 'SUPER_ADMIN' && (
+              <>
+                <button
+                  onClick={() => { setActiveTab('tenants-admin'); setMobileMenuOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                    activeTab === 'tenants-admin'
+                      ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.15)]'
+                      : 'text-purple-300/80 hover:bg-slate-800/50 hover:text-purple-300'
+                  }`}
+                >
+                  <Shield className="w-4 h-4 text-purple-400" /> Administración Tenants
+                </button>
+                <button
+                  onClick={() => { setActiveTab('ai-config'); setMobileMenuOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                    activeTab === 'ai-config'
+                      ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-400 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.15)]'
+                      : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+                  }`}
+                >
+                  <Cpu className="w-4 h-4" /> Configuración de IA
+                </button>
+              </>
+            )}
             <button
               onClick={() => { setActiveTab('templates'); setMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
@@ -1442,17 +1502,19 @@ export default function DashboardPage() {
 
             {selectedBot ? (
               <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Modelo de IA</label>
-                  <select
-                    value={aiModel}
-                    onChange={(e) => setAiModel(e.target.value)}
-                    className="w-full p-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-sm focus:outline-none focus:border-emerald-500"
-                  >
-                    <option value="gpt-4o-mini">OpenAI GPT-4o-mini (Rápido y económico)</option>
-                    <option value="gpt-4o">OpenAI GPT-4o (Avanzado)</option>
-                  </select>
-                </div>
+                {user?.role === 'SUPER_ADMIN' && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1">Modelo de IA (Administrador)</label>
+                    <select
+                      value={aiModel}
+                      onChange={(e) => setAiModel(e.target.value)}
+                      className="w-full p-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-sm focus:outline-none focus:border-emerald-500"
+                    >
+                      <option value="gpt-4o-mini">OpenAI GPT-4o-mini (Rápido y económico)</option>
+                      <option value="gpt-4o">OpenAI GPT-4o (Avanzado)</option>
+                    </select>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-1">System Prompt</label>
@@ -2018,6 +2080,509 @@ export default function DashboardPage() {
                 </button>
               </div>
             </div>
+          </div>
+        )}
+        {/* Tenants Admin Tab (SUPER_ADMIN) */}
+        {activeTab === 'tenants-admin' && user?.role === 'SUPER_ADMIN' && (
+          <div className="max-w-6xl mx-auto space-y-8">
+            <div className="flex items-center justify-between flex-wrap gap-4 border-b border-slate-800 pb-4">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-100 flex items-center gap-3">
+                  <Shield className="w-7 h-7 text-purple-400" />
+                  Panel de Super Administrador
+                </h2>
+                <p className="text-slate-400 text-sm mt-1">
+                  Administración de Tenants, planes de venta, control de accesos y facturación.
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowPlanModal(true)}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-purple-500/20"
+                >
+                  <Plus className="w-4 h-4" /> Crear Plan de Venta
+                </button>
+                <button
+                  onClick={() => { loadTenants(); loadSalesPlans(); }}
+                  disabled={loadingTenants}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-2 border border-slate-700"
+                >
+                  {loadingTenants ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                  Actualizar
+                </button>
+              </div>
+            </div>
+
+            {/* SECCIÓN 1: PLANES DE VENTA DISPONIBLES */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-bold text-slate-200 flex items-center gap-2">
+                <CreditCard className="w-5 h-5 text-purple-400" /> Planes de Venta Configurados ({salesPlans.length})
+              </h3>
+              
+              {salesPlans.length === 0 ? (
+                <div className="p-6 rounded-2xl bg-slate-900/40 border border-slate-800 text-center">
+                  <p className="text-slate-500 text-sm">No hay planes de venta personalizados creados aún.</p>
+                </div>
+              ) : (
+                <div className="grid md:grid-cols-3 gap-4">
+                  {salesPlans.map((p) => (
+                    <div key={p.id} className="p-5 rounded-2xl bg-slate-900/60 border border-purple-500/30 space-y-3 relative">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="font-bold text-slate-100 text-base">{p.name}</h4>
+                          <p className="text-xs text-slate-400">{p.description || 'Sin descripción'}</p>
+                        </div>
+                        <button
+                          onClick={async () => {
+                            if (confirm(`¿Eliminar plan ${p.name}?`)) {
+                              await api.deleteSalesPlan(p.id);
+                              loadSalesPlans();
+                            }
+                          }}
+                          className="p-1 rounded-lg text-slate-500 hover:text-red-400"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <div className="text-2xl font-extrabold text-purple-400">
+                        ${p.price} <span className="text-xs text-slate-400 font-normal">CLP / mes</span>
+                      </div>
+                      <div className="text-xs text-slate-300 space-y-1 pt-2 border-t border-slate-800">
+                        <p>🤖 Max Bots: <span className="font-semibold text-white">{p.maxBots}</span></p>
+                        <p>📄 Max RAG Docs: <span className="font-semibold text-white">{p.maxDocs}</span></p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* SECCIÓN 2: LISTADO DE TENANTS Y CONTROL DE ACCESO */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-bold text-slate-200 flex items-center gap-2">
+                <Building className="w-5 h-5 text-purple-400" /> Organizaciones / Tenants ({tenantsList.length})
+              </h3>
+
+              {loadingTenants ? (
+                <div className="p-12 text-center">
+                  <Loader2 className="w-8 h-8 text-purple-400 animate-spin mx-auto mb-3" />
+                  <p className="text-slate-400 text-sm">Cargando organizaciones...</p>
+                </div>
+              ) : tenantsList.length === 0 ? (
+                <p className="text-slate-500 text-center py-8">No hay tenants registrados.</p>
+              ) : (
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {tenantsList.map((t) => {
+                    const bot = t.bots?.[0];
+                    const sub = t.subscriptions?.[0];
+                    const isTenantActive = t.isActive !== false;
+
+                    return (
+                      <div key={t.id} className={`p-6 rounded-2xl bg-slate-900/60 border flex flex-col justify-between space-y-4 transition-all ${
+                        isTenantActive ? 'border-purple-500/20 hover:border-purple-500/40' : 'border-red-500/30 bg-red-950/10'
+                      }`}>
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-start gap-2">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <Building className="w-5 h-5 text-purple-400" />
+                                <h3 className="font-bold text-slate-100 text-base">{t.name}</h3>
+                              </div>
+                              <p className="text-[11px] text-slate-500 mt-0.5">{t.users?.[0]?.email}</p>
+                            </div>
+                            <div className="flex flex-col items-end gap-1">
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                isTenantActive ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-red-500/20 text-red-400 border-red-500/30'
+                              }`}>
+                                {isTenantActive ? '● ACCESO ACTIVO' : '✕ SUSPENDIDO'}
+                              </span>
+                              <span className="text-[10px] bg-purple-500/20 text-purple-300 font-bold px-2 py-0.5 rounded-full border border-purple-500/30">
+                                {sub?.plan || 'STARTER'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="text-xs text-slate-400 space-y-1.5 pt-2 border-t border-slate-800">
+                            <p><span className="text-slate-500">Slug:</span> {t.slug}</p>
+                            <p><span className="text-slate-500">Agentes WhatsApp:</span> {t.bots?.length || 0}</p>
+                            {bot && (
+                              <p className="text-emerald-400 font-medium truncate">
+                                <span className="text-slate-500">Modelo IA:</span> {bot.aiModel || 'gpt-4o-mini'}
+                              </p>
+                            )}
+                            <p><span className="text-slate-500">Facturas Registradas:</span> {t.invoices?.length || 0}</p>
+                          </div>
+
+                          {/* Selector para cambiar de Plan de Suscripción */}
+                          <div className="pt-2">
+                            <label className="block text-[11px] font-medium text-slate-400 mb-1">Asignar Plan Comercial</label>
+                            <select
+                              value={sub?.plan || 'STARTER'}
+                              onChange={async (e) => {
+                                const newPlan = e.target.value;
+                                try {
+                                  await api.updateTenantSubscription(t.id, {
+                                    plan: newPlan,
+                                    status: 'ACTIVE',
+                                  });
+                                  loadTenants();
+                                } catch (err: any) {
+                                  alert(`Error: ${err.message}`);
+                                }
+                              }}
+                              className="w-full p-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 focus:border-purple-500"
+                            >
+                              <option value="STARTER">Plan Starter ($29/mes)</option>
+                              <option value="PRO">Plan Pro ($79/mes)</option>
+                              <option value="ENTERPRISE">Plan Enterprise</option>
+                              {salesPlans.map(sp => (
+                                <option key={sp.id} value={sp.name}>{sp.name} (${sp.price}/mes)</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Botones de Acción */}
+                        <div className="pt-3 border-t border-slate-800 space-y-2">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => {
+                                setSelectedTenantForEdit(t);
+                                setTenantAiModel(bot?.aiModel || 'gpt-4o-mini');
+                                setTenantPrompt(bot?.systemPrompt || '');
+                                setTenantSaveStatus(null);
+                              }}
+                              className="flex-1 py-1.5 px-3 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 font-semibold text-xs border border-purple-500/30 flex items-center justify-center gap-1.5 transition-all"
+                            >
+                              <Sliders className="w-3.5 h-3.5" /> Configurar IA
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                setInvoiceModalTenant(t);
+                                setInvoiceForm({ amount: 29000, description: 'Suscripción Mensual Agente WhatsApp IA', phone: bot?.phoneNumber || '' });
+                                setInvoiceStatusMsg(null);
+                              }}
+                              className="flex-1 py-1.5 px-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 font-semibold text-xs border border-emerald-500/30 flex items-center justify-center gap-1.5 transition-all"
+                            >
+                              <FileText className="w-3.5 h-3.5" /> Facturar
+                            </button>
+                          </div>
+
+                          <div className="flex items-center justify-between gap-2">
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await api.toggleTenantStatus(t.id, !isTenantActive);
+                                  loadTenants();
+                                } catch (err: any) {
+                                  alert(`Error: ${err.message}`);
+                                }
+                              }}
+                              className={`flex-1 py-1.5 px-3 rounded-xl font-semibold text-xs border flex items-center justify-center gap-1.5 transition-all ${
+                                isTenantActive 
+                                  ? 'bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20' 
+                                  : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/20'
+                              }`}
+                            >
+                              {isTenantActive ? 'Suspender Acceso' : 'Reactivar Acceso'}
+                            </button>
+
+                            <button
+                              onClick={async () => {
+                                if (confirm(`¿Seguro que deseas eliminar el tenant "${t.name}" y todos sus datos?`)) {
+                                  try {
+                                    await api.deleteTenant(t.id);
+                                    loadTenants();
+                                  } catch (err: any) {
+                                    alert(`Error: ${err.message}`);
+                                  }
+                                }
+                              }}
+                              className="p-1.5 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all border border-red-500/20"
+                              title="Eliminar Tenant"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Modal / Panel para Editar Configuración de IA de Tenant Seleccionado */}
+            {selectedTenantForEdit && (
+              <div className="p-6 rounded-2xl bg-slate-900 border border-purple-500/40 shadow-2xl space-y-6">
+                <div className="flex justify-between items-center border-b border-slate-800 pb-4">
+                  <div className="flex items-center gap-3">
+                    <Sliders className="w-6 h-6 text-purple-400" />
+                    <div>
+                      <h3 className="font-bold text-lg text-slate-100">Configuración de IA para Tenant: {selectedTenantForEdit.name}</h3>
+                      <p className="text-xs text-slate-400">Asigna el modelo de IA y personaliza el system prompt exclusivo de este cliente.</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setSelectedTenantForEdit(null)}
+                    className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">Modelo de IA Asignado</label>
+                    <select
+                      value={tenantAiModel}
+                      onChange={(e) => setTenantAiModel(e.target.value)}
+                      className="w-full p-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-sm focus:outline-none focus:border-purple-500"
+                    >
+                      <optgroup label="OpenAI">
+                        <option value="gpt-4o-mini">OpenAI GPT-4o-mini</option>
+                        <option value="gpt-4o">OpenAI GPT-4o</option>
+                        <option value="o3-mini">OpenAI o3-mini</option>
+                      </optgroup>
+                      <optgroup label="Anthropic Claude">
+                        <option value="claude-3-5-sonnet">Claude 3.5 Sonnet</option>
+                        <option value="claude-3-5-haiku">Claude 3.5 Haiku</option>
+                      </optgroup>
+                      <optgroup label="Google Gemini">
+                        <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                        <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                        <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                      </optgroup>
+                      <optgroup label="DeepSeek">
+                        <option value="deepseek-chat">DeepSeek-V3 Chat</option>
+                        <option value="deepseek-r1">DeepSeek-R1</option>
+                      </optgroup>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">System Prompt por Defecto</label>
+                    <textarea
+                      value={tenantPrompt}
+                      onChange={(e) => setTenantPrompt(e.target.value)}
+                      rows={6}
+                      className="w-full p-4 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 focus:outline-none focus:border-purple-500 font-mono text-sm"
+                      placeholder="Escribe las instrucciones para el agente..."
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2">
+                    <button
+                      onClick={async () => {
+                        setSavingTenantAi(true);
+                        setTenantSaveStatus(null);
+                        try {
+                          await api.updateTenantAiConfig(selectedTenantForEdit.id, {
+                            aiModel: tenantAiModel,
+                            systemPrompt: tenantPrompt,
+                          });
+                          setTenantSaveStatus('✅ Configuración de IA guardada exitosamente');
+                          await loadTenants();
+                        } catch (err: any) {
+                          setTenantSaveStatus(`❌ Error: ${err.message}`);
+                        } finally {
+                          setSavingTenantAi(false);
+                        }
+                      }}
+                      disabled={savingTenantAi}
+                      className="px-6 py-2.5 rounded-xl bg-purple-500 hover:bg-purple-400 font-semibold text-slate-950 transition-all text-xs flex items-center gap-2 disabled:opacity-50"
+                    >
+                      {savingTenantAi ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                      Guardar Configuración de IA
+                    </button>
+                    {tenantSaveStatus && (
+                      <span className={`text-xs font-medium ${tenantSaveStatus.includes('❌') ? 'text-red-400' : 'text-emerald-400'}`}>
+                        {tenantSaveStatus}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* MODAL CREAR PLAN DE VENTA */}
+            {showPlanModal && (
+              <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                <div className="bg-slate-900 border border-purple-500/40 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl">
+                  <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+                    <h3 className="font-bold text-slate-100 text-base flex items-center gap-2">
+                      <Plus className="w-4 h-4 text-purple-400" /> Crear Plan de Venta
+                    </h3>
+                    <button onClick={() => setShowPlanModal(false)} className="text-slate-400 hover:text-white">
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      try {
+                        await api.createSalesPlan(planForm);
+                        setShowPlanModal(false);
+                        setPlanForm({ name: '', description: '', price: 29, maxBots: 1, maxDocs: 50 });
+                        loadSalesPlans();
+                      } catch (err: any) {
+                        alert(`Error al crear plan: ${err.message}`);
+                      }
+                    }}
+                    className="space-y-3 text-xs"
+                  >
+                    <div>
+                      <label className="block text-slate-300 font-semibold mb-1">Nombre del Plan</label>
+                      <input
+                        type="text"
+                        required
+                        value={planForm.name}
+                        onChange={(e) => setPlanForm({ ...planForm, name: e.target.value })}
+                        placeholder="Ej. Plan PyME Plus"
+                        className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-purple-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-300 font-semibold mb-1">Descripción corta</label>
+                      <input
+                        type="text"
+                        value={planForm.description}
+                        onChange={(e) => setPlanForm({ ...planForm, description: e.target.value })}
+                        placeholder="Ej. Ideal para pequeños negocios"
+                        className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-purple-500"
+                      />
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <label className="block text-slate-300 font-semibold mb-1">Precio (CLP)</label>
+                        <input
+                          type="number"
+                          required
+                          value={planForm.price}
+                          onChange={(e) => setPlanForm({ ...planForm, price: parseFloat(e.target.value) || 0 })}
+                          className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-purple-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-300 font-semibold mb-1">Max Bots</label>
+                        <input
+                          type="number"
+                          required
+                          value={planForm.maxBots}
+                          onChange={(e) => setPlanForm({ ...planForm, maxBots: parseInt(e.target.value) || 1 })}
+                          className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-purple-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-300 font-semibold mb-1">Max Docs RAG</label>
+                        <input
+                          type="number"
+                          required
+                          value={planForm.maxDocs}
+                          onChange={(e) => setPlanForm({ ...planForm, maxDocs: parseInt(e.target.value) || 50 })}
+                          className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-purple-500"
+                        />
+                      </div>
+                    </div>
+                    <div className="pt-3">
+                      <button
+                        type="submit"
+                        className="w-full py-2.5 rounded-xl bg-purple-500 hover:bg-purple-400 font-bold text-slate-950 transition-all shadow-lg shadow-purple-500/20"
+                      >
+                        Guardar Plan Comercial
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* MODAL FACTURAR TENANT */}
+            {invoiceModalTenant && (
+              <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                <div className="bg-slate-900 border border-emerald-500/40 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl">
+                  <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+                    <h3 className="font-bold text-slate-100 text-base flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-emerald-400" /> Emitir Factura: {invoiceModalTenant.name}
+                    </h3>
+                    <button onClick={() => setInvoiceModalTenant(null)} className="text-slate-400 hover:text-white">
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      setSendingInvoice(true);
+                      setInvoiceStatusMsg(null);
+                      try {
+                        await api.createTenantInvoice(invoiceModalTenant.id, {
+                          amount: invoiceForm.amount,
+                          description: invoiceForm.description,
+                          customerPhone: invoiceForm.phone,
+                        });
+                        setInvoiceStatusMsg('✅ Factura emitida y notificada por WhatsApp');
+                        setTimeout(() => {
+                          setInvoiceModalTenant(null);
+                          loadTenants();
+                        }, 1500);
+                      } catch (err: any) {
+                        setInvoiceStatusMsg(`❌ Error: ${err.message}`);
+                      } finally {
+                        setSendingInvoice(false);
+                      }
+                    }}
+                    className="space-y-3 text-xs"
+                  >
+                    <div>
+                      <label className="block text-slate-300 font-semibold mb-1">Monto (CLP)</label>
+                      <input
+                        type="number"
+                        required
+                        value={invoiceForm.amount}
+                        onChange={(e) => setInvoiceForm({ ...invoiceForm, amount: parseFloat(e.target.value) || 0 })}
+                        className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-emerald-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-300 font-semibold mb-1">Descripción del Cobro</label>
+                      <input
+                        type="text"
+                        required
+                        value={invoiceForm.description}
+                        onChange={(e) => setInvoiceForm({ ...invoiceForm, description: e.target.value })}
+                        className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-emerald-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-300 font-semibold mb-1">Teléfono WhatsApp para Envío</label>
+                      <input
+                        type="text"
+                        placeholder="Ej. 56912345678"
+                        value={invoiceForm.phone}
+                        onChange={(e) => setInvoiceForm({ ...invoiceForm, phone: e.target.value })}
+                        className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-emerald-500"
+                      />
+                    </div>
+                    <div className="pt-3">
+                      <button
+                        type="submit"
+                        disabled={sendingInvoice}
+                        className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 font-bold text-slate-950 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+                      >
+                        {sendingInvoice ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                        Emitir y Notificar Factura
+                      </button>
+                    </div>
+                    {invoiceStatusMsg && (
+                      <p className={`text-center text-xs font-medium ${invoiceStatusMsg.includes('❌') ? 'text-red-400' : 'text-emerald-400'}`}>
+                        {invoiceStatusMsg}
+                      </p>
+                    )}
+                  </form>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>

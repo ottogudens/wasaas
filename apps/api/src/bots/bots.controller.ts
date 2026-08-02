@@ -87,6 +87,10 @@ export class BotsController {
 
   @Patch(':id')
   async updateBot(@Param('id') id: string, @Req() req: any, @Body() dto: UpdateBotDto) {
+    // Si el usuario no es SUPER_ADMIN, remover la modificación de aiModel para evitar cambios no autorizados
+    if (req.user.role !== 'SUPER_ADMIN') {
+      delete dto.aiModel;
+    }
     return this.botsService.updateBot(id, req.user.organizationId, dto);
   }
 

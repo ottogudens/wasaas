@@ -11,6 +11,7 @@ generator client {
 }
 
 enum Role {
+  SUPER_ADMIN
   ADMIN
   MEMBER
 }
@@ -45,6 +46,7 @@ model Organization {
   id                String         @id @default(uuid())
   name              String
   slug              String         @unique
+  isActive          Boolean        @default(true)
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 
@@ -52,6 +54,7 @@ model Organization {
   bots              BotInstance[]
   subscriptions     Subscription[]
   documents         KnowledgeDocument[]
+  invoices          Invoice[]
 }
 
 model User {
@@ -60,10 +63,36 @@ model User {
   passwordHash   String
   name           String?
   role           Role         @default(ADMIN)
+  isActive       Boolean      @default(true)
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
+}
+
+model Plan {
+  id           String   @id @default(uuid())
+  name         String   @unique
+  description  String?
+  price        Float
+  maxBots      Int      @default(1)
+  maxDocs      Int      @default(50)
+  features     String[] @default([])
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Invoice {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  amount         Float
+  description    String?
+  status         String       @default("PAID") // "PAID" | "PENDING" | "OVERDUE"
+  pdfUrl         String?
+  dueDate        DateTime?
+  createdAt      DateTime     @default(now())
 }
 
 model Subscription {
@@ -71,6 +100,7 @@ model Subscription {
   organizationId     String
   organization       Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   plan               PlanType           @default(STARTER)
+  customPlanName     String?
   status             SubscriptionStatus @default(PENDING)
   mpPreapprovalId    String?            @unique // ID de Suscripción en MercadoPago
   mpPayerId          String?

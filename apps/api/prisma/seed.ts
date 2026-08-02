@@ -1,20 +1,27 @@
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+import * as dotenv from 'dotenv';
+
+dotenv.config();
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Seeding default user...');
+  console.log('🌱 Seeding default super admin user...');
 
-  const email = 'skale@wasaas.com';
+  const email = 'mibot@skale.cl';
   const password = 'GuD3Ns@#';
-  const orgName = 'Skale IA';
-  const userName = 'skale';
+  const orgName = 'Skale Admin';
+  const userName = 'Super Admin';
 
   // Check if user already exists
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
-    console.log(`⚠️ User "${email}" already exists. Skipping.`);
+    console.log(`⚠️ User "${email}" already exists. Updating role to SUPER_ADMIN...`);
+    await prisma.user.update({
+      where: { email },
+      data: { role: 'SUPER_ADMIN' },
+    });
     return;
   }
 
@@ -26,19 +33,22 @@ async function main() {
   const passwordHash = await bcrypt.hash(password, 12);
 
   const result = await prisma.$transaction(async (tx) => {
-    const organization = await tx.organization.create({
-      data: {
-        name: orgName,
-        slug,
-      },
-    });
+    let organization = await tx.organization.findUnique({ where: { slug } });
+    if (!organization) {
+      organization = await tx.organization.create({
+        data: {
+          name: orgName,
+          slug,
+        },
+      });
+    }
 
     const user = await tx.user.create({
       data: {
         email,
         passwordHash,
         name: userName,
-        role: 'ADMIN',
+        role: 'SUPER_ADMIN',
         organizationId: organization.id,
       },
     });
@@ -46,7 +56,7 @@ async function main() {
     await tx.subscription.create({
       data: {
         organizationId: organization.id,
-        plan: 'STARTER',
+        plan: 'ENTERPRISE',
         status: 'ACTIVE',
       },
     });
@@ -54,9 +64,9 @@ async function main() {
     return { organization, user };
   });
 
-  console.log(`✅ Organization created: "${result.organization.name}" (${result.organization.id})`);
-  console.log(`✅ User created: "${result.user.email}" (${result.user.id})`);
-  console.log(`🔑 Login credentials: email=${email} password=${password}`);
+  console.log(`✅ Organization created/verified: "${result.organization.name}" (${result.organization.id})`);
+  console.log(`✅ Super Admin created: "${result.user.email}" (${result.user.id})`);
+  console.log(`🔑 Super Admin login credentials: email=${email} password=${password}`);
 }
 
 main()

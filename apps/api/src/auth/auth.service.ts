@@ -115,6 +115,10 @@ export class AuthService {
       throw new UnauthorizedException('Credenciales inválidas.');
     }
 
+    if (user.isActive === false || user.organization?.isActive === false) {
+      throw new UnauthorizedException('Cuenta o acceso de la organización suspendido. Contacta al Administrador.');
+    }
+
     const token = this.generateToken(user.id, user.organizationId, user.role);
 
     this.logger.log(`🔑 Login exitoso: ${user.email} (Org: ${user.organization.name})`);

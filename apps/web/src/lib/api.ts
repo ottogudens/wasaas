@@ -170,6 +170,59 @@ class ApiClient {
       throw new Error(`Error al enviar documento por WhatsApp: ${err.message}`);
     }
   }
+
+  // ── Tenants Super Admin ───────────────────────────
+  async listTenants() {
+    return this.request<any[]>('/tenants');
+  }
+
+  async updateTenantAiConfig(tenantId: string, body: { aiModel?: string; systemPrompt?: string }) {
+    return this.request<any>(`/tenants/${tenantId}/ai-config`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    });
+  }
+
+  async updateTenantSubscription(tenantId: string, body: { plan: string; customPlanName?: string; status: string }) {
+    return this.request<any>(`/tenants/${tenantId}/subscription`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    });
+  }
+
+  async toggleTenantStatus(tenantId: string, isActive: boolean) {
+    return this.request<any>(`/tenants/${tenantId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ isActive }),
+    });
+  }
+
+  async createTenantInvoice(tenantId: string, body: { amount: number; description?: string; customerPhone?: string }) {
+    return this.request<any>(`/tenants/${tenantId}/invoices`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  }
+
+  async deleteTenant(tenantId: string) {
+    return this.request<any>(`/tenants/${tenantId}`, { method: 'DELETE' });
+  }
+
+  // ── Sales Plans ──────────────────────────────────
+  async listSalesPlans() {
+    return this.request<any[]>('/tenants/plans/all');
+  }
+
+  async createSalesPlan(body: { name: string; description?: string; price: number; maxBots: number; maxDocs: number }) {
+    return this.request<any>('/tenants/plans/create', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  }
+
+  async deleteSalesPlan(planId: string) {
+    return this.request<any>(`/tenants/plans/${planId}`, { method: 'DELETE' });
+  }
 }
 
 export const api = new ApiClient();
