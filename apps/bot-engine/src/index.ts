@@ -104,7 +104,16 @@ const createAiFlow = (tenantId: string) => {
         console.warn('⚠️ Error al consultar el módulo NestJS AI API:', err);
       }
 
-      await flowDynamic([{ body: botReply }]);
+      try {
+        await flowDynamic([{ body: botReply }]);
+      } catch (flowErr: any) {
+        const errMsg = flowErr?.message || String(flowErr);
+        if (errMsg.includes('Connection Closed') || flowErr?.output?.statusCode === 428) {
+          console.warn(`⚠️ [BotEngine Flow] Conexión de WhatsApp cerrada durante el envío a ${customerPhone} (428 Connection Closed).`);
+        } else {
+          console.error(`❌ [BotEngine Flow] Error al enviar respuesta dinámica:`, flowErr);
+        }
+      }
     });
 };
 
@@ -225,7 +234,20 @@ manager.createBot = async (tenantConfig: any) => {
           }
           if (data.reply && typeof provider.sendMessage === 'function') {
             console.log(`🤖 [BotEngine] Respondiendo a ${cleanFrom}: "${data.reply}"`);
-            await provider.sendMessage(cleanFrom, data.reply, {});
+            try {
+              await provider.sendMessage(cleanFrom, data.reply, {});
+            } catch (sendErr: any) {
+              const errMsg = sendErr?.message || String(sendErr);
+              const statusCode = sendErr?.output?.statusCode || sendErr?.data?.statusCode;
+              
+              if (errMsg.includes('Connection Closed') || statusCode === 428) {
+                console.warn(`⚠️ [BotEngine] La conexión de WhatsApp con ${tenantConfig.tenantId} se cerró (428 Connection Closed). Intentando re-conectar...`);
+                // Notificar desconexión a clientes y frontend
+                (manager as any).emit('bot:disconnected', tenantConfig.tenantId);
+              } else {
+                console.error(`❌ [BotEngine] Error al enviar mensaje con Baileys a ${cleanFrom}:`, sendErr);
+              }
+            }
           }
         } else {
           console.warn(`⚠️ [BotEngine] Respuesta HTTP ${response.status} desde /ai/chat-with-context`);
