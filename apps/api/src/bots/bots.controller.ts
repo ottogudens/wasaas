@@ -72,7 +72,8 @@ export class BotsController {
 
   @Get()
   async listBots(@Req() req: any) {
-    return this.botsService.listBots(req.user.organizationId);
+    const isSuperAdmin = req.user.role === 'SUPER_ADMIN';
+    return this.botsService.listBots(req.user.organizationId, isSuperAdmin);
   }
 
   @Post()
@@ -82,16 +83,18 @@ export class BotsController {
 
   @Get(':id')
   async getBot(@Param('id') id: string, @Req() req: any) {
-    return this.botsService.getBot(id, req.user.organizationId);
+    const isSuperAdmin = req.user.role === 'SUPER_ADMIN';
+    return this.botsService.getBot(id, req.user.organizationId, isSuperAdmin);
   }
 
   @Patch(':id')
   async updateBot(@Param('id') id: string, @Req() req: any, @Body() dto: UpdateBotDto) {
+    const isSuperAdmin = req.user.role === 'SUPER_ADMIN';
     // Si el usuario no es SUPER_ADMIN, remover la modificación de aiModel para evitar cambios no autorizados
-    if (req.user.role !== 'SUPER_ADMIN') {
+    if (!isSuperAdmin) {
       delete dto.aiModel;
     }
-    return this.botsService.updateBot(id, req.user.organizationId, dto);
+    return this.botsService.updateBot(id, req.user.organizationId, dto, isSuperAdmin);
   }
 
   @Delete(':id')

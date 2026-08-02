@@ -8,11 +8,12 @@ export class BotsService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Listar todos los bots de una organización
+   * Listar todos los bots de una organización (o todos si es SUPER_ADMIN)
    */
-  async listBots(organizationId: string) {
+  async listBots(organizationId: string, isSuperAdmin: boolean = false) {
+    const where = isSuperAdmin ? {} : { organizationId };
     return this.prisma.botInstance.findMany({
-      where: { organizationId },
+      where,
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
@@ -23,6 +24,7 @@ export class BotsService {
         status: true,
         aiModel: true,
         systemPrompt: true,
+        organizationId: true,
         createdAt: true,
         updatedAt: true,
         _count: { select: { conversations: true } },
@@ -59,9 +61,9 @@ export class BotsService {
   }
 
   /**
-   * Obtener un bot con verificación de pertenencia a la organización
+   * Obtener un bot con verificación de pertenencia a la organización (o acceso total si es SUPER_ADMIN)
    */
-  async getBot(botId: string, organizationId: string) {
+  async getBot(botId: string, organizationId: string, isSuperAdmin: boolean = false) {
     const bot = await this.prisma.botInstance.findUnique({
       where: { id: botId },
       include: {
@@ -70,7 +72,7 @@ export class BotsService {
     });
 
     if (!bot) throw new NotFoundException('Bot no encontrado.');
-    if (bot.organizationId !== organizationId) throw new ForbiddenException('No tienes acceso a este bot.');
+    if (!isSuperAdmin && bot.organizationId !== organizationId) throw new ForbiddenException('No tienes acceso a este bot.');
 
     return bot;
   }
@@ -88,8 +90,8 @@ export class BotsService {
   /**
    * Actualizar configuración de un bot
    */
-  async updateBot(botId: string, organizationId: string, data: { name?: string; systemPrompt?: string; aiModel?: string; provider?: string; metaJwtToken?: string; metaNumberId?: string; metaVerifyToken?: string }) {
-    const bot = await this.getBot(botId, organizationId);
+  async updateBot(botId: string, organizationId: string, data: { name?: string; systemPrompt?: string; aiModel?: string; provider?: string; metaJwtToken?: string; metaNumberId?: string; metaVerifyToken?: string }, isSuperAdmin: boolean = false) {
+    const bot = await this.getBot(botId, organizationId, isSuperAdmin);
 
     const updated = await this.prisma.botInstance.update({
       where: { id: bot.id },

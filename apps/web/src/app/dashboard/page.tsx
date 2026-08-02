@@ -1013,6 +1013,47 @@ export default function DashboardPage() {
 
       {/* Main Content Area */}
       <main className="flex-1 p-10 overflow-y-auto">
+        {/* Banner de Selección Global de Agente para Super Admin */}
+        {bots.length > 0 && (
+          <div className="mb-6 p-4 rounded-2xl bg-slate-900/80 border border-purple-500/30 flex items-center justify-between flex-wrap gap-4 shadow-lg">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                <Bot className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-purple-300">
+                  {user?.role === 'SUPER_ADMIN' ? '👑 Modo Super Admin — Agente Activo Global' : 'Agente Activo Seleccionado'}
+                </p>
+                <p className="text-sm font-bold text-slate-100">
+                  {selectedBot ? `${selectedBot.name} (${selectedBot.tenantId})` : 'Ningún agente seleccionado'}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-slate-400 font-medium">Cambiar Agente:</label>
+              <select
+                value={selectedBot?.id || ''}
+                onChange={(e) => {
+                  const b = bots.find((item) => item.id === e.target.value);
+                  if (b) {
+                    setSelectedBot(b);
+                    setSystemPrompt(b.systemPrompt || '');
+                    setAiModel(b.aiModel || 'gpt-4o-mini');
+                    setBotStatus(b.status || 'DISCONNECTED');
+                  }
+                }}
+                className="p-2 px-3 rounded-xl bg-slate-950 border border-slate-800 text-xs font-medium text-slate-200 focus:outline-none focus:border-purple-500"
+              >
+                {bots.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name} ({b.tenantId}) — {b.status || 'DISCONNECTED'}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+
         {/* Bots Tab */}
         {activeTab === 'bots' && (
           <div className="max-w-4xl mx-auto space-y-6">
@@ -2384,6 +2425,7 @@ export default function DashboardPage() {
                           });
                           setTenantSaveStatus('✅ Configuración de IA guardada exitosamente');
                           await loadTenants();
+                          await loadBots();
                         } catch (err: any) {
                           setTenantSaveStatus(`❌ Error: ${err.message}`);
                         } finally {
