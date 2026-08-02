@@ -5,12 +5,13 @@ import { useRouter } from 'next/navigation';
 import { 
   Bot, QrCode, Sparkles, CreditCard, Shield, CheckCircle2, FileText, Send, Phone,
   RefreshCw, Loader2, Settings2, AlertTriangle, Terminal, LogOut, Plus, Trash2, User, Building, MessageSquare, Pencil, X, Wifi, WifiOff,
-  Cpu, Key, Sliders, Check, Eye, EyeOff, Upload, FileCheck, Download, Smartphone, Menu, Share2, Copy
+  Cpu, Key, Sliders, Check, Eye, EyeOff, Upload, FileCheck, Download, Smartphone, Menu, Share2, Copy, HelpCircle
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '../../lib/auth-context';
 import { api } from '../../lib/api';
 import { MiBotLogo } from '../../components/MiBotLogo';
+import { InteractiveHelpModal } from '../../components/InteractiveHelpModal';
 
 const DEFAULT_TEMPLATES = [
   {
@@ -112,6 +113,7 @@ export default function DashboardPage() {
 
   const [activeTab, setActiveTab] = useState<'qr' | 'prompt' | 'ai-config' | 'templates' | 'rag' | 'billing' | 'bots' | 'chat' | 'tenants-admin'>('bots');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
 
   // PWA Install State
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -847,6 +849,12 @@ export default function DashboardPage() {
       <header className="md:hidden flex items-center justify-between p-4 border-b border-slate-800 bg-slate-900/90 backdrop-blur-md sticky top-0 z-40">
         <MiBotLogo className="w-8 h-8" textClassName="text-lg" />
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsHelpOpen(true)}
+            className="px-2.5 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs font-bold flex items-center gap-1"
+          >
+            <HelpCircle className="w-3.5 h-3.5" /> Ayuda
+          </button>
           {isInstallable && (
             <button
               onClick={handleInstallPwa}
@@ -1003,6 +1011,12 @@ export default function DashboardPage() {
 
         <div className="space-y-3">
           <button
+            onClick={() => setIsHelpOpen(true)}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 text-xs font-bold text-emerald-400 hover:bg-emerald-500/30 transition-all shadow-md"
+          >
+            <HelpCircle className="w-4 h-4" /> Guía Interactiva
+          </button>
+          <button
             onClick={logout}
             className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-semibold text-slate-400 hover:text-red-400 transition-all"
           >
@@ -1012,7 +1026,7 @@ export default function DashboardPage() {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 p-10 overflow-y-auto">
+      <main className="flex-1 p-4 sm:p-6 md:p-10 overflow-y-auto">
         {/* Banner de Selección Global de Agente para Super Admin */}
         {bots.length > 0 && (
           <div className="mb-6 p-4 rounded-2xl bg-slate-900/80 border border-purple-500/30 flex items-center justify-between flex-wrap gap-4 shadow-lg">
@@ -1063,7 +1077,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Create Bot Form */}
-            <form onSubmit={handleCreateBot} className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 flex gap-4">
+            <form onSubmit={handleCreateBot} className="p-4 sm:p-6 rounded-2xl bg-slate-900/60 border border-slate-800 flex flex-col sm:flex-row gap-3 sm:gap-4">
               <input
                 type="text"
                 required
@@ -1075,7 +1089,7 @@ export default function DashboardPage() {
               <button
                 type="submit"
                 disabled={creatingBot}
-                className="px-6 py-3 rounded-xl bg-emerald-500 font-semibold text-slate-950 hover:bg-emerald-400 transition-all flex items-center gap-2 text-sm disabled:opacity-50"
+                className="px-6 py-3 rounded-xl bg-emerald-500 font-semibold text-slate-950 hover:bg-emerald-400 transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-50"
               >
                 {creatingBot ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                 Crear Agente
@@ -1948,7 +1962,7 @@ export default function DashboardPage() {
                       <label className="text-xs text-slate-400 font-medium block">
                         Número de WhatsApp de Destino (Cliente):
                       </label>
-                      <div className="flex gap-2">
+                      <div className="flex flex-col sm:flex-row gap-2">
                         <input
                           type="tel"
                           value={targetPhoneForDoc}
@@ -1959,7 +1973,7 @@ export default function DashboardPage() {
                         <button
                           onClick={handleSendGeneratedDoc}
                           disabled={sendingDoc || !targetPhoneForDoc.trim()}
-                          className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition-all flex items-center gap-2 disabled:opacity-50"
+                          className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                         >
                           {sendingDoc ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                           Enviar por WhatsApp
@@ -2165,7 +2179,7 @@ export default function DashboardPage() {
                   <p className="text-slate-500 text-sm">No hay planes de venta personalizados creados aún.</p>
                 </div>
               ) : (
-                <div className="grid md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   {salesPlans.map((p) => (
                     <div key={p.id} className="p-5 rounded-2xl bg-slate-900/60 border border-purple-500/30 space-y-3 relative">
                       <div className="flex justify-between items-start">
@@ -2212,7 +2226,7 @@ export default function DashboardPage() {
               ) : tenantsList.length === 0 ? (
                 <p className="text-slate-500 text-center py-8">No hay tenants registrados.</p>
               ) : (
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                   {tenantsList.map((t) => {
                     const bot = t.bots?.[0];
                     const sub = t.subscriptions?.[0];
@@ -2495,7 +2509,7 @@ export default function DashboardPage() {
                         className="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-purple-500"
                       />
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                       <div>
                         <label className="block text-slate-300 font-semibold mb-1">Precio (CLP)</label>
                         <input
@@ -2627,6 +2641,15 @@ export default function DashboardPage() {
             )}
           </div>
         )}
+        {/* Componente de Guía e Instructivo Interactivo */}
+        <InteractiveHelpModal
+          isOpen={isHelpOpen}
+          onClose={() => setIsHelpOpen(false)}
+          onNavigateTab={(tab) => {
+            setActiveTab(tab);
+            setMobileMenuOpen(false);
+          }}
+        />
       </main>
     </div>
   );
