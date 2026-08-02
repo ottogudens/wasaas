@@ -2,10 +2,68 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { PrismaService } from './prisma/prisma.service';
+import * as bcrypt from 'bcryptjs';
+
+async function seedSuperAdmin(prisma: PrismaService) {
+  try {
+    const email = 'mibot@skale.cl';
+    const password = 'GuD3Ns@#';
+    const orgName = 'Skale Admin';
+    const userName = 'Super Admin';
+    const slug = 'skale-admin';
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    const existing = await prisma.user.findUnique({ where: { email } });
+
+    if (existing) {
+      await prisma.user.update({
+        where: { email },
+        data: {
+          role: 'SUPER_ADMIN',
+          passwordHash,
+          isActive: true,
+        },
+      });
+      console.log(`✅ [SEED-AUTO] Super Admin verificado y actualizado: "${email}"`);
+    } else {
+      let organization = await prisma.organization.findUnique({ where: { slug } });
+      if (!organization) {
+        organization = await prisma.organization.create({
+          data: { name: orgName, slug },
+        });
+      }
+
+      await prisma.user.create({
+        data: {
+          email,
+          passwordHash,
+          name: userName,
+          role: 'SUPER_ADMIN',
+          organizationId: organization.id,
+        },
+      });
+
+      await prisma.subscription.create({
+        data: {
+          organizationId: organization.id,
+          plan: 'ENTERPRISE',
+          status: 'ACTIVE',
+        },
+      });
+      console.log(`✅ [SEED-AUTO] Super Admin creado exitosamente: "${email}"`);
+    }
+  } catch (err: any) {
+    console.error('⚠️ [SEED-AUTO] Advertencia al verificar Super Admin:', err.message);
+  }
+}
 
 async function bootstrap() {
   console.log('[BOOTSTART] Iniciando ejecucion de bootstrap NestJS...');
   const app = await NestFactory.create(AppModule);
+
+  const prisma = app.get(PrismaService);
+  await seedSuperAdmin(prisma);
 
   // Security headers (configurar helmet para no bloquear CORS/preflight)
   app.use(
