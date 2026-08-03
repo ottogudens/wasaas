@@ -45,4 +45,39 @@ export class AiController {
       isHumanMode: (result as any).isHumanMode || false,
     };
   }
+
+  /**
+   * Endpoint interno para transcribir y procesar notas de voz desde WhatsApp (usado por bot-engine)
+   */
+  @Post('transcribe-voice')
+  async transcribeVoice(@Body() body: { tenantId: string; customerPhone: string; audioBase64: string; mimeType?: string }) {
+    if (!body.tenantId || !body.customerPhone || !body.audioBase64) {
+      return { status: 'error', message: 'Faltan parámetros requeridos.' };
+    }
+
+    const audioBuffer = Buffer.from(body.audioBase64, 'base64');
+    const transcribedText = await this.aiService.transcriptionService.transcribeAudioBuffer(audioBuffer, 'voice.ogg');
+
+    if (!transcribedText || transcribedText.trim().length === 0) {
+      return {
+        status: 'success',
+        transcribedText: '',
+        reply: 'No se pudo comprender el mensaje de audio. Por favor intenta enviar una nota de voz más clara o un texto.',
+      };
+    }
+
+    const result = await this.aiService.chatWithContext(
+      body.tenantId,
+      body.customerPhone,
+      transcribedText,
+    );
+
+    return {
+      status: 'success',
+      transcribedText,
+      reply: result.reply,
+      conversationId: result.conversationId,
+      isHumanMode: (result as any).isHumanMode || false,
+    };
+  }
 }

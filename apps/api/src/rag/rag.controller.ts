@@ -68,6 +68,36 @@ export class RagController {
   }
 
   /**
+   * Endpoint interno para procesar documentos de WhatsApp (usado por bot-engine)
+   */
+  @Post('process-whatsapp-file')
+  async processWhatsAppFile(@Body() body: { tenantId: string; title: string; content: string }) {
+    if (!body.tenantId || !body.title || !body.content) {
+      throw new BadRequestException('tenantId, title y content son obligatorios.');
+    }
+
+    const bot = await this.ragService['prisma'].botInstance.findUnique({
+      where: { tenantId: body.tenantId },
+    });
+
+    if (!bot) {
+      throw new BadRequestException('Bot no encontrado.');
+    }
+
+    const result = await this.ragService.processAndStoreDocument(
+      bot.organizationId,
+      body.title,
+      body.content,
+    );
+
+    return {
+      status: 'success',
+      documentId: result.documentId,
+      chunksProcessed: result.chunksProcessed,
+    };
+  }
+
+  /**
    * Listar documentos de la organización
    */
   @Get('documents')

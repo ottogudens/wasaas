@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import { PrismaService } from '../prisma/prisma.service';
 import { RagService } from '../rag/rag.service';
+import { TranscriptionService } from './transcription.service';
 
 const HISTORY_WINDOW = 20;
 
@@ -15,6 +16,7 @@ export class AiService {
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
     private readonly ragService: RagService,
+    public readonly transcriptionService: TranscriptionService,
   ) {
     const apiKey = this.configService.get<string>('OPENAI_API_KEY');
     if (!apiKey) {
@@ -101,10 +103,27 @@ export class AiService {
       },
     });
 
-    // 3.5. Si está en modo humano, abortar respuesta de IA
-    if (conversation.isHumanMode) {
+    // 3.5. Chequeo de intención de traspaso a operador humano (Human Handover Detector)
+    const lowerMessage = userMessage.toLowerCase().trim();
+    const humanKeywords = ['hablar con persona', 'agente humano', 'hablar con alguien', 'operador', 'asesor humano', 'hablar con humano'];
+    const requestsHuman = humanKeywords.some(kw => lowerMessage.includes(kw));
+
+    if (conversation.isHumanMode || requestsHuman) {
+      if (requestsHuman && !conversation.isHumanMode) {
+        await this.prisma.conversation.update({
+          where: { id: conversation.id },
+          data: { isHumanMode: true, updatedAt: new Date() },
+        });
+        this.logger.log(`✋ Solicitud de humano detectada en conv ${conversation.id}. Traspasando a modo humano.`);
+        
+        const handoverReply = 'He derivado tu solicitud con un asesor humano. En breve un miembro de nuestro equipo se pondrá en contacto contigo.';
+        await this.prisma.message.create({
+          data: { conversationId: conversation.id, sender: 'BOT', content: handoverReply },
+        });
+        return { reply: handoverReply, conversationId: conversation.id, isHumanMode: true };
+      }
+
       this.logger.log(`✋ Modo humano activo en conv ${conversation.id}. Ignorando IA.`);
-      // Actualizar timestamp
       await this.prisma.conversation.update({
         where: { id: conversation.id },
         data: { updatedAt: new Date() },
@@ -122,24 +141,55 @@ export class AiService {
     // Revertir para orden cronológico
     const orderedHistory = history.reverse();
 
-    // 5. Buscar chunks RAG relevantes
+    // 4.5. Buscar en la memoria semántica aprendida (Semantic Caching)
+    const cachedMemory = await this.ragService.findCachedMemory(userMessage, bot.organizationId);
+    if (cachedMemory) {
+      const reply = cachedMemory.replyText;
+
+      // Guardar respuesta del bot en BD
+      await this.prisma.message.create({
+        data: {
+          conversationId: conversation.id,
+          sender: 'BOT',
+          content: reply,
+        },
+      });
+
+      await this.prisma.conversation.update({
+        where: { id: conversation.id },
+        data: { updatedAt: new Date() },
+      });
+
+      return { reply, conversationId: conversation.id };
+    }
+
+    // 5. Buscar chunks RAG relevantes con filtro de similitud mínima (minSimilarity = 0.60)
     let ragContext = '';
+    let foundRelevantChunks = false;
     try {
       const similarChunks = await this.ragService.searchSimilarChunks(
         userMessage,
         bot.organizationId,
         3,
+        0.60,
       );
       if (similarChunks.length > 0) {
-        ragContext = `\n\nInformación relevante de la base de conocimiento:\n${similarChunks.map(c => c.content).join('\n---\n')}`;
+        foundRelevantChunks = true;
+        ragContext = `\n\n[BASE DE CONOCIMIENTO OFICIAL DE LA EMPRESA]:\n${similarChunks.map(c => c.content).join('\n---\n')}`;
       }
     } catch (err) {
       this.logger.warn('⚠️ Error al buscar contexto RAG, continuando sin contexto:', err);
     }
 
-    // 6. Construir system prompt completo
-    const systemPrompt = bot.systemPrompt || 'Eres un asistente virtual profesional especializado en atención al cliente.';
-    const fullSystemPrompt = `${systemPrompt}${ragContext}`;
+    // 6. Construir system prompt completo con reglas anti-alucinación (Strict Grounding)
+    const customPrompt = bot.systemPrompt || 'Eres un asistente virtual profesional especializado en atención al cliente.';
+    const strictGroundingRules = `
+[REGLAS OBLIGATORIAS DE COMPORTAMIENTO]:
+1. Si la pregunta del cliente está relacionada con productos, precios, servicios, políticas o datos del negocio, DEBES responder basándote ÚNICAMENTE en la [BASE DE CONOCIMIENTO OFICIAL DE LA EMPRESA].
+2. Si la información solicitada NO está presente en la Base de Conocimiento, di amablemente que no dispones de esa información en este momento y ofrece conectar con un asesor humano. JAMÁS inventes datos, precios ni condiciones.
+3. Mantén un trato cordial, claro y conciso acorde a tu personalidad.`;
+
+    const fullSystemPrompt = `${customPrompt}\n${strictGroundingRules}${ragContext}`;
 
     // 7. Construir mensajes para OpenAI
     const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
@@ -170,6 +220,11 @@ export class AiService {
       });
 
       reply = response.choices[0]?.message?.content || 'No se pudo generar una respuesta.';
+
+      // 8.5. Memorizar en caché semántico si se encontró información relevante y no fue un error
+      if (foundRelevantChunks && reply && !reply.includes('no dispones de esa información')) {
+        await this.ragService.storeMemory(bot.organizationId, userMessage, reply);
+      }
     } catch (error) {
       this.logger.error('Error generando respuesta con IA:', error);
       reply = 'Lo siento, en este momento no puedo procesar tu solicitud. Por favor intenta más tarde.';

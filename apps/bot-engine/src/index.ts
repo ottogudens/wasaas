@@ -191,15 +191,90 @@ manager.createBot = async (tenantConfig: any) => {
     });
 
     provider.on('message', async (payload: any) => {
-      const bodyText = extractMessageText(payload);
       const rawFrom = payload?.from || payload?.key?.remoteJid || '';
       const cleanFrom = cleanPhoneNumber(rawFrom);
 
-      // Ignorar mensajes vacíos, estados de broadcast o remite inválido
-      if (!cleanFrom || !bodyText || rawFrom.includes('status@broadcast')) return;
+      // Ignorar mensajes salientes o de broadcast
+      if (!cleanFrom || rawFrom.includes('status@broadcast') || payload?.key?.fromMe) return;
 
-      // Evitar bucles ignorando mensajes salientes generados por la propia instancia
-      if (payload?.key?.fromMe) return;
+      const isAudio = !!(payload?.message?.audioMessage);
+      const isDocument = !!(payload?.message?.documentMessage || payload?.message?.documentWithCaptionMessage);
+      let bodyText = extractMessageText(payload);
+
+      // 🎙️ A. Procesar Nota de Voz vía OpenAI Whisper
+      if (isAudio && typeof provider.saveFile === 'function') {
+        console.log(`🎙️ [Baileys Audio Message] Recibida nota de voz de ${cleanFrom}...`);
+        try {
+          const localAudioPath = await provider.saveFile(payload, { path: './sessions/temp_audio' });
+          if (localAudioPath && fs.existsSync(localAudioPath)) {
+            const audioBuffer = fs.readFileSync(localAudioPath);
+            const audioBase64 = audioBuffer.toString('base64');
+            fs.unlinkSync(localAudioPath); // Limpieza de archivo temporal
+
+            const voiceRes = await fetch(`${API_URL}/ai/transcribe-voice`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
+              body: JSON.stringify({ tenantId: tenantConfig.tenantId, customerPhone: cleanFrom, audioBase64 }),
+            });
+
+            if (voiceRes.ok) {
+              const voiceData = await voiceRes.json();
+
+              // Emitir evento WebSocket para actualizar Live Chat en el Frontend con el texto transcrito
+              if (voiceData.transcribedText) {
+                (manager as any).emit('bot:message', tenantConfig.tenantId, {
+                  from: cleanFrom,
+                  body: `🎙️ (Audio): "${voiceData.transcribedText}"`,
+                  name: payload?.pushName || payload?.name || cleanFrom,
+                  timestamp: Date.now()
+                });
+              }
+
+              if (voiceData.reply && typeof provider.sendMessage === 'function') {
+                console.log(`🤖 [BotEngine Voice Reply] Respondiendo a ${cleanFrom}: "${voiceData.reply}"`);
+                await provider.sendMessage(cleanFrom, voiceData.reply, {});
+              }
+            }
+            return;
+          }
+        } catch (audioErr) {
+          console.error('❌ Error procesando mensaje de voz:', audioErr);
+        }
+      }
+
+      // 📄 B. Procesar Ingesta de Documentos vía RAG
+      if (isDocument && typeof provider.saveFile === 'function') {
+        const docMsg = payload?.message?.documentMessage || payload?.message?.documentWithCaptionMessage?.message?.documentMessage;
+        const docTitle = docMsg?.fileName || 'Documento_WhatsApp.txt';
+        console.log(`📄 [Baileys Document Message] Recibido archivo "${docTitle}" de ${cleanFrom}...`);
+        try {
+          const localDocPath = await provider.saveFile(payload, { path: './sessions/temp_docs' });
+          if (localDocPath && fs.existsSync(localDocPath)) {
+            const docContent = fs.readFileSync(localDocPath, 'utf-8');
+            fs.unlinkSync(localDocPath); // Limpieza
+
+            const docRes = await fetch(`${API_URL}/rag/process-whatsapp-file`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
+              body: JSON.stringify({ tenantId: tenantConfig.tenantId, title: docTitle, content: docContent }),
+            });
+
+            if (docRes.ok) {
+              const docData = await docRes.json();
+              const ackReply = `📄 He recibido e indexado el documento "${docTitle}" (${docData.chunksProcessed} fragmentos aprendidos). Ya puedo responder preguntas sobre su contenido.`;
+              if (typeof provider.sendMessage === 'function') {
+                await provider.sendMessage(cleanFrom, ackReply, {});
+              }
+            }
+            return;
+          }
+        } catch (docErr) {
+          console.error('❌ Error procesando documento de WhatsApp:', docErr);
+        }
+      }
+
+      // Ignorar si no hay texto extraíble
+      if (!bodyText) return;
 
       console.log(`📩 [Baileys Incoming Message] Tenant: ${tenantConfig.tenantId}, From: ${cleanFrom} (${rawFrom}), Body: "${bodyText}"`);
 
@@ -211,7 +286,7 @@ manager.createBot = async (tenantConfig: any) => {
         timestamp: Date.now()
       });
 
-      // 2. Procesar con NestJS AI API: persiste conversación/mensaje en PostgreSQL, evalúa RAG y genera respuesta
+      // 2. Procesar mensaje de texto con NestJS AI API
       try {
         const response = await fetch(`${API_URL}/ai/chat-with-context`, {
           method: 'POST',
@@ -242,7 +317,6 @@ manager.createBot = async (tenantConfig: any) => {
               
               if (errMsg.includes('Connection Closed') || statusCode === 428) {
                 console.warn(`⚠️ [BotEngine] La conexión de WhatsApp con ${tenantConfig.tenantId} se cerró (428 Connection Closed). Intentando re-conectar...`);
-                // Notificar desconexión a clientes y frontend
                 (manager as any).emit('bot:disconnected', tenantConfig.tenantId);
               } else {
                 console.error(`❌ [BotEngine] Error al enviar mensaje con Baileys a ${cleanFrom}:`, sendErr);

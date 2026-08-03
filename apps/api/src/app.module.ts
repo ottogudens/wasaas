@@ -17,6 +17,8 @@ import { MercadoPagoController } from './mercadopago/mercadopago.controller';
 import { MercadoPagoService } from './mercadopago/mercadopago.service';
 import { TenantsController } from './tenants/tenants.controller';
 
+import { TranscriptionService } from './ai/transcription.service';
+
 @Module({
   imports: [
     // Configuración global de variables de entorno
@@ -47,6 +49,7 @@ import { TenantsController } from './tenants/tenants.controller';
   providers: [
     AiService,
     RagService,
+    TranscriptionService,
     MercadoPagoService,
     // Aplicar rate limiting globalmente
     {

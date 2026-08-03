@@ -68,12 +68,13 @@ export class RagService {
   }
 
   /**
-   * Buscar chunks similares por cosine similarity en pgvector
+   * Buscar chunks similares por cosine similarity en pgvector con filtro de similitud mínima
    */
   async searchSimilarChunks(
     query: string,
     organizationId: string,
     topK: number = 3,
+    minSimilarity: number = 0.65,
   ): Promise<Array<{ id: string; content: string; similarity: number }>> {
     try {
       const queryEmbedding = await this.generateEmbedding(query);
@@ -89,6 +90,7 @@ export class RagService {
         INNER JOIN "KnowledgeDocument" kd ON kd.id = dvc."documentId"
         WHERE kd."organizationId" = ${organizationId}
           AND dvc.embedding IS NOT NULL
+          AND 1 - (dvc.embedding <=> ${JSON.stringify(queryEmbedding)}::vector) >= ${minSimilarity}
         ORDER BY dvc.embedding <=> ${JSON.stringify(queryEmbedding)}::vector
         LIMIT ${topK}
       `;
@@ -129,6 +131,81 @@ export class RagService {
 
     this.logger.log(`🗑️ Documento "${doc.title}" eliminado con sus chunks.`);
     return doc;
+  }
+
+  /**
+   * Buscar en la memoria semántica aprendida (Semantic Caching)
+   */
+  async findCachedMemory(
+    query: string,
+    organizationId: string,
+    minSimilarity: number = 0.88,
+  ): Promise<{ replyText: string; similarity: number } | null> {
+    try {
+      const queryEmbedding = await this.generateEmbedding(query);
+
+      const results = await this.prisma.$queryRaw<
+        Array<{ id: string; replyText: string; similarity: number }>
+      >`
+        SELECT
+          smc.id,
+          smc."replyText",
+          1 - (smc."queryEmbedding" <=> ${JSON.stringify(queryEmbedding)}::vector) AS similarity
+        FROM "SemanticMemoryCache" smc
+        WHERE smc."organizationId" = ${organizationId}
+          AND smc."queryEmbedding" IS NOT NULL
+          AND 1 - (smc."queryEmbedding" <=> ${JSON.stringify(queryEmbedding)}::vector) >= ${minSimilarity}
+        ORDER BY smc."queryEmbedding" <=> ${JSON.stringify(queryEmbedding)}::vector
+        LIMIT 1
+      `;
+
+      if (results.length > 0) {
+        const match = results[0];
+        // Incrementar contador de hits
+        await this.prisma.$executeRaw`
+          UPDATE "SemanticMemoryCache"
+          SET "hitCount" = "hitCount" + 1, "updatedAt" = NOW()
+          WHERE id = ${match.id}
+        `;
+        this.logger.log(`⚡ [SemanticCache HIT] Respuesta recuperada de la memoria aprendida (Similitud: ${match.similarity.toFixed(3)})`);
+        return { replyText: match.replyText, similarity: match.similarity };
+      }
+      return null;
+    } catch (error) {
+      this.logger.error('Error al buscar en caché semántico:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Guardar nuevo par de conocimiento aprendido en la memoria semántica (Semantic Memory)
+   */
+  async storeMemory(
+    organizationId: string,
+    queryText: string,
+    replyText: string,
+  ): Promise<void> {
+    try {
+      if (!queryText || !replyText || queryText.length < 5 || replyText.length < 5) return;
+      const embedding = await this.generateEmbedding(queryText);
+
+      await this.prisma.$executeRaw`
+        INSERT INTO "SemanticMemoryCache" (id, "organizationId", "queryText", "queryEmbedding", "replyText", "hitCount", "createdAt", "updatedAt")
+        VALUES (
+          gen_random_uuid(),
+          ${organizationId},
+          ${queryText},
+          ${JSON.stringify(embedding)}::vector,
+          ${replyText},
+          1,
+          NOW(),
+          NOW()
+        )
+      `;
+      this.logger.log(`🧠 [SemanticMemory Saved] Nuevo conocimiento aprendido y almacenado para la organización.`);
+    } catch (error) {
+      this.logger.error('Error al guardar en memoria semántica:', error);
+    }
   }
 
   /**
