@@ -227,16 +227,11 @@ export class BotsService {
   }
 
   /**
-   * Internal: Get all active bots (not disconnected)
+   * Internal: Get all registered bots for rehydration after restart/deploy
    */
   async getActiveBots() {
     return this.prisma.botInstance.findMany({
-      where: {
-        status: {
-          not: 'DISCONNECTED',
-        },
-      },
-      select: { tenantId: true },
+      select: { tenantId: true, name: true, status: true },
     });
   }
 

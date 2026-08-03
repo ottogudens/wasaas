@@ -197,22 +197,35 @@ manager.createBot = async (tenantConfig: any) => {
       const rawFrom = payload?.from || payload?.key?.remoteJid || '';
       const cleanFrom = cleanPhoneNumber(rawFrom);
 
-      // Ignorar mensajes salientes o de broadcast
-      if (!cleanFrom || rawFrom.includes('status@broadcast') || payload?.key?.fromMe) return;
-
-      const isAudio = !!(payload?.message?.audioMessage);
-      const isDocument = !!(payload?.message?.documentMessage || payload?.message?.documentWithCaptionMessage);
+      const isAudio = !!(
+        payload?.message?.audioMessage ||
+        payload?.message?.pttMessage ||
+        payload?.audioMessage ||
+        payload?.type === 'audio' ||
+        payload?.message?.extendedTextMessage?.contextInfo?.quotedMessage?.audioMessage
+      );
+      const isDocument = !!(
+        payload?.message?.documentMessage ||
+        payload?.message?.documentWithCaptionMessage ||
+        payload?.documentMessage
+      );
       let bodyText = extractMessageText(payload);
 
       // 🎙️ A. Procesar Nota de Voz vía OpenAI Whisper
-      if (isAudio && typeof provider.saveFile === 'function') {
+      if (isAudio) {
         console.log(`🎙️ [Baileys Audio Message] Recibida nota de voz de ${cleanFrom}...`);
         try {
-          const localAudioPath = await provider.saveFile(payload, { path: './sessions/temp_audio' });
+          let localAudioPath: string | null = null;
+          if (typeof provider.saveFile === 'function') {
+            localAudioPath = await provider.saveFile(payload, { path: './sessions/temp_audio' });
+          } else if (typeof (provider as any).downloadMediaMessage === 'function') {
+            localAudioPath = await (provider as any).downloadMediaMessage(payload, './sessions/temp_audio');
+          }
+
           if (localAudioPath && fs.existsSync(localAudioPath)) {
             const audioBuffer = fs.readFileSync(localAudioPath);
             const audioBase64 = audioBuffer.toString('base64');
-            fs.unlinkSync(localAudioPath); // Limpieza de archivo temporal
+            try { fs.unlinkSync(localAudioPath); } catch (e) {} // Limpieza de archivo temporal
 
             const voiceRes = await fetch(`${API_URL}/ai/transcribe-voice`, {
               method: 'POST',
@@ -538,18 +551,19 @@ const setupProviderListeners = (botInstance: any, tenantId: string) => {
 // 7. Rehidratación (Arranque de Bots Activos) y Limpieza de Caché Huérfano
 const cleanOrphanSessions = (activeTenantIds: string[]) => {
   try {
-    if (!fs.existsSync(SESSIONS_DIR)) return;
+    if (!fs.existsSync(SESSIONS_DIR) || activeTenantIds.length === 0) return;
     const files = fs.readdirSync(SESSIONS_DIR);
     for (const file of files) {
-      const isTenantActive = activeTenantIds.some(id => file.includes(id));
-      if (!isTenantActive) {
+      // Solo borrar carpetas de sesiones si no pertenecen a NINGÚN bot registrado
+      const isTenantRegistered = activeTenantIds.some(id => file.includes(id));
+      if (!isTenantRegistered) {
         const fullPath = path.join(SESSIONS_DIR, file);
         fs.rmSync(fullPath, { recursive: true, force: true });
-        console.log(`🧹 [CleanCache] Sesión huérfana o eliminada borrada de disco: ${fullPath}`);
+        console.log(`🧹 [CleanCache] Sesión eliminada de disco por no existir en la BD: ${fullPath}`);
       }
     }
   } catch (err) {
-    console.warn('⚠️ Error al limpiar sesiones huérfanas:', err);
+    console.warn('⚠️ Error al verificar sesiones en disco:', err);
   }
 };
 
