@@ -215,18 +215,29 @@ manager.createBot = async (tenantConfig: any) => {
       if (isAudio) {
         console.log(`🎙️ [Baileys Audio Message] Recibida nota de voz de ${cleanFrom}...`);
         try {
-          let localAudioPath: string | null = null;
+          let audioBuffer: Buffer | null = null;
+
           if (typeof provider.saveFile === 'function') {
-            localAudioPath = await provider.saveFile(payload, { path: './sessions/temp_audio' });
-          } else if (typeof (provider as any).downloadMediaMessage === 'function') {
-            localAudioPath = await (provider as any).downloadMediaMessage(payload, './sessions/temp_audio');
+            try {
+              const localPath = await provider.saveFile(payload, { path: './sessions/temp_audio' });
+              if (localPath && fs.existsSync(localPath)) {
+                audioBuffer = fs.readFileSync(localPath);
+                try { fs.unlinkSync(localPath); } catch (e) {}
+              }
+            } catch (e) {}
           }
 
-          if (localAudioPath && fs.existsSync(localAudioPath)) {
-            const audioBuffer = fs.readFileSync(localAudioPath);
-            const audioBase64 = audioBuffer.toString('base64');
-            try { fs.unlinkSync(localAudioPath); } catch (e) {} // Limpieza de archivo temporal
+          // Fallback nativo a downloadMediaMessage de Baileys
+          if (!audioBuffer && provider.vendor && typeof (provider as any).vendor.downloadMediaMessage === 'function') {
+            try {
+              audioBuffer = await (provider as any).vendor.downloadMediaMessage(payload);
+            } catch (e) {
+              console.warn('⚠️ Falló descarga nativa vendor:', e);
+            }
+          }
 
+          if (audioBuffer && audioBuffer.length > 0) {
+            const audioBase64 = audioBuffer.toString('base64');
             const voiceRes = await fetch(`${API_URL}/ai/transcribe-voice`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
@@ -240,7 +251,7 @@ manager.createBot = async (tenantConfig: any) => {
               if (voiceData.transcribedText) {
                 (manager as any).emit('bot:message', tenantConfig.tenantId, {
                   from: cleanFrom,
-                  body: `🎙️ (Audio): "${voiceData.transcribedText}"`,
+                  body: `🎙️ (Audio Transcrito): "${voiceData.transcribedText}"`,
                   name: payload?.pushName || payload?.name || cleanFrom,
                   timestamp: Date.now()
                 });
@@ -259,16 +270,31 @@ manager.createBot = async (tenantConfig: any) => {
       }
 
       // 📄 B. Procesar Ingesta de Documentos vía RAG
-      if (isDocument && typeof provider.saveFile === 'function') {
+      if (isDocument) {
         const docMsg = payload?.message?.documentMessage || payload?.message?.documentWithCaptionMessage?.message?.documentMessage;
         const docTitle = docMsg?.fileName || 'Documento_WhatsApp.txt';
         console.log(`📄 [Baileys Document Message] Recibido archivo "${docTitle}" de ${cleanFrom}...`);
         try {
-          const localDocPath = await provider.saveFile(payload, { path: './sessions/temp_docs' });
-          if (localDocPath && fs.existsSync(localDocPath)) {
-            const docContent = fs.readFileSync(localDocPath, 'utf-8');
-            fs.unlinkSync(localDocPath); // Limpieza
+          let docBuffer: Buffer | null = null;
 
+          if (typeof provider.saveFile === 'function') {
+            try {
+              const localDocPath = await provider.saveFile(payload, { path: './sessions/temp_docs' });
+              if (localDocPath && fs.existsSync(localDocPath)) {
+                docBuffer = fs.readFileSync(localDocPath);
+                try { fs.unlinkSync(localDocPath); } catch (e) {}
+              }
+            } catch (e) {}
+          }
+
+          if (!docBuffer && provider.vendor && typeof (provider as any).vendor.downloadMediaMessage === 'function') {
+            try {
+              docBuffer = await (provider as any).vendor.downloadMediaMessage(payload);
+            } catch (e) {}
+          }
+
+          if (docBuffer && docBuffer.length > 0) {
+            const docContent = docBuffer.toString('utf-8');
             const docRes = await fetch(`${API_URL}/rag/process-whatsapp-file`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
