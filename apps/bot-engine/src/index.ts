@@ -78,7 +78,10 @@ const createAiFlow = (tenantId: string) => {
         // Endpoint con contexto: carga prompt de BD, busca RAG, persiste historial
         const response = await fetch(`${API_URL}/ai/chat-with-context`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': API_KEY,
+          },
           body: JSON.stringify({
             tenantId,
             customerPhone,
