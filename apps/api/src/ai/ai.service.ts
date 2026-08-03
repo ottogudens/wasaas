@@ -163,7 +163,7 @@ export class AiService {
       return { reply, conversationId: conversation.id };
     }
 
-    // 5. Buscar chunks RAG relevantes con filtro de similitud mínima (minSimilarity = 0.60)
+    // 5. Buscar chunks RAG relevantes con filtro permisivo de similitud
     let ragContext = '';
     let foundRelevantChunks = false;
     try {
@@ -171,25 +171,27 @@ export class AiService {
         userMessage,
         bot.organizationId,
         3,
-        0.60,
+        0.25,
       );
       if (similarChunks.length > 0) {
         foundRelevantChunks = true;
-        ragContext = `\n\n[BASE DE CONOCIMIENTO OFICIAL DE LA EMPRESA]:\n${similarChunks.map(c => c.content).join('\n---\n')}`;
+        ragContext = `\n\n[BASE DE CONOCIMIENTO DE LA EMPRESA]:\n${similarChunks.map(c => c.content).join('\n---\n')}`;
       }
     } catch (err) {
       this.logger.warn('⚠️ Error al buscar contexto RAG, continuando sin contexto:', err);
     }
 
-    // 6. Construir system prompt completo con reglas anti-alucinación (Strict Grounding)
+    // 6. Construir system prompt dinámico
     const customPrompt = bot.systemPrompt || 'Eres un asistente virtual profesional especializado en atención al cliente.';
-    const strictGroundingRules = `
-[REGLAS OBLIGATORIAS DE COMPORTAMIENTO]:
-1. Si la pregunta del cliente está relacionada con productos, precios, servicios, políticas o datos del negocio, DEBES responder basándote ÚNICAMENTE en la [BASE DE CONOCIMIENTO OFICIAL DE LA EMPRESA].
-2. Si la información solicitada NO está presente en la Base de Conocimiento, di amablemente que no dispones de esa información en este momento y ofrece conectar con un asesor humano. JAMÁS inventes datos, precios ni condiciones.
-3. Mantén un trato cordial, claro y conciso acorde a tu personalidad.`;
+    const systemInstruction = `
+${customPrompt}
 
-    const fullSystemPrompt = `${customPrompt}\n${strictGroundingRules}${ragContext}`;
+[INSTRUCCIONES DE ATENCIÓN]:
+1. Si el usuario te saluda o hace preguntas generales de cortesía (ej. "hola", "buenos días", "¿cómo estás?"), responde de manera amable y profesional ofreciendo tu ayuda.
+2. Si el usuario pregunta sobre servicios, productos, precios o información específica del negocio, prioriza la información de la [BASE DE CONOCIMIENTO DE LA EMPRESA].
+3. Si la consulta se refiere a información de la empresa que NO está registrada en la Base de Conocimiento, informa cortésmente que no dispones de esa información en este momento y ofrece derivar la consulta con un asesor humano.${ragContext}`;
+
+    const fullSystemPrompt = systemInstruction;
 
     // 7. Construir mensajes para OpenAI
     const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [

@@ -73,8 +73,8 @@ export class RagService {
   async searchSimilarChunks(
     query: string,
     organizationId: string,
-    topK: number = 3,
-    minSimilarity: number = 0.65,
+    topK: number = 5,
+    minSimilarity: number = 0.30,
   ): Promise<Array<{ id: string; content: string; similarity: number }>> {
     try {
       const queryEmbedding = await this.generateEmbedding(query);
@@ -95,7 +95,7 @@ export class RagService {
         LIMIT ${topK}
       `;
 
-      return results;
+      return results || [];
     } catch (error) {
       this.logger.error('Error buscando chunks similares:', error);
       return [];
@@ -139,7 +139,7 @@ export class RagService {
   async findCachedMemory(
     query: string,
     organizationId: string,
-    minSimilarity: number = 0.88,
+    minSimilarity: number = 0.85,
   ): Promise<{ replyText: string; similarity: number } | null> {
     try {
       const queryEmbedding = await this.generateEmbedding(query);
@@ -159,7 +159,7 @@ export class RagService {
         LIMIT 1
       `;
 
-      if (results.length > 0) {
+      if (results && results.length > 0) {
         const match = results[0];
         // Incrementar contador de hits
         await this.prisma.$executeRaw`
