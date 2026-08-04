@@ -12,6 +12,7 @@ import { BotsModule } from './bots/bots.module';
 import { AiController } from './ai/ai.controller';
 import { AiService } from './ai/ai.service';
 import { RagController } from './rag/rag.controller';
+import { InternalRagController } from './rag/rag.controller';
 import { RagService } from './rag/rag.service';
 import { MercadoPagoController } from './mercadopago/mercadopago.controller';
 import { MercadoPagoService } from './mercadopago/mercadopago.service';
@@ -43,6 +44,7 @@ import { TranscriptionService } from './ai/transcription.service';
   controllers: [
     AiController,
     RagController,
+    InternalRagController,
     MercadoPagoController,
     TenantsController,
   ],

@@ -1,6 +1,7 @@
-import { Controller, Post, Get, Delete, Body, Param, UseGuards, Req, BadRequestException } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Body, Param, Headers, UseGuards, Req, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { RagService } from './rag.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { SkipThrottle } from '@nestjs/throttler';
 import { IsString, IsOptional, MaxLength, MinLength } from 'class-validator';
 
 class ProcessTextDto {
@@ -24,6 +25,61 @@ class SearchDto {
   topK?: number;
 }
 
+/**
+ * Controlador interno para endpoints usados por bot-engine (API key, sin JWT)
+ */
+@Controller('rag')
+@SkipThrottle()
+export class InternalRagController {
+  constructor(private readonly ragService: RagService) {}
+
+  private validateApiKey(apiKey: string) {
+    const expectedKey = process.env.INTERNAL_API_KEY || 'skale-saas-secret-key';
+    if (apiKey !== expectedKey) {
+      throw new UnauthorizedException('Invalid API Key');
+    }
+  }
+
+  /**
+   * Endpoint interno para procesar documentos de WhatsApp (usado por bot-engine)
+   * Protegido por API key interna — NO requiere JWT
+   */
+  @Post('process-whatsapp-file')
+  async processWhatsAppFile(
+    @Headers('x-api-key') apiKey: string,
+    @Body() body: { tenantId: string; title: string; content: string },
+  ) {
+    this.validateApiKey(apiKey);
+
+    if (!body.tenantId || !body.title || !body.content) {
+      throw new BadRequestException('tenantId, title y content son obligatorios.');
+    }
+
+    const bot = await this.ragService['prisma'].botInstance.findUnique({
+      where: { tenantId: body.tenantId },
+    });
+
+    if (!bot) {
+      throw new BadRequestException('Bot no encontrado.');
+    }
+
+    const result = await this.ragService.processAndStoreDocument(
+      bot.organizationId,
+      body.title,
+      body.content,
+    );
+
+    return {
+      status: 'success',
+      documentId: result.documentId,
+      chunksProcessed: result.chunksProcessed,
+    };
+  }
+}
+
+/**
+ * Controlador principal de RAG protegido por JWT (usado desde el dashboard web)
+ */
 @Controller('rag')
 @UseGuards(JwtAuthGuard)
 export class RagController {
@@ -64,36 +120,6 @@ export class RagController {
       status: 'success',
       query: body.query,
       results,
-    };
-  }
-
-  /**
-   * Endpoint interno para procesar documentos de WhatsApp (usado por bot-engine)
-   */
-  @Post('process-whatsapp-file')
-  async processWhatsAppFile(@Body() body: { tenantId: string; title: string; content: string }) {
-    if (!body.tenantId || !body.title || !body.content) {
-      throw new BadRequestException('tenantId, title y content son obligatorios.');
-    }
-
-    const bot = await this.ragService['prisma'].botInstance.findUnique({
-      where: { tenantId: body.tenantId },
-    });
-
-    if (!bot) {
-      throw new BadRequestException('Bot no encontrado.');
-    }
-
-    const result = await this.ragService.processAndStoreDocument(
-      bot.organizationId,
-      body.title,
-      body.content,
-    );
-
-    return {
-      status: 'success',
-      documentId: result.documentId,
-      chunksProcessed: result.chunksProcessed,
     };
   }
 

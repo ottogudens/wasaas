@@ -5,7 +5,7 @@ import { BotManager, BotManagerApi } from '@builderbot/manager';
 import { BaileysProvider } from '@builderbot/provider-baileys';
 import { MetaProvider } from '@builderbot/provider-meta';
 import { addKeyword, EVENTS } from '@builderbot/bot';
-import { fetchLatestBaileysVersion } from 'baileys';
+import { fetchLatestBaileysVersion, downloadMediaMessage } from 'baileys';
 import { WebSocketServer, WebSocket } from 'ws';
 import QRCode from 'qrcode';
 
@@ -151,93 +151,89 @@ manager.createBot = async (tenantConfig: any) => {
       // Ignorar mensajes salientes o de broadcast
       if (!cleanFrom || rawFrom.includes('status@broadcast') || payload?.key?.fromMe) return;
 
-      const isAudio = !!(
-        payload?.message?.audioMessage ||
-        payload?.message?.pttMessage ||
-        payload?.audioMessage ||
-        payload?.type === 'audio' ||
-        payload?.message?.extendedTextMessage?.contextInfo?.quotedMessage?.audioMessage
-      );
-      const isDocument = !!(
-        payload?.message?.documentMessage ||
-        payload?.message?.documentWithCaptionMessage ||
-        payload?.documentMessage
-      );
+      const msgContent = payload?.message || {};
+      const isAudio = !!(msgContent.audioMessage || msgContent.pttMessage);
+      const isDocument = !!(msgContent.documentMessage || msgContent.documentWithCaptionMessage);
       
       let bodyText = extractMessageText(payload);
 
-      // 🎙️ A. Procesar Nota de Voz vía OpenAI Whisper
+      // 🎙️ A. Procesar Nota de Voz vía OpenAI Whisper (descarga nativa de Baileys)
       if (isAudio) {
-        console.log(`🎙️ [Baileys Audio Message] Recibida nota de voz de ${cleanFrom}...`);
+        console.log(`🎙️ [Baileys Audio] Recibida nota de voz de ${cleanFrom}...`);
         try {
-          let audioBuffer: Buffer | null = null;
-          if (typeof provider.saveFile === 'function') {
-            try {
-              if (payload?.message && payload?.message?.pttMessage && !payload?.message?.audioMessage) {
-                payload.message.audioMessage = payload.message.pttMessage;
-              }
-              const localPath = await provider.saveFile(payload, { path: './sessions/temp_audio' });
-              if (localPath && fs.existsSync(localPath)) {
-                audioBuffer = fs.readFileSync(localPath);
-                try { fs.unlinkSync(localPath); } catch (e) {}
-              }
-            } catch (e) {
-              console.warn('⚠️ Error en provider.saveFile para audio:', e);
-            }
-          }
+          // Descargar media directamente con Baileys nativo (no depende de BuilderBot)
+          const audioBuffer = await downloadMediaMessage(payload, 'buffer', {}) as Buffer;
+          
           if (audioBuffer && audioBuffer.length > 0) {
+            console.log(`🎙️ [Baileys Audio] Descargados ${audioBuffer.length} bytes de audio.`);
             const audioBase64 = audioBuffer.toString('base64');
+            
+            // /ai/transcribe-voice ya transcribe Y genera respuesta de IA (chatWithContext)
             const voiceRes = await fetch(`${API_URL}/ai/transcribe-voice`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
               body: JSON.stringify({ tenantId: tenantConfig.tenantId, customerPhone: cleanFrom, audioBase64 }),
             });
+            
             if (voiceRes.ok) {
               const voiceData = await voiceRes.json();
+              
+              // Emitir al Live Chat el texto transcrito
               if (voiceData.transcribedText) {
-                bodyText = voiceData.transcribedText;
-                console.log(`🎙️ [BotEngine] Audio transcrito: "${bodyText}"`);
+                (manager as any).emit('bot:message', tenantConfig.tenantId, {
+                  from: cleanFrom,
+                  body: `🎙️ ${voiceData.transcribedText}`,
+                  name: payload?.pushName || payload?.name || cleanFrom,
+                  timestamp: Date.now()
+                });
               }
+              
+              // Enviar la respuesta de la IA (ya generada por transcribe-voice)
+              if (voiceData.reply && !voiceData.isHumanMode && typeof provider.sendMessage === 'function') {
+                console.log(`🤖 [BotEngine Voice Reply] Respondiendo a ${cleanFrom}: "${voiceData.reply}"`);
+                await provider.sendMessage(cleanFrom, voiceData.reply, {});
+              }
+            } else {
+              console.warn(`⚠️ [BotEngine] transcribe-voice HTTP ${voiceRes.status}`);
             }
+            return; // Procesado como audio, no continuar al flujo de texto
           }
         } catch (audioErr) {
           console.error('❌ Error procesando mensaje de voz:', audioErr);
         }
       }
 
-      // 📄 B. Procesar Ingesta de Documentos vía RAG
+      // 📄 B. Procesar Ingesta de Documentos vía RAG (descarga nativa de Baileys)
       if (isDocument) {
-        const docMsg = payload?.message?.documentMessage || payload?.message?.documentWithCaptionMessage?.message?.documentMessage;
+        const docMsg = msgContent.documentMessage || msgContent.documentWithCaptionMessage?.message?.documentMessage;
         const docTitle = docMsg?.fileName || 'Documento_WhatsApp.txt';
-        console.log(`📄 [Baileys Document Message] Recibido archivo "${docTitle}" de ${cleanFrom}...`);
+        console.log(`📄 [Baileys Document] Recibido archivo "${docTitle}" de ${cleanFrom}...`);
         try {
-          let docBuffer: Buffer | null = null;
-          if (typeof provider.saveFile === 'function') {
-            try {
-              const localDocPath = await provider.saveFile(payload, { path: './sessions/temp_docs' });
-              if (localDocPath && fs.existsSync(localDocPath)) {
-                docBuffer = fs.readFileSync(localDocPath);
-                try { fs.unlinkSync(localDocPath); } catch (e) {}
-              }
-            } catch (e) {
-              console.warn('⚠️ Error en provider.saveFile para documento:', e);
-            }
-          }
+          const docBuffer = await downloadMediaMessage(payload, 'buffer', {}) as Buffer;
+          
           if (docBuffer && docBuffer.length > 0) {
+            console.log(`📄 [Baileys Document] Descargados ${docBuffer.length} bytes del documento.`);
             const docContent = docBuffer.toString('utf-8');
+            
             const docRes = await fetch(`${API_URL}/rag/process-whatsapp-file`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
               body: JSON.stringify({ tenantId: tenantConfig.tenantId, title: docTitle, content: docContent }),
             });
+            
             if (docRes.ok) {
               const docData = await docRes.json();
               const ackReply = `📄 He recibido e indexado el documento "${docTitle}" (${docData.chunksProcessed} fragmentos aprendidos). Ya puedo responder preguntas sobre su contenido.`;
               if (typeof provider.sendMessage === 'function') {
                 await provider.sendMessage(cleanFrom, ackReply, {});
               }
+            } else {
+              console.warn(`⚠️ [BotEngine] process-whatsapp-file HTTP ${docRes.status}`);
+              if (typeof provider.sendMessage === 'function') {
+                await provider.sendMessage(cleanFrom, 'Recibí tu documento pero ocurrió un error al procesarlo. Por favor inténtalo de nuevo.', {});
+              }
             }
-            return;
+            return; // Procesado como documento, no continuar al flujo de texto
           }
         } catch (docErr) {
           console.error('❌ Error procesando documento de WhatsApp:', docErr);

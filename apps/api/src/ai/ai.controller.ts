@@ -1,11 +1,19 @@
-import { Controller, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, Headers, UseGuards, UnauthorizedException } from '@nestjs/common';
 import { AiService } from './ai.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { SkipThrottle } from '@nestjs/throttler';
 import { AiChatDto, AiChatWithContextDto } from './ai-chat.dto';
 
 @Controller('ai')
 export class AiController {
   constructor(private readonly aiService: AiService) {}
+
+  private validateApiKey(apiKey: string) {
+    const expectedKey = process.env.INTERNAL_API_KEY || 'skale-saas-secret-key';
+    if (apiKey !== expectedKey) {
+      throw new UnauthorizedException('Invalid API Key');
+    }
+  }
 
   /**
    * Chat directo protegido por JWT (usado desde el dashboard)
@@ -31,7 +39,13 @@ export class AiController {
    * Protegido por API key interna en lugar de JWT
    */
   @Post('chat-with-context')
-  async chatWithContext(@Body() body: AiChatWithContextDto) {
+  @SkipThrottle()
+  async chatWithContext(
+    @Headers('x-api-key') apiKey: string,
+    @Body() body: AiChatWithContextDto,
+  ) {
+    this.validateApiKey(apiKey);
+
     const result = await this.aiService.chatWithContext(
       body.tenantId,
       body.customerPhone,
@@ -48,9 +62,16 @@ export class AiController {
 
   /**
    * Endpoint interno para transcribir y procesar notas de voz desde WhatsApp (usado por bot-engine)
+   * Protegido por API key interna
    */
   @Post('transcribe-voice')
-  async transcribeVoice(@Body() body: { tenantId: string; customerPhone: string; audioBase64: string; mimeType?: string }) {
+  @SkipThrottle()
+  async transcribeVoice(
+    @Headers('x-api-key') apiKey: string,
+    @Body() body: { tenantId: string; customerPhone: string; audioBase64: string; mimeType?: string },
+  ) {
+    this.validateApiKey(apiKey);
+
     if (!body.tenantId || !body.customerPhone || !body.audioBase64) {
       return { status: 'error', message: 'Faltan parámetros requeridos.' };
     }
