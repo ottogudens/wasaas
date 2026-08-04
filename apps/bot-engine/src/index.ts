@@ -66,10 +66,77 @@ const cleanPhoneNumber = (raw: string): string => {
 // Esto garantiza que cuando llega un mensaje, el tenantId correcto se envía a la API.
 const createAiFlow = (tenantId: string) => {
   return addKeyword(EVENTS.WELCOME)
-    .addAction(async (ctx: any, { flowDynamic }: { flowDynamic: any }) => {
-      const userPrompt = extractMessageText(ctx) || 'Hola';
+    .addAction(async (ctx: any, { flowDynamic, provider }: { flowDynamic: any, provider: any }) => {
+      let userPrompt = extractMessageText(ctx) || 'Hola';
       const rawFrom = ctx.from || ctx.key?.remoteJid || '';
       const customerPhone = cleanPhoneNumber(rawFrom);
+      // 1. Interceptar Eventos de Multimedia de BuilderBot
+      const isVoiceNote = ctx.body && ctx.body.includes('_event_voice_note_');
+      const isDocument = ctx.body && ctx.body.includes('_event_document_');
+
+      if (isVoiceNote || isDocument) {
+        console.log(`📥 [BotEngine Flow] Procesando multimedia de ${customerPhone} (Tenant: ${tenantId})...`);
+        try {
+          if (typeof provider.saveFile === 'function') {
+            // HACK for Baileys PTT voice notes
+            if (ctx.message && ctx.message.pttMessage && !ctx.message.audioMessage) {
+              ctx.message.audioMessage = ctx.message.pttMessage;
+            }
+
+            const localPath = await provider.saveFile(ctx, { path: './sessions/temp_media' });
+            if (localPath && fs.existsSync(localPath)) {
+              const fileBuffer = fs.readFileSync(localPath);
+              try { fs.unlinkSync(localPath); } catch (e) {}
+
+              if (isVoiceNote) {
+                const audioBase64 = fileBuffer.toString('base64');
+                const voiceRes = await fetch(`${API_URL}/ai/transcribe-voice`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
+                  body: JSON.stringify({ tenantId, customerPhone, audioBase64 }),
+                });
+
+                if (voiceRes.ok) {
+                  const voiceData = await voiceRes.json();
+                  if (voiceData.transcribedText) {
+                    userPrompt = voiceData.transcribedText;
+                    console.log(`🎙️ [BotEngine] Audio transcrito: "${userPrompt}"`);
+                  } else {
+                     return await flowDynamic([{ body: "Lo siento, no pude entender el audio." }]);
+                  }
+                } else {
+                   return await flowDynamic([{ body: "Lo siento, el servicio de transcripción falló temporalmente." }]);
+                }
+              } else if (isDocument) {
+                const docContent = fileBuffer.toString('utf-8');
+                const docTitle = ctx?.message?.documentMessage?.fileName || 'Documento_WhatsApp.txt';
+                const docRes = await fetch(`${API_URL}/rag/process-whatsapp-file`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
+                  body: JSON.stringify({ tenantId, title: docTitle, content: docContent }),
+                });
+
+                if (docRes.ok) {
+                  const docData = await docRes.json();
+                  const ackReply = `📄 He recibido e indexado el documento "${docTitle}" (${docData.chunksProcessed} fragmentos aprendidos). Ya puedo responder preguntas sobre su contenido.`;
+                  return await flowDynamic([{ body: ackReply }]);
+                } else {
+                  return await flowDynamic([{ body: "Error al procesar e indexar el documento." }]);
+                }
+              }
+            } else {
+               throw new Error("No se pudo guardar el archivo localmente.");
+            }
+          } else {
+             console.warn("⚠️ provider.saveFile no está disponible.");
+             return await flowDynamic([{ body: "Mi proveedor actual no soporta la descarga de archivos." }]);
+          }
+        } catch (mediaErr) {
+          console.error("❌ Error procesando media en el flujo:", mediaErr);
+          return await flowDynamic([{ body: "Lo siento, ocurrió un error interno al intentar descargar o leer tu archivo." }]);
+        }
+      }
+
       console.log(`🤖 [BotEngine] Mensaje procesado de ${customerPhone} (Tenant: ${tenantId}): "${userPrompt}"`);
 
       let botReply = 'Lo siento, en este momento no puedo procesar tu solicitud. Intenta más tarde.';
@@ -196,117 +263,9 @@ manager.createBot = async (tenantConfig: any) => {
     provider.on('message', async (payload: any) => {
       const rawFrom = payload?.from || payload?.key?.remoteJid || '';
       const cleanFrom = cleanPhoneNumber(rawFrom);
-
-      const isAudio = !!(
-        payload?.message?.audioMessage ||
-        payload?.message?.pttMessage ||
-        payload?.audioMessage ||
-        payload?.type === 'audio' ||
-        payload?.message?.extendedTextMessage?.contextInfo?.quotedMessage?.audioMessage
-      );
-      const isDocument = !!(
-        payload?.message?.documentMessage ||
-        payload?.message?.documentWithCaptionMessage ||
-        payload?.documentMessage
-      );
       let bodyText = extractMessageText(payload);
 
-      // 🎙️ A. Procesar Nota de Voz vía OpenAI Whisper
-      if (isAudio) {
-        console.log(`🎙️ [Baileys Audio Message] Recibida nota de voz de ${cleanFrom}...`);
-        try {
-          let audioBuffer: Buffer | null = null;
-
-          if (typeof provider.saveFile === 'function') {
-            try {
-              // HACK: Builderbot's getMimeType no soporta pttMessage, lo inyectamos como audioMessage
-              if (payload?.message && payload?.message?.pttMessage && !payload?.message?.audioMessage) {
-                payload.message.audioMessage = payload.message.pttMessage;
-              }
-              const localPath = await provider.saveFile(payload, { path: './sessions/temp_audio' });
-              if (localPath && fs.existsSync(localPath)) {
-                audioBuffer = fs.readFileSync(localPath);
-                try { fs.unlinkSync(localPath); } catch (e) {}
-              }
-            } catch (e) {
-              console.warn('⚠️ Error en provider.saveFile para audio:', e);
-            }
-          }
-
-          if (audioBuffer && audioBuffer.length > 0) {
-            const audioBase64 = audioBuffer.toString('base64');
-            const voiceRes = await fetch(`${API_URL}/ai/transcribe-voice`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
-              body: JSON.stringify({ tenantId: tenantConfig.tenantId, customerPhone: cleanFrom, audioBase64 }),
-            });
-
-            if (voiceRes.ok) {
-              const voiceData = await voiceRes.json();
-
-              // Emitir evento WebSocket para actualizar Live Chat en el Frontend con el texto transcrito
-              if (voiceData.transcribedText) {
-                (manager as any).emit('bot:message', tenantConfig.tenantId, {
-                  from: cleanFrom,
-                  body: `🎙️ (Audio Transcrito): "${voiceData.transcribedText}"`,
-                  name: payload?.pushName || payload?.name || cleanFrom,
-                  timestamp: Date.now()
-                });
-              }
-
-              if (voiceData.reply && typeof provider.sendMessage === 'function') {
-                console.log(`🤖 [BotEngine Voice Reply] Respondiendo a ${cleanFrom}: "${voiceData.reply}"`);
-                await provider.sendMessage(cleanFrom, voiceData.reply, {});
-              }
-            }
-            return;
-          }
-        } catch (audioErr) {
-          console.error('❌ Error procesando mensaje de voz:', audioErr);
-        }
-      }
-
-      // 📄 B. Procesar Ingesta de Documentos vía RAG
-      if (isDocument) {
-        const docMsg = payload?.message?.documentMessage || payload?.message?.documentWithCaptionMessage?.message?.documentMessage;
-        const docTitle = docMsg?.fileName || 'Documento_WhatsApp.txt';
-        console.log(`📄 [Baileys Document Message] Recibido archivo "${docTitle}" de ${cleanFrom}...`);
-        try {
-          let docBuffer: Buffer | null = null;
-
-          if (typeof provider.saveFile === 'function') {
-            try {
-              const localDocPath = await provider.saveFile(payload, { path: './sessions/temp_docs' });
-              if (localDocPath && fs.existsSync(localDocPath)) {
-                docBuffer = fs.readFileSync(localDocPath);
-                try { fs.unlinkSync(localDocPath); } catch (e) {}
-              }
-            } catch (e) {
-              console.warn('⚠️ Error en provider.saveFile para documento:', e);
-            }
-          }
-
-          if (docBuffer && docBuffer.length > 0) {
-            const docContent = docBuffer.toString('utf-8');
-            const docRes = await fetch(`${API_URL}/rag/process-whatsapp-file`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
-              body: JSON.stringify({ tenantId: tenantConfig.tenantId, title: docTitle, content: docContent }),
-            });
-
-            if (docRes.ok) {
-              const docData = await docRes.json();
-              const ackReply = `📄 He recibido e indexado el documento "${docTitle}" (${docData.chunksProcessed} fragmentos aprendidos). Ya puedo responder preguntas sobre su contenido.`;
-              if (typeof provider.sendMessage === 'function') {
-                await provider.sendMessage(cleanFrom, ackReply, {});
-              }
-            }
-            return;
-          }
-        } catch (docErr) {
-          console.error('❌ Error procesando documento de WhatsApp:', docErr);
-        }
-      }
+      // Limpiado el procesamiento multimedia aquí porque BuilderBot lo intercepta antes y lo manda al Flow (createAiFlow).
 
       // Ignorar si no hay texto extraíble
       if (!bodyText) return;
@@ -321,49 +280,7 @@ manager.createBot = async (tenantConfig: any) => {
         timestamp: Date.now()
       });
 
-      // 2. Procesar mensaje de texto con NestJS AI API
-      try {
-        const response = await fetch(`${API_URL}/ai/chat-with-context`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': API_KEY
-          },
-          body: JSON.stringify({
-            tenantId: tenantConfig.tenantId,
-            customerPhone: cleanFrom,
-            message: bodyText,
-          }),
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          if (data.isHumanMode) {
-            console.log(`✋ [BotEngine] Modo humano activo para ${cleanFrom}. Ignorando IA.`);
-            return;
-          }
-          if (data.reply && typeof provider.sendMessage === 'function') {
-            console.log(`🤖 [BotEngine] Respondiendo a ${cleanFrom}: "${data.reply}"`);
-            try {
-              await provider.sendMessage(cleanFrom, data.reply, {});
-            } catch (sendErr: any) {
-              const errMsg = sendErr?.message || String(sendErr);
-              const statusCode = sendErr?.output?.statusCode || sendErr?.data?.statusCode;
-              
-              if (errMsg.includes('Connection Closed') || statusCode === 428) {
-                console.warn(`⚠️ [BotEngine] La conexión de WhatsApp con ${tenantConfig.tenantId} se cerró (428 Connection Closed). Intentando re-conectar...`);
-                (manager as any).emit('bot:disconnected', tenantConfig.tenantId);
-              } else {
-                console.error(`❌ [BotEngine] Error al enviar mensaje con Baileys a ${cleanFrom}:`, sendErr);
-              }
-            }
-          }
-        } else {
-          console.warn(`⚠️ [BotEngine] Respuesta HTTP ${response.status} desde /ai/chat-with-context`);
-        }
-      } catch (err) {
-        console.error('❌ Error al enviar mensaje entrante a AI API:', err);
-      }
+      // NO se llama a la API de IA aquí porque el flujo createAiFlow lo maneja.
     });
 
     // Forzar inicio del proveedor vendor de Baileys
