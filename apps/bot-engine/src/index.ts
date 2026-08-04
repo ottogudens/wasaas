@@ -62,128 +62,13 @@ const cleanPhoneNumber = (raw: string): string => {
 };
 
 // --- Factory de flujos IA por tenant ---
-// Cada bot obtiene su propio flujo con el tenantId capturado en la closure.
-// Esto garantiza que cuando llega un mensaje, el tenantId correcto se envía a la API.
+// Flujo inerte para cumplir con el requisito de BuilderBot de tener al menos un flujo.
+// No atrapamos EVENTS.WELCOME para evitar que BuilderBot secuestre notas de voz o documentos.
+// Todo el procesamiento se hará a nivel nativo en provider.on('message')
 const createAiFlow = (tenantId: string) => {
-  return addKeyword(EVENTS.WELCOME)
-    .addAction(async (ctx: any, { flowDynamic, provider }: { flowDynamic: any, provider: any }) => {
-      let userPrompt = extractMessageText(ctx) || 'Hola';
-      const rawFrom = ctx.from || ctx.key?.remoteJid || '';
-      const customerPhone = cleanPhoneNumber(rawFrom);
-      // 1. Interceptar Eventos de Multimedia de BuilderBot
-      const isVoiceNote = ctx.body && ctx.body.includes('_event_voice_note_');
-      const isDocument = ctx.body && ctx.body.includes('_event_document_');
-
-      if (isVoiceNote || isDocument) {
-        console.log(`📥 [BotEngine Flow] Procesando multimedia de ${customerPhone} (Tenant: ${tenantId})...`);
-        try {
-          if (typeof provider.saveFile === 'function') {
-            // HACK for Baileys PTT voice notes
-            if (ctx.message && ctx.message.pttMessage && !ctx.message.audioMessage) {
-              ctx.message.audioMessage = ctx.message.pttMessage;
-            }
-
-            const localPath = await provider.saveFile(ctx, { path: './sessions/temp_media' });
-            if (localPath && fs.existsSync(localPath)) {
-              const fileBuffer = fs.readFileSync(localPath);
-              try { fs.unlinkSync(localPath); } catch (e) {}
-
-              if (isVoiceNote) {
-                const audioBase64 = fileBuffer.toString('base64');
-                const voiceRes = await fetch(`${API_URL}/ai/transcribe-voice`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
-                  body: JSON.stringify({ tenantId, customerPhone, audioBase64 }),
-                });
-
-                if (voiceRes.ok) {
-                  const voiceData = await voiceRes.json();
-                  if (voiceData.transcribedText) {
-                    userPrompt = voiceData.transcribedText;
-                    console.log(`🎙️ [BotEngine] Audio transcrito: "${userPrompt}"`);
-                  } else {
-                     return await flowDynamic([{ body: "Lo siento, no pude entender el audio." }]);
-                  }
-                } else {
-                   return await flowDynamic([{ body: "Lo siento, el servicio de transcripción falló temporalmente." }]);
-                }
-              } else if (isDocument) {
-                const docContent = fileBuffer.toString('utf-8');
-                const docTitle = ctx?.message?.documentMessage?.fileName || 'Documento_WhatsApp.txt';
-                const docRes = await fetch(`${API_URL}/rag/process-whatsapp-file`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
-                  body: JSON.stringify({ tenantId, title: docTitle, content: docContent }),
-                });
-
-                if (docRes.ok) {
-                  const docData = await docRes.json();
-                  const ackReply = `📄 He recibido e indexado el documento "${docTitle}" (${docData.chunksProcessed} fragmentos aprendidos). Ya puedo responder preguntas sobre su contenido.`;
-                  return await flowDynamic([{ body: ackReply }]);
-                } else {
-                  return await flowDynamic([{ body: "Error al procesar e indexar el documento." }]);
-                }
-              }
-            } else {
-               throw new Error("No se pudo guardar el archivo localmente.");
-            }
-          } else {
-             console.warn("⚠️ provider.saveFile no está disponible.");
-             return await flowDynamic([{ body: "Mi proveedor actual no soporta la descarga de archivos." }]);
-          }
-        } catch (mediaErr) {
-          console.error("❌ Error procesando media en el flujo:", mediaErr);
-          return await flowDynamic([{ body: "Lo siento, ocurrió un error interno al intentar descargar o leer tu archivo." }]);
-        }
-      }
-
-      console.log(`🤖 [BotEngine] Mensaje procesado de ${customerPhone} (Tenant: ${tenantId}): "${userPrompt}"`);
-
-      let botReply = 'Lo siento, en este momento no puedo procesar tu solicitud. Intenta más tarde.';
-
-      try {
-        // Endpoint con contexto: carga prompt de BD, busca RAG, persiste historial
-        const response = await fetch(`${API_URL}/ai/chat-with-context`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': API_KEY,
-          },
-          body: JSON.stringify({
-            tenantId,
-            customerPhone,
-            message: userPrompt,
-          }),
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-
-          if (data.isHumanMode) {
-            console.log(`✋ [BotEngine] Modo humano activo para ${customerPhone}. Ignorando IA.`);
-            return;
-          }
-
-          if (data.reply) {
-            botReply = data.reply;
-          }
-        } else {
-          console.warn(`⚠️ [BotEngine] Respuesta HTTP ${response.status} desde /ai/chat-with-context`);
-        }
-      } catch (err) {
-        console.warn('⚠️ Error al consultar el módulo NestJS AI API:', err);
-      }
-
-      try {
-        await flowDynamic([{ body: botReply }]);
-      } catch (flowErr: any) {
-        const errMsg = flowErr?.message || String(flowErr);
-        if (errMsg.includes('Connection Closed') || flowErr?.output?.statusCode === 428) {
-          console.warn(`⚠️ [BotEngine Flow] Conexión de WhatsApp cerrada durante el envío a ${customerPhone} (428 Connection Closed).`);
-        } else {
-          console.error(`❌ [BotEngine Flow] Error al enviar respuesta dinámica:`, flowErr);
-        }
-      }
+  return addKeyword('__IGNORE_THIS_FLOW__')
+    .addAction(async (ctx: any, { flowDynamic }: { flowDynamic: any }) => {
+      // No hace nada
     });
 };
 
@@ -263,16 +148,108 @@ manager.createBot = async (tenantConfig: any) => {
     provider.on('message', async (payload: any) => {
       const rawFrom = payload?.from || payload?.key?.remoteJid || '';
       const cleanFrom = cleanPhoneNumber(rawFrom);
+      // Ignorar mensajes salientes o de broadcast
+      if (!cleanFrom || rawFrom.includes('status@broadcast') || payload?.key?.fromMe) return;
+
+      const isAudio = !!(
+        payload?.message?.audioMessage ||
+        payload?.message?.pttMessage ||
+        payload?.audioMessage ||
+        payload?.type === 'audio' ||
+        payload?.message?.extendedTextMessage?.contextInfo?.quotedMessage?.audioMessage
+      );
+      const isDocument = !!(
+        payload?.message?.documentMessage ||
+        payload?.message?.documentWithCaptionMessage ||
+        payload?.documentMessage
+      );
+      
       let bodyText = extractMessageText(payload);
 
-      // Limpiado el procesamiento multimedia aquí porque BuilderBot lo intercepta antes y lo manda al Flow (createAiFlow).
+      // 🎙️ A. Procesar Nota de Voz vía OpenAI Whisper
+      if (isAudio) {
+        console.log(`🎙️ [Baileys Audio Message] Recibida nota de voz de ${cleanFrom}...`);
+        try {
+          let audioBuffer: Buffer | null = null;
+          if (typeof provider.saveFile === 'function') {
+            try {
+              if (payload?.message && payload?.message?.pttMessage && !payload?.message?.audioMessage) {
+                payload.message.audioMessage = payload.message.pttMessage;
+              }
+              const localPath = await provider.saveFile(payload, { path: './sessions/temp_audio' });
+              if (localPath && fs.existsSync(localPath)) {
+                audioBuffer = fs.readFileSync(localPath);
+                try { fs.unlinkSync(localPath); } catch (e) {}
+              }
+            } catch (e) {
+              console.warn('⚠️ Error en provider.saveFile para audio:', e);
+            }
+          }
+          if (audioBuffer && audioBuffer.length > 0) {
+            const audioBase64 = audioBuffer.toString('base64');
+            const voiceRes = await fetch(`${API_URL}/ai/transcribe-voice`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
+              body: JSON.stringify({ tenantId: tenantConfig.tenantId, customerPhone: cleanFrom, audioBase64 }),
+            });
+            if (voiceRes.ok) {
+              const voiceData = await voiceRes.json();
+              if (voiceData.transcribedText) {
+                bodyText = voiceData.transcribedText;
+                console.log(`🎙️ [BotEngine] Audio transcrito: "${bodyText}"`);
+              }
+            }
+          }
+        } catch (audioErr) {
+          console.error('❌ Error procesando mensaje de voz:', audioErr);
+        }
+      }
 
-      // Ignorar si no hay texto extraíble
+      // 📄 B. Procesar Ingesta de Documentos vía RAG
+      if (isDocument) {
+        const docMsg = payload?.message?.documentMessage || payload?.message?.documentWithCaptionMessage?.message?.documentMessage;
+        const docTitle = docMsg?.fileName || 'Documento_WhatsApp.txt';
+        console.log(`📄 [Baileys Document Message] Recibido archivo "${docTitle}" de ${cleanFrom}...`);
+        try {
+          let docBuffer: Buffer | null = null;
+          if (typeof provider.saveFile === 'function') {
+            try {
+              const localDocPath = await provider.saveFile(payload, { path: './sessions/temp_docs' });
+              if (localDocPath && fs.existsSync(localDocPath)) {
+                docBuffer = fs.readFileSync(localDocPath);
+                try { fs.unlinkSync(localDocPath); } catch (e) {}
+              }
+            } catch (e) {
+              console.warn('⚠️ Error en provider.saveFile para documento:', e);
+            }
+          }
+          if (docBuffer && docBuffer.length > 0) {
+            const docContent = docBuffer.toString('utf-8');
+            const docRes = await fetch(`${API_URL}/rag/process-whatsapp-file`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
+              body: JSON.stringify({ tenantId: tenantConfig.tenantId, title: docTitle, content: docContent }),
+            });
+            if (docRes.ok) {
+              const docData = await docRes.json();
+              const ackReply = `📄 He recibido e indexado el documento "${docTitle}" (${docData.chunksProcessed} fragmentos aprendidos). Ya puedo responder preguntas sobre su contenido.`;
+              if (typeof provider.sendMessage === 'function') {
+                await provider.sendMessage(cleanFrom, ackReply, {});
+              }
+            }
+            return;
+          }
+        } catch (docErr) {
+          console.error('❌ Error procesando documento de WhatsApp:', docErr);
+        }
+      }
+
+      // Ignorar si al final no hay texto (ni nativo ni transcrito)
       if (!bodyText) return;
 
       console.log(`📩 [Baileys Incoming Message] Tenant: ${tenantConfig.tenantId}, From: ${cleanFrom} (${rawFrom}), Body: "${bodyText}"`);
 
-      // 1. Emitir evento WebSocket para actualizar Live Chat en tiempo real en el Frontend
+      // 1. Emitir evento WebSocket para actualizar Live Chat
       (manager as any).emit('bot:message', tenantConfig.tenantId, {
         from: cleanFrom,
         body: bodyText,
@@ -280,7 +257,48 @@ manager.createBot = async (tenantConfig: any) => {
         timestamp: Date.now()
       });
 
-      // NO se llama a la API de IA aquí porque el flujo createAiFlow lo maneja.
+      // 2. Procesar mensaje con NestJS AI API
+      try {
+        const response = await fetch(`${API_URL}/ai/chat-with-context`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': API_KEY,
+          },
+          body: JSON.stringify({
+            tenantId: tenantConfig.tenantId,
+            customerPhone: cleanFrom,
+            message: bodyText,
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.isHumanMode) {
+            console.log(`✋ [BotEngine] Modo humano activo para ${cleanFrom}. Ignorando IA.`);
+            return;
+          }
+          if (data.reply && typeof provider.sendMessage === 'function') {
+            console.log(`🤖 [BotEngine] Respondiendo a ${cleanFrom}: "${data.reply}"`);
+            try {
+              await provider.sendMessage(cleanFrom, data.reply, {});
+            } catch (sendErr: any) {
+              const errMsg = sendErr?.message || String(sendErr);
+              const statusCode = sendErr?.output?.statusCode || sendErr?.data?.statusCode;
+              if (errMsg.includes('Connection Closed') || statusCode === 428) {
+                console.warn(`⚠️ [BotEngine] La conexión de WhatsApp se cerró (428).`);
+                (manager as any).emit('bot:disconnected', tenantConfig.tenantId);
+              } else {
+                console.error(`❌ [BotEngine] Error al enviar mensaje con Baileys:`, sendErr);
+              }
+            }
+          }
+        } else {
+          console.warn(`⚠️ [BotEngine] Respuesta HTTP ${response.status} desde /ai/chat-with-context`);
+        }
+      } catch (err) {
+        console.error('❌ Error al enviar mensaje entrante a AI API:', err);
+      }
     });
 
     // Forzar inicio del proveedor vendor de Baileys
