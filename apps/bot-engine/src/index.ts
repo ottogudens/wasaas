@@ -634,9 +634,10 @@ if ((managerApi as any).app) {
 
   // Habilitar CORS global para permitir peticiones directas desde el Frontend (ej. generar QR o desconectar)
   app.use(cors({
-    origin: '*',
+    origin: true,
     methods: ['GET', 'POST', 'OPTIONS', 'PUT', 'PATCH', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key']
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'Accept'],
+    credentials: true
   }));
 
   app.post('/internal/start', async (req: any, res: any) => {
