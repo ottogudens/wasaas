@@ -219,20 +219,17 @@ manager.createBot = async (tenantConfig: any) => {
 
           if (typeof provider.saveFile === 'function') {
             try {
+              // HACK: Builderbot's getMimeType no soporta pttMessage, lo inyectamos como audioMessage
+              if (payload?.message && payload?.message?.pttMessage && !payload?.message?.audioMessage) {
+                payload.message.audioMessage = payload.message.pttMessage;
+              }
               const localPath = await provider.saveFile(payload, { path: './sessions/temp_audio' });
               if (localPath && fs.existsSync(localPath)) {
                 audioBuffer = fs.readFileSync(localPath);
                 try { fs.unlinkSync(localPath); } catch (e) {}
               }
-            } catch (e) {}
-          }
-
-          // Fallback nativo a downloadMediaMessage de Baileys
-          if (!audioBuffer && provider.vendor && typeof (provider as any).vendor.downloadMediaMessage === 'function') {
-            try {
-              audioBuffer = await (provider as any).vendor.downloadMediaMessage(payload);
             } catch (e) {
-              console.warn('⚠️ Falló descarga nativa vendor:', e);
+              console.warn('⚠️ Error en provider.saveFile para audio:', e);
             }
           }
 
@@ -284,13 +281,9 @@ manager.createBot = async (tenantConfig: any) => {
                 docBuffer = fs.readFileSync(localDocPath);
                 try { fs.unlinkSync(localDocPath); } catch (e) {}
               }
-            } catch (e) {}
-          }
-
-          if (!docBuffer && provider.vendor && typeof (provider as any).vendor.downloadMediaMessage === 'function') {
-            try {
-              docBuffer = await (provider as any).vendor.downloadMediaMessage(payload);
-            } catch (e) {}
+            } catch (e) {
+              console.warn('⚠️ Error en provider.saveFile para documento:', e);
+            }
           }
 
           if (docBuffer && docBuffer.length > 0) {
