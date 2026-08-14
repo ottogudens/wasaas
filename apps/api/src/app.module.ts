@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { ClsModule } from 'nestjs-cls';
 
 // Infrastructure
 import { PrismaModule } from './prisma/prisma.module';
@@ -26,6 +27,12 @@ import { TranscriptionService } from './ai/transcription.service';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env', '.env.local'],
+    }),
+
+    // Contexto de la solicitud (AsyncLocalStorage) para el tenantId
+    ClsModule.forRoot({
+      global: true,
+      middleware: { mount: true },
     }),
 
     // Rate limiting global: 60 requests por minuto por IP
