@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, User, Bot, Send } from 'lucide-react';
+import { MessageSquare, User, Bot, Send, Loader2 } from 'lucide-react';
 import { useBotContext } from '../../lib/bot-context';
 import { useConversations } from '../../hooks/useConversations';
+import { useBots } from '../../hooks/useBots';
+import { useAuth } from '../../lib/auth-context';
 
 export function LiveChatPanel() {
   const { selectedBotId } = useBotContext();
@@ -20,6 +22,9 @@ export function LiveChatPanel() {
   } = useConversations(selectedBotId);
 
   const { data: messages = [] } = useMessages(selectedConversationId);
+  const { token } = useAuth();
+  const { useBotStatus } = useBots(token);
+  const { data: botData } = useBotStatus(selectedBotId || '');
 
   useEffect(() => {
     if (chatContainerRef.current) {
@@ -60,6 +65,38 @@ export function LiveChatPanel() {
     return (
       <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-2xl h-[650px] flex items-center justify-center">
         <p className="text-slate-400">Selecciona un bot en el panel principal para ver sus conversaciones.</p>
+      </div>
+    );
+  }
+
+  if (botData && botData.status !== 'CONNECTED') {
+    return (
+      <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800 rounded-3xl p-8 shadow-2xl h-[650px] flex flex-col items-center justify-center text-center">
+        <h2 className="text-2xl font-bold text-white mb-3">Vincular WhatsApp</h2>
+        <p className="text-slate-400 mb-8 max-w-md leading-relaxed">Para activar este agente, debes escanear el código QR con la aplicación de WhatsApp en tu teléfono (Dispositivos vinculados).</p>
+        
+        {botData.status === 'QR_READY' && botData.qrCode ? (
+          <div className="bg-white p-4 rounded-xl shadow-lg mb-6 ring-4 ring-emerald-500/20">
+            <img src={botData.qrCode} alt="WhatsApp QR Code" className="w-64 h-64" />
+          </div>
+        ) : (
+          <div className="w-64 h-64 bg-slate-800/50 rounded-xl border-2 border-dashed border-slate-700 flex flex-col items-center justify-center mb-6 gap-3">
+            <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+            <span className="text-xs text-slate-500 font-medium">Generando QR...</span>
+          </div>
+        )}
+        
+        <div className="space-y-4">
+          <p className="text-sm font-medium text-emerald-400 bg-emerald-500/10 px-5 py-2.5 rounded-xl inline-block border border-emerald-500/20">
+            {botData.status === 'CONNECTING' ? 'Estableciendo conexión...' : 'Esperando a que escanees el código...'}
+          </p>
+          {botData.pairingCode && (
+            <div className="mt-6 pt-6 border-t border-slate-800">
+              <p className="text-xs text-slate-500 mb-2 font-medium uppercase tracking-wider">O usa el código de vinculación</p>
+              <p className="font-mono text-2xl font-bold tracking-widest text-slate-200 bg-slate-950 px-6 py-3 rounded-xl border border-slate-700/50 inline-block shadow-inner">{botData.pairingCode}</p>
+            </div>
+          )}
+        </div>
       </div>
     );
   }
