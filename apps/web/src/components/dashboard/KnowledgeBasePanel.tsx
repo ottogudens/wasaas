@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, useRef } from 'react';
 import { Upload, FileText, Send, Loader2, Trash2 } from 'lucide-react';
 import { useDocuments } from '../../hooks/useDocuments';

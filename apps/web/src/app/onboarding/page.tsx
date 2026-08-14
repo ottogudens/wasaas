@@ -40,8 +40,7 @@ export default function OnboardingPage() {
     try {
       await processDocument({
         title: 'Documento Inicial',
-        content: documentContent,
-        botId: createdBotId || undefined
+        content: documentContent
       });
       router.push('/dashboard/bots'); // Terminado! Redirigir al dashboard
     } catch (error) {

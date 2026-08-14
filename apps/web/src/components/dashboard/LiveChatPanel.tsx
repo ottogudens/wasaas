@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, useRef, useEffect } from 'react';
 import { MessageSquare, User, Bot, Send } from 'lucide-react';
 import { useBotContext } from '../../lib/bot-context';

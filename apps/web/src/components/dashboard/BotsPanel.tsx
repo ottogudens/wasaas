@@ -1,7 +1,11 @@
+'use client';
+
 import React, { useState } from 'react';
 import { Bot, Plus, Loader2, CheckCircle2, X, Pencil, Trash2, QrCode } from 'lucide-react';
 import { useBotContext } from '../../lib/bot-context';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '../../lib/auth-context';
+import { useBots } from '../../hooks/useBots';
 
 export function BotsPanel() {
   const { token } = useAuth();
