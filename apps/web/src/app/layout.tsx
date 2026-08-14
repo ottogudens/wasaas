@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
-import { AuthProvider } from '../lib/auth-context';
+import { Providers } from '../components/Providers';
 
 export const metadata: Metadata = {
   title: 'miBot - Plataforma de Agentes IA de WhatsApp',
@@ -30,9 +30,9 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body className="bg-[#090d16] text-slate-100 antialiased selection:bg-emerald-500 selection:text-black min-h-screen">
-        <AuthProvider>
+        <Providers>
           {children}
-        </AuthProvider>
+        </Providers>
         <script
           dangerouslySetInnerHTML={{
             __html: `
