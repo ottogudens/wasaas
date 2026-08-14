@@ -49,5 +49,21 @@ Se rediseñó la arquitectura de carpetas para aislar responsabilidades:
   - El código de TypeScript (`tsc`) compiló exitosamente.
   - Mayor seguridad al realizar cambios, ya que cada capa (HTTP vs WebSockets vs Baileys) está aislada.
 
+---
+
+## 3. Rediseño UX/UI y PWA (Fase 4)
+
+El frontend de la aplicación web (`apps/web`) ha sido completamente rediseñado pensando en dispositivos móviles y usabilidad:
+
+### Cambios realizados:
+- **Progressive Web App (PWA):** Se configuró `next-pwa` y se generó el `manifest.json`. Ahora la aplicación puede ser instalada en móviles (Android/iOS) como una app nativa, con caché offline.
+- **Enrutamiento Real (App Router):** Se eliminó el "fake routing" basado en estados (`activeTab`) del monolito. Ahora tenemos URLs reales (`/dashboard/bots`, `/dashboard/chat`), lo cual mejora el SEO interno, permite compartir links directos y da soporte a los botones "atrás/adelante" del navegador.
+- **Layout Responsivo:** 
+  - En móviles, la navegación se muestra como una **Bottom Tab Bar** (fija abajo).
+  - En desktop, la navegación se muestra como un clásico Sidebar a la izquierda.
+- **Contexto Global de Estado:** Se creó `BotProvider` para compartir qué Bot está seleccionado globalmente a través de todas las pestañas sin pasar `props`.
+- **Badge Permanente:** El estado del Bot (`CONECTADO`, `QR_LISTO`) ahora es un componente permanente visible en todo momento en la cabecera del Dashboard (`BotConnectionBadge.tsx`).
+- **Onboarding Wizard:** Se creó un nuevo flujo interactivo en `/onboarding` para que los clientes nuevos configuren su primer Bot en solo 3 pasos sin fricciones.
+
 > [!TIP]
-> **Siguiente paso recomendado:** Con el backend y frontend optimizados, se recomienda realizar un despliegue en staging o producción (Railway) para verificar que las sesiones de WhatsApp y WebSockets se reconectan correctamente con la nueva estructura de módulos.
+> **Siguiente paso recomendado:** Con el backend refactorizado y el frontend convertido en una PWA moderna, el producto está listo para un Rollout Piloto. Te sugiero desplegar a producción (Railway y Vercel) y probar el Onboarding desde un teléfono celular.

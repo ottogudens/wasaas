@@ -1,15 +1,13 @@
 import React, { useState } from 'react';
 import { Bot, Plus, Loader2, CheckCircle2, X, Pencil, Trash2, QrCode } from 'lucide-react';
-import { useBots } from '../../hooks/useBots';
-import { useAuth } from '../../lib/auth-context';
+import { useBotContext } from '../../lib/bot-context';
+import { useRouter } from 'next/navigation';
 
-interface BotsPanelProps {
-  onSelectBot: (bot: any) => void;
-}
-
-export function BotsPanel({ onSelectBot }: BotsPanelProps) {
+export function BotsPanel() {
   const { token } = useAuth();
   const { bots, isLoading, isCreating, createBot, updateBot, deleteBot } = useBots(token);
+  const { setSelectedBotId, setSelectedBot } = useBotContext();
+  const router = useRouter();
 
   const [newBotName, setNewBotName] = useState('');
   const [editingBotId, setEditingBotId] = useState<string | null>(null);
@@ -109,7 +107,7 @@ export function BotsPanel({ onSelectBot }: BotsPanelProps) {
                       </button>
                     </div>
                   ) : (
-                    <h3 className="font-bold text-lg cursor-pointer" onClick={() => onSelectBot(b)}>{b.name}</h3>
+                    <h3 className="font-bold text-lg cursor-pointer hover:text-emerald-400 transition-colors" onClick={() => { setSelectedBot(b); router.push('/dashboard/chat'); }}>{b.name}</h3>
                   )}
                   <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 border ${badge.className}`}>
                     {badge.icon} {badge.label}
@@ -119,7 +117,7 @@ export function BotsPanel({ onSelectBot }: BotsPanelProps) {
                 <p className="text-xs text-slate-500 mb-3">Modelo: {b.aiModel || 'gpt-4o-mini'}</p>
                 <div className="flex items-center gap-2 pt-3 border-t border-slate-800">
                   <button
-                    onClick={() => onSelectBot(b)}
+                    onClick={() => { setSelectedBot(b); router.push('/dashboard/chat'); }}
                     className="text-xs px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-all flex items-center gap-1.5"
                   >
                     <QrCode className="w-3 h-3" /> Vincular

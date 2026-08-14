@@ -1,12 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MessageSquare, User, Bot, Send } from 'lucide-react';
+import { useBotContext } from '../../lib/bot-context';
 import { useConversations } from '../../hooks/useConversations';
 
-interface LiveChatPanelProps {
-  selectedBotId: string | null;
-}
-
-export function LiveChatPanel({ selectedBotId }: LiveChatPanelProps) {
+export function LiveChatPanel() {
+  const { selectedBotId } = useBotContext();
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [chatInput, setChatInput] = useState('');
   const chatContainerRef = useRef<HTMLDivElement>(null);

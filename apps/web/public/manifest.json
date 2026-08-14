@@ -1,24 +1,16 @@
 {
-  "name": "miBot - Agentes IA de WhatsApp",
+  "name": "miBot Admin",
   "short_name": "miBot",
-  "description": "Plataforma de Agentes IA de WhatsApp para Automatización, RAG y Gestión de Clientes.",
+  "description": "Panel de administración y chat en vivo para bots de WhatsApp.",
   "start_url": "/dashboard",
   "display": "standalone",
-  "background_color": "#090d16",
+  "background_color": "#020617",
   "theme_color": "#10b981",
-  "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "src": "/favicon.ico",
+      "sizes": "64x64",
+      "type": "image/x-icon"
     }
   ]
 }
