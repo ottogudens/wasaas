@@ -15,7 +15,7 @@ const FeatureFlagsContext = createContext<FeatureFlagsContextType>({
 });
 
 export const FeatureFlagsProvider = ({ children }: { children: React.ReactNode }) => {
-  const { token, isAuthenticated } = useAuth();
+  const { token } = useAuth();
   const [features, setFeatures] = useState<Record<string, boolean>>({});
   const [isLoading, setIsLoading] = useState(true);
 
@@ -23,7 +23,7 @@ export const FeatureFlagsProvider = ({ children }: { children: React.ReactNode }
     let isMounted = true;
     
     const fetchFlags = async () => {
-      if (!isAuthenticated || !token) {
+      if (!token) {
         if (isMounted) {
           setFeatures({});
           setIsLoading(false);
@@ -51,7 +51,7 @@ export const FeatureFlagsProvider = ({ children }: { children: React.ReactNode }
     return () => {
       isMounted = false;
     };
-  }, [isAuthenticated, token]);
+  }, [token]);
 
   return (
     <FeatureFlagsContext.Provider value={{ features, isLoading }}>
