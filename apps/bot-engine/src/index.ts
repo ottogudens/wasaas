@@ -86,11 +86,7 @@ const main = async () => {
   // 5. Suscribirse a eventos del Manager y generar QR DataURL oficial de Baileys
   bindManagerEventsToBroadcast(manager, broadcast);
 
-  // 6. Sincronización Webhook y Rehidratación
-  manager.on('bot:qr', (tenantId: string, data: any) => notifyWebhook({ event: 'bot:qr', tenantId, qr: typeof data?.qr === 'string' && data.qr.startsWith('data:image') ? data.qr : null }));
-  manager.on('bot:connected', (tenantId: string) => notifyWebhook({ event: 'connected', tenantId }));
-  manager.on('bot:disconnected', (tenantId: string) => notifyWebhook({ event: 'disconnected', tenantId }));
-  (manager as any).on('error', (err: any) => notifyWebhook({ event: 'error', error: err?.message || 'Error' }));
+  // 6. Sincronización Webhook manejada directamente en manager.ts
 
   // 8. Endpoints Custom sobre Polka
   if ((managerApi as any).app) {

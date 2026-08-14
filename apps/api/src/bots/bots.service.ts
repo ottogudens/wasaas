@@ -235,7 +235,7 @@ export class BotsService {
     });
   }
 
-  /**
+  /**
    * Internal: Handle webhook events from bot-engine
    */
   async handleWebhook(data: any) {
@@ -247,21 +247,29 @@ export class BotsService {
 
     let newStatus = bot.status;
     let newQr = bot.qrCode;
+    let newPairingCode = bot.pairingCode;
 
     switch (event) {
       case 'bot:qr':
         newStatus = 'QR_READY';
         newQr = qr;
+        newPairingCode = null;
+        break;
+      case 'bot:code':
+        newStatus = 'QR_READY'; // Keep it QR_READY so UI shows the code
+        newPairingCode = data.code;
         break;
       case 'bot:ready':
       case 'connected':
         newStatus = 'CONNECTED';
         newQr = null; // Clear QR once connected
+        newPairingCode = null;
         break;
       case 'bot:disconnected':
       case 'disconnected':
         newStatus = 'DISCONNECTED';
         newQr = null;
+        newPairingCode = null;
         break;
       case 'bot:error':
       case 'error':
@@ -274,6 +282,7 @@ export class BotsService {
       data: {
         status: newStatus as any,
         qrCode: newQr,
+        pairingCode: newPairingCode,
       },
     });
 

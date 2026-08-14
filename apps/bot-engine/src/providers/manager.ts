@@ -299,6 +299,7 @@ export const bindManagerEventsToBroadcast = (manager: any, broadcast: Function) 
       tenantId,
       qr: qrImageBase64,
     });
+    notifyWebhook({ event: 'bot:qr', tenantId, qr: qrImageBase64 });
     logger.info(`📡 [BotManager WebSocket] Evento 'bot:qr' emitido a clientes autorizados para Tenant ${tenantId}`);
   });
   
@@ -309,6 +310,7 @@ export const bindManagerEventsToBroadcast = (manager: any, broadcast: Function) 
       tenantId,
       code: data?.code,
     });
+    notifyWebhook({ event: 'bot:code', tenantId, code: data?.code });
   });
   
   manager.on('bot:connected', (tenantId: string) => {
@@ -318,6 +320,7 @@ export const bindManagerEventsToBroadcast = (manager: any, broadcast: Function) 
       tenantId,
       status: 'CONNECTED',
     });
+    notifyWebhook({ event: 'connected', tenantId });
   });
   
   manager.on('bot:disconnected', (tenantId: string) => {
@@ -327,6 +330,7 @@ export const bindManagerEventsToBroadcast = (manager: any, broadcast: Function) 
       tenantId,
       status: 'DISCONNECTED',
     });
+    notifyWebhook({ event: 'disconnected', tenantId });
   });
   
   manager.on('bot:message', (tenantId: string, data: any) => {
@@ -344,5 +348,6 @@ export const bindManagerEventsToBroadcast = (manager: any, broadcast: Function) 
       event: 'bot:error',
       error: typeof err === 'string' ? err : err?.message || 'Error interno en BotManager',
     });
+    notifyWebhook({ event: 'error', error: typeof err === 'string' ? err : err?.message || 'Error interno' });
   });
 };

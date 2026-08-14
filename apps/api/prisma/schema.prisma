@@ -125,6 +125,7 @@ model BotInstance {
   metaVerifyToken String?
   status          BotStatus     @default(DISCONNECTED)
   qrCode          String?       @db.Text
+  pairingCode     String?
   systemPrompt    String?       @db.Text
   aiModel         String        @default("gpt-4o-mini")
   organizationId  String
