@@ -2,15 +2,12 @@ import './check-env.js'; // Validar vars de entorno antes de cualquier otra impo
 import 'dotenv/config';
 import { logger, getTenantLogger } from './logger.js';
 import * as Sentry from '@sentry/node';
-import { nodeProfilingIntegration } from '@sentry/profiling-node';
 
 if (process.env.SENTRY_DSN) {
   Sentry.init({
     dsn: process.env.SENTRY_DSN,
-    integrations: [nodeProfilingIntegration()],
     tracesSampleRate: 1.0,
-    profilesSampleRate: 1.0,
-  });
+    });
 }
 import fs from 'fs';
 import path from 'path';

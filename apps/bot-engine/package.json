@@ -14,7 +14,6 @@
     "@builderbot/provider-baileys": "^1.4.3-y.6",
     "@builderbot/provider-meta": "^1.4.3-y.6",
     "@sentry/node": "^10.70.0",
-    "@sentry/profiling-node": "^10.70.0",
     "@types/qrcode": "^1.5.6",
     "@types/ws": "^8.18.1",
     "cors": "^2.8.5",
