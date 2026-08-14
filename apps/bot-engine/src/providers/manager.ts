@@ -169,9 +169,9 @@ export const overrideManagerCreateBot = async (manager: any) => {
             
             if (docBuffer && docBuffer.length > 0) {
               logger.info(`📄 [Baileys Document] Descargados ${docBuffer.length} bytes del documento.`);
-              const docContent = docBuffer.toString('utf-8');
+              const docContentBase64 = docBuffer.toString('base64');
               
-              const docRes = await processWhatsappFile(tenantConfig.tenantId, docTitle, docContent);
+              const docRes = await processWhatsappFile(tenantConfig.tenantId, docTitle, docContentBase64);
               
               if (docRes.ok) {
                 const docData = await docRes.json();

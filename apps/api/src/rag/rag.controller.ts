@@ -48,12 +48,12 @@ export class InternalRagController {
   @Post('process-whatsapp-file')
   async processWhatsAppFile(
     @Headers('x-api-key') apiKey: string,
-    @Body() body: { tenantId: string; title: string; content: string },
+    @Body() body: { tenantId: string; title: string; content?: string; contentBase64?: string },
   ) {
     this.validateApiKey(apiKey);
 
-    if (!body.tenantId || !body.title || !body.content) {
-      throw new BadRequestException('tenantId, title y content son obligatorios.');
+    if (!body.tenantId || !body.title || (!body.content && !body.contentBase64)) {
+      throw new BadRequestException('tenantId, title y content/contentBase64 son obligatorios.');
     }
 
     const bot = await this.ragService['prisma'].botInstance.findUnique({
@@ -64,10 +64,24 @@ export class InternalRagController {
       throw new BadRequestException('Bot no encontrado.');
     }
 
+    let finalContent = body.content || '';
+
+    if (body.contentBase64) {
+      const buffer = Buffer.from(body.contentBase64, 'base64');
+      const ext = body.title.split('.').pop()?.toLowerCase() || '';
+      let mimetype = 'text/plain';
+      
+      if (ext === 'pdf') mimetype = 'application/pdf';
+      else if (ext === 'docx') mimetype = 'docx';
+      else if (ext === 'xlsx' || ext === 'xls') mimetype = 'xlsx';
+      
+      finalContent = await this.ragService.extractTextFromBuffer(buffer, mimetype);
+    }
+
     const result = await this.ragService.processAndStoreDocument(
       bot.organizationId,
       body.title,
-      body.content,
+      finalContent,
     );
 
     return {

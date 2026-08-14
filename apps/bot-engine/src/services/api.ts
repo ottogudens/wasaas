@@ -10,11 +10,11 @@ export const transcribeVoice = async (tenantId: string, customerPhone: string, a
   }, 1, 15000);
 };
 
-export const processWhatsappFile = async (tenantId: string, title: string, content: string) => {
+export const processWhatsappFile = async (tenantId: string, title: string, contentBase64: string) => {
   return fetchWithRetry(`${API_URL}/rag/process-whatsapp-file`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
-    body: JSON.stringify({ tenantId, title, content }),
+    body: JSON.stringify({ tenantId, title, contentBase64 }),
   }, 1, 15000);
 };
 
