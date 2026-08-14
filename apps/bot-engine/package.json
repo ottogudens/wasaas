@@ -6,7 +6,8 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc"
+    "build": "tsc",
+    "test": "vitest run"
   },
   "dependencies": {
     "@builderbot/bot": "^1.4.3-y.6",
@@ -28,8 +29,9 @@
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
-    "@types/node": "^20.11.0",
+    "@types/node": "^20.19.43",
     "tsx": "^4.7.1",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^4.1.10"
   }
 }
