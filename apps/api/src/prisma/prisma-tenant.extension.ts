@@ -39,8 +39,9 @@ export const tenantExtension = Prisma.defineExtension((client) => {
             
             if (tenantId && tenantModels.includes(model) && tenantOperations.includes(operation)) {
               // Interceptar los args para inyectar organizationId en el 'where'
-              args.where = {
-                ...(args.where || {}),
+              const anyArgs = args as any;
+              anyArgs.where = {
+                ...(anyArgs.where || {}),
                 organizationId: tenantId,
               };
             }

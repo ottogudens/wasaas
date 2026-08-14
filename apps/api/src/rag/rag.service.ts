@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import { PrismaService } from '../prisma/prisma.service';
 import { encoding_for_model } from 'tiktoken';
-import * as pdfParse from 'pdf-parse';
+const pdfParse = require('pdf-parse');
 import * as mammoth from 'mammoth';
 import * as xlsx from 'xlsx';
 import { Prisma } from '@prisma/client';
@@ -280,7 +280,8 @@ export class RagService {
 
     for (let i = 0; i < tokens.length; i += (maxTokens - overlapTokens)) {
       const chunkTokens = tokens.slice(i, i + maxTokens);
-      const chunkText = enc.decode(chunkTokens);
+      const chunkTextRaw = enc.decode(chunkTokens);
+      const chunkText = new TextDecoder().decode(chunkTextRaw);
       if (chunkText.trim().length > 0) {
         chunks.push(chunkText);
       }
