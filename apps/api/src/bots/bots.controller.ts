@@ -41,13 +41,28 @@ class SendMessageDto {
   content: string;
 }
 
+class SendDocumentDto {
+  @IsString()
+  customerPhone: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  documentTitle?: string;
+
+  @IsString()
+  @MinLength(1)
+  documentContent: string;
+}
+
 @Controller('bots/internal')
 export class InternalBotsController {
   constructor(private readonly botsService: BotsService) {}
 
   private validateApiKey(apiKey: string) {
-    const expectedKey = process.env.INTERNAL_API_KEY || 'skale-saas-secret-key';
-    if (apiKey !== expectedKey) {
+    // INTERNAL_API_KEY es obligatoria — check-env.ts ya validó que existe al arrancar.
+    const expectedKey = process.env.INTERNAL_API_KEY;
+    if (!apiKey || apiKey !== expectedKey) {
       throw new UnauthorizedException('Invalid API Key');
     }
   }
@@ -115,6 +130,11 @@ export class BotsController {
   @Post('conversations/:conversationId/messages')
   async sendMessage(@Param('conversationId') conversationId: string, @Req() req: any, @Body() dto: SendMessageDto) {
     return this.botsService.sendManualMessage(conversationId, req.user.organizationId, dto.content);
+  }
+
+  @Post(':id/send-document')
+  async sendDocument(@Param('id') id: string, @Req() req: any, @Body() dto: SendDocumentDto) {
+    return this.botsService.sendDocument(id, req.user.organizationId, dto);
   }
 
   @Patch('conversations/:conversationId/human-mode')

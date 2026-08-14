@@ -143,7 +143,7 @@ export class BotsService {
     // Intentar detener el bot en el engine
     try {
       const botEngineUrl = process.env.BOT_ENGINE_URL || 'https://whatsapp-service-production-e6f2.up.railway.app';
-      const apiKey = process.env.INTERNAL_API_KEY || 'skale-saas-secret-key';
+      const apiKey = process.env.INTERNAL_API_KEY;
 
       await fetch(`${botEngineUrl}/internal/disconnect`, {
         method: 'POST',
@@ -313,7 +313,7 @@ export class BotsService {
     // Enviar mensaje real a WhatsApp a través del bot-engine
     try {
       const botEngineUrl = process.env.BOT_ENGINE_URL || 'https://whatsapp-service-production-e6f2.up.railway.app';
-      const apiKey = process.env.INTERNAL_API_KEY || 'skale-saas-secret-key';
+      const apiKey = process.env.INTERNAL_API_KEY;
       
       const res = await fetch(`${botEngineUrl}/internal/send-message`, {
         method: 'POST',
@@ -360,5 +360,43 @@ export class BotsService {
 
     this.logger.log(`👤 Modo Humano ${nextMode ? 'ACTIVADO' : 'DESACTIVADO'} para conversación ${conversation.id}`);
     return updated;
+  }
+
+  /**
+   * Enviar documento generado por WhatsApp a través del bot-engine.
+   * Este método actúa como proxy server-side para que la INTERNAL_API_KEY
+   * NUNCA salga al navegador del usuario.
+   */
+  async sendDocument(botId: string, organizationId: string, dto: {
+    customerPhone: string;
+    documentTitle?: string;
+    documentContent: string;
+  }) {
+    const bot = await this.getBot(botId, organizationId);
+
+    const botEngineUrl = process.env.BOT_ENGINE_URL || 'https://whatsapp-service-production-e6f2.up.railway.app';
+    const apiKey = process.env.INTERNAL_API_KEY;
+
+    const res = await fetch(`${botEngineUrl}/internal/send-document`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+      },
+      body: JSON.stringify({
+        tenantId: bot.tenantId,
+        customerPhone: dto.customerPhone,
+        documentTitle: dto.documentTitle,
+        documentContent: dto.documentContent,
+      }),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      this.logger.error(`Error enviando documento a bot-engine: HTTP ${res.status} — ${errText}`);
+      throw new Error(`Error al enviar documento por WhatsApp: HTTP ${res.status}`);
+    }
+
+    return res.json();
   }
 }

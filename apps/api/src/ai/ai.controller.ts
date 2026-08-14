@@ -9,8 +9,9 @@ export class AiController {
   constructor(private readonly aiService: AiService) {}
 
   private validateApiKey(apiKey: string) {
-    const expectedKey = process.env.INTERNAL_API_KEY || 'skale-saas-secret-key';
-    if (apiKey !== expectedKey) {
+    // INTERNAL_API_KEY es obligatoria — check-env.ts ya validó que existe al arrancar.
+    const expectedKey = process.env.INTERNAL_API_KEY;
+    if (!apiKey || apiKey !== expectedKey) {
       throw new UnauthorizedException('Invalid API Key');
     }
   }

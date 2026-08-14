@@ -149,27 +149,14 @@ class ApiClient {
 
   // ── Document Generation & WhatsApp Dispatch ───────
   async sendGeneratedDocument(botId: string, customerPhone: string, documentTitle: string, documentContent: string) {
-    try {
-      const botEngineUrl = process.env.NEXT_PUBLIC_BOT_ENGINE_URL || 'https://whatsapp-service-production-e6f2.up.railway.app';
-      const bot = await this.getBot(botId);
-      const res = await fetch(`${botEngineUrl}/internal/send-document`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': 'skale-saas-secret-key'
-        },
-        body: JSON.stringify({
-          tenantId: bot.tenantId,
-          customerPhone,
-          documentTitle,
-          documentContent
-        })
-      });
-      return await res.json();
-    } catch (err: any) {
-      throw new Error(`Error al enviar documento por WhatsApp: ${err.message}`);
-    }
+    // SEGURIDAD: La INTERNAL_API_KEY NUNCA debe enviarse desde el browser.
+    // Esta llamada se hace a través de la API NestJS, que la proxea al bot-engine server-side.
+    return this.request<{ success: boolean; message: string }>(`/bots/${botId}/send-document`, {
+      method: 'POST',
+      body: JSON.stringify({ customerPhone, documentTitle, documentContent }),
+    });
   }
+
 
   // ── Tenants Super Admin ───────────────────────────
   async listTenants() {

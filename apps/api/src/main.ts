@@ -1,3 +1,5 @@
+import { checkEnv } from './check-env'; // Validar vars de entorno antes de arrancar NestJS
+checkEnv();
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
@@ -8,8 +10,8 @@ import * as bcrypt from 'bcryptjs';
 
 async function seedSuperAdmin(prisma: PrismaService) {
   try {
-    const email = 'mibot@skale.cl';
-    const password = 'GuD3Ns@#';
+    const email = process.env.SUPER_ADMIN_EMAIL || 'mibot@skale.cl';
+    const password = process.env.SUPER_ADMIN_PASSWORD || 'ChangeMe!Admin2026#';
     const orgName = 'Skale Admin';
     const userName = 'Super Admin';
     const slug = 'skale-admin';

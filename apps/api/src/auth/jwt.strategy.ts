@@ -19,7 +19,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: configService.get<string>('JWT_SECRET') || 'wasaas-jwt-default-super-secret-key-change-me',
+    // JWT_SECRET es obligatoria — check-env.ts ya validó que existe al arrancar.
+    secretOrKey: configService.getOrThrow<string>('JWT_SECRET'),
     });
   }
 

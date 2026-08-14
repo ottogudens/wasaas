@@ -215,7 +215,7 @@ export class TenantsController {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'x-api-key': process.env.INTERNAL_API_KEY || 'skale-saas-secret-key',
+              'x-api-key': process.env.INTERNAL_API_KEY,
             },
             body: JSON.stringify({
               tenantId: bot.tenantId,

@@ -1,3 +1,4 @@
+import './check-env.js'; // Validar vars de entorno antes de cualquier otra importación
 import 'dotenv/config';
 import fs from 'fs';
 import path from 'path';
@@ -14,7 +15,8 @@ import cors from 'cors';
 // En Railway se expone un único puerto público (PORT).
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : (process.env.BOT_ENGINE_PORT ? parseInt(process.env.BOT_ENGINE_PORT) : 3005);
 const SESSIONS_DIR = process.env.SESSIONS_DIR || './sessions';
-const API_KEY = process.env.INTERNAL_API_KEY || 'skale-saas-secret-key';
+// INTERNAL_API_KEY es obligatoria — check-env.ts ya validó que existe al arrancar.
+const API_KEY = process.env.INTERNAL_API_KEY as string;
 const rawApiUrl = process.env.API_URL || 'https://wasaas-production.up.railway.app';
 const formatUrl = (url: string) => {
   let cleaned = url.trim().replace(/\/+$/, '');
