@@ -1,4 +1,4 @@
-import { KnowledgeBasePanel } from '../../../../components/dashboard/KnowledgeBasePanel';
+import { KnowledgeBasePanel } from '../../../components/dashboard/KnowledgeBasePanel';
 
 export default function KnowledgePage() {
   return <KnowledgeBasePanel />;
