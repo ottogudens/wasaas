@@ -72,6 +72,32 @@ const cleanPhoneNumber = (raw: string): string => {
   return raw.replace(/@.*$/, '').replace(/:.*$/, '').replace(/[^\d]/g, '');
 };
 
+// --- Helper HTTP con Timeouts y Reintentos ---
+const fetchWithRetry = async (url: string, options: RequestInit, retries = 2, timeoutMs = 8000) => {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (res.ok) return res;
+      if (res.status >= 500 && attempt < retries) {
+        logger.warn(`⚠️ [HTTP] Status ${res.status} en ${url}. Reintentando (${attempt + 1}/${retries})...`);
+        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt))); // Exponential backoff
+        continue;
+      }
+      return res;
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      const isTimeout = err.name === 'AbortError';
+      logger.warn(`⚠️ [HTTP] ${isTimeout ? 'Timeout' : 'Error'} en ${url}. Intento ${attempt + 1}/${retries}`);
+      if (attempt >= retries) throw err;
+      await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
+    }
+  }
+  throw new Error('Max retries reached');
+};
+
 // --- Factory de flujos IA por tenant ---
 // Flujo inerte para cumplir con el requisito de BuilderBot de tener al menos un flujo.
 // No atrapamos EVENTS.WELCOME para evitar que BuilderBot secuestre notas de voz o documentos.
@@ -180,11 +206,11 @@ manager.createBot = async (tenantConfig: any) => {
             const audioBase64 = audioBuffer.toString('base64');
             
             // /ai/transcribe-voice ya transcribe Y genera respuesta de IA (chatWithContext)
-            const voiceRes = await fetch(`${API_URL}/ai/transcribe-voice`, {
+            const voiceRes = await fetchWithRetry(`${API_URL}/ai/transcribe-voice`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
               body: JSON.stringify({ tenantId: tenantConfig.tenantId, customerPhone: cleanFrom, audioBase64 }),
-            });
+            }, 1, 15000); // Timeout largo para transcripción
             
             if (voiceRes.ok) {
               const voiceData = await voiceRes.json();
@@ -226,11 +252,11 @@ manager.createBot = async (tenantConfig: any) => {
             logger.info(`📄 [Baileys Document] Descargados ${docBuffer.length} bytes del documento.`);
             const docContent = docBuffer.toString('utf-8');
             
-            const docRes = await fetch(`${API_URL}/rag/process-whatsapp-file`, {
+            const docRes = await fetchWithRetry(`${API_URL}/rag/process-whatsapp-file`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
               body: JSON.stringify({ tenantId: tenantConfig.tenantId, title: docTitle, content: docContent }),
-            });
+            }, 1, 15000);
             
             if (docRes.ok) {
               const docData = await docRes.json();
@@ -266,7 +292,7 @@ manager.createBot = async (tenantConfig: any) => {
 
       // 2. Procesar mensaje con NestJS AI API
       try {
-        const response = await fetch(`${API_URL}/ai/chat-with-context`, {
+        const response = await fetchWithRetry(`${API_URL}/ai/chat-with-context`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -277,7 +303,7 @@ manager.createBot = async (tenantConfig: any) => {
             customerPhone: cleanFrom,
             message: bodyText,
           }),
-        });
+        }, 2, 8000); // 2 reintentos, 8s timeout
 
         if (response.ok) {
           const data = await response.json();
@@ -302,9 +328,15 @@ manager.createBot = async (tenantConfig: any) => {
           }
         } else {
           logger.warn(`⚠️ [BotEngine] Respuesta HTTP ${response.status} desde /ai/chat-with-context`);
+          if (typeof provider.sendMessage === 'function') {
+            await provider.sendMessage(cleanFrom, 'Estoy teniendo intermitencias técnicas en este momento, por favor intenta en unos minutos.', {});
+          }
         }
       } catch (err) {
         logger.error('❌ Error al enviar mensaje entrante a AI API:', err);
+        if (typeof provider.sendMessage === 'function') {
+          await provider.sendMessage(cleanFrom, 'Disculpa, mi sistema central está tardando en responder. Vuelve a escribirme en breve.', {});
+        }
       }
     });
 

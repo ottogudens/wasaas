@@ -2,6 +2,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import { PrismaService } from '../prisma/prisma.service';
+import { encoding_for_model } from 'tiktoken';
+import * as pdfParse from 'pdf-parse';
+import * as mammoth from 'mammoth';
+import * as xlsx from 'xlsx';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class RagService {
@@ -32,7 +37,7 @@ export class RagService {
       },
     });
 
-    // 2. Dividir en chunks
+    // 2. Dividir en chunks usando tiktoken
     const chunks = this.chunkText(content);
 
     // 3. Para cada chunk, generar embedding y persistir
@@ -60,6 +65,9 @@ export class RagService {
     }
 
     this.logger.log(`📚 Documento "${title}" procesado: ${chunksProcessed}/${chunks.length} chunks almacenados.`);
+
+    // Invalida la caché semántica de la organización porque hay un nuevo documento
+    await this.invalidateSemanticCache(organizationId);
 
     return {
       documentId: document.id,
@@ -129,7 +137,10 @@ export class RagService {
       where: { id: documentId },
     });
 
-    this.logger.log(`🗑️ Documento "${doc.title}" eliminado con sus chunks.`);
+    // Invalida la caché semántica de la organización porque un doc fue borrado
+    await this.invalidateSemanticCache(organizationId);
+
+    this.logger.log(`🗑️ Documento "${doc.title}" eliminado con sus chunks. Caché semántica invalidada.`);
     return doc;
   }
 
@@ -144,6 +155,9 @@ export class RagService {
     try {
       const queryEmbedding = await this.generateEmbedding(query);
 
+      // Solo retornar entradas más recientes que N días (TTL: ej. 7 días)
+      const ttlDays = 7;
+      
       const results = await this.prisma.$queryRaw<
         Array<{ id: string; replyText: string; similarity: number }>
       >`
@@ -154,6 +168,7 @@ export class RagService {
         FROM "SemanticMemoryCache" smc
         WHERE smc."organizationId" = ${organizationId}
           AND smc."queryEmbedding" IS NOT NULL
+          AND smc."createdAt" >= NOW() - INTERVAL '${Prisma.sql`${ttlDays} days`}'
           AND 1 - (smc."queryEmbedding" <=> ${JSON.stringify(queryEmbedding)}::vector) >= ${minSimilarity}
         ORDER BY smc."queryEmbedding" <=> ${JSON.stringify(queryEmbedding)}::vector
         LIMIT 1
@@ -221,19 +236,73 @@ export class RagService {
   }
 
   /**
-   * Dividir un texto largo en fragmentos (chunks) con solapamiento
+   * Extraer texto de un archivo en memoria (Buffer)
    */
-  chunkText(text: string, chunkSize: number = 500, overlap: number = 50): string[] {
-    const words = text.split(/\s+/);
+  async extractTextFromBuffer(buffer: Buffer, mimetype: string): Promise<string> {
+    try {
+      if (mimetype === 'application/pdf' || mimetype === 'pdf') {
+        const data = await pdfParse(buffer);
+        return data.text;
+      } else if (mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || mimetype === 'docx') {
+        const result = await mammoth.extractRawText({ buffer });
+        return result.value;
+      } else if (
+        mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+        mimetype === 'application/vnd.ms-excel' ||
+        mimetype === 'xlsx' || mimetype === 'xls'
+      ) {
+        const workbook = xlsx.read(buffer, { type: 'buffer' });
+        let text = '';
+        workbook.SheetNames.forEach((sheetName) => {
+          const sheet = workbook.Sheets[sheetName];
+          text += `Sheet: ${sheetName}\n`;
+          text += xlsx.utils.sheet_to_txt(sheet) + '\n\n';
+        });
+        return text;
+      } else if (mimetype === 'text/plain' || mimetype === 'txt' || mimetype === 'csv') {
+        return buffer.toString('utf8');
+      } else {
+        throw new Error(`Mimetype no soportado para extracción de texto: ${mimetype}`);
+      }
+    } catch (err) {
+      this.logger.error('Error extrayendo texto del archivo:', err);
+      throw err;
+    }
+  }
+
+  /**
+   * Dividir un texto largo en fragmentos (chunks) basándose en tokens
+   */
+  chunkText(text: string, maxTokens: number = 500, overlapTokens: number = 50): string[] {
+    const enc = encoding_for_model('text-embedding-3-small');
+    const tokens = enc.encode(text);
     const chunks: string[] = [];
 
-    for (let i = 0; i < words.length; i += (chunkSize - overlap)) {
-      const chunk = words.slice(i, i + chunkSize).join(' ');
-      if (chunk.trim().length > 0) {
-        chunks.push(chunk);
+    for (let i = 0; i < tokens.length; i += (maxTokens - overlapTokens)) {
+      const chunkTokens = tokens.slice(i, i + maxTokens);
+      const chunkText = enc.decode(chunkTokens);
+      if (chunkText.trim().length > 0) {
+        chunks.push(chunkText);
       }
     }
 
+    enc.free();
     return chunks;
+  }
+
+  /**
+   * Invalidar caché semántica de una organización (borrar todas sus entradas)
+   */
+  async invalidateSemanticCache(organizationId: string) {
+    try {
+      const { count } = await this.prisma.semanticMemoryCache.deleteMany({
+        where: { organizationId },
+      });
+      if (count > 0) {
+        this.logger.log(`🧹 Caché semántica invalidada para org ${organizationId}: ${count} entradas borradas.`);
+      }
+    } catch (err) {
+      this.logger.error('Error al invalidar caché semántica:', err);
+    }
   }
 }
