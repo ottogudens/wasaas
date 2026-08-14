@@ -1,15 +1,26 @@
+'use client';
+
 import React from 'react';
 import Link from 'next/link';
-import { Bot, MessageSquare, Database, CreditCard, Menu } from 'lucide-react';
+import { Bot, MessageSquare, Database, CreditCard, Menu, FlaskConical } from 'lucide-react';
 import { BotConnectionBadge } from '../../components/dashboard/BotConnectionBadge';
+import { useFeatureFlag } from '../../lib/feature-flags-context';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const isBetaDashboardEnabled = useFeatureFlag('BETA_DASHBOARD');
+
   const navItems = [
     { label: 'Bots', href: '/dashboard/bots', icon: <Bot className="w-5 h-5" /> },
     { label: 'Live Chat', href: '/dashboard/chat', icon: <MessageSquare className="w-5 h-5" /> },
     { label: 'Conocimiento', href: '/dashboard/knowledge', icon: <Database className="w-5 h-5" /> },
     { label: 'Facturación', href: '/dashboard/billing', icon: <CreditCard className="w-5 h-5" /> },
   ];
+
+  if (isBetaDashboardEnabled) {
+    navItems.push({ label: 'Beta Funcs', href: '/dashboard', icon: <FlaskConical className="w-5 h-5 text-emerald-400" /> });
+  }
+
+  const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col md:flex-row text-slate-100 font-sans selection:bg-emerald-500/30">

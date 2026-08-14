@@ -58,6 +58,7 @@ model Organization {
   documents         KnowledgeDocument[]
   semanticCaches    SemanticMemoryCache[]
   invoices          Invoice[]
+  featureFlags      OrganizationFeatureFlag[]
 }
 
 model User {
@@ -190,4 +191,25 @@ model SemanticMemoryCache {
   updatedAt      DateTime     @updatedAt
 
   @@index([organizationId])
+}
+
+model FeatureFlag {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  isEnabled   Boolean  @default(false)
+  percentage  Int      @default(0) // Rollout 0-100%
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model OrganizationFeatureFlag {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  featureName    String
+  isEnabled      Boolean      
+  createdAt      DateTime     @default(now())
+
+  @@unique([organizationId, featureName])
 }

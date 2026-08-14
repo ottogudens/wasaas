@@ -44,6 +44,10 @@ class ApiClient {
     return data;
   }
 
+  async getFeatures() {
+    return this.request('/features');
+  }
+
   // ── Auth ──────────────────────────────────────────
   async register(body: { organizationName: string; email: string; password: string; userName?: string }) {
     return this.request<{

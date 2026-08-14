@@ -18,6 +18,7 @@ import { RagService } from './rag/rag.service';
 import { MercadoPagoController } from './mercadopago/mercadopago.controller';
 import { MercadoPagoService } from './mercadopago/mercadopago.service';
 import { TenantsController } from './tenants/tenants.controller';
+import { FeaturesModule } from './features/features.module';
 
 import { TranscriptionService } from './ai/transcription.service';
 

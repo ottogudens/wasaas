@@ -67,3 +67,28 @@ El frontend de la aplicación web (`apps/web`) ha sido completamente rediseñado
 
 > [!TIP]
 > **Siguiente paso recomendado:** Con el backend refactorizado y el frontend convertido en una PWA moderna, el producto está listo para un Rollout Piloto. Te sugiero desplegar a producción (Railway y Vercel) y probar el Onboarding desde un teléfono celular.
+
+---
+
+## 4. Rollout Controlado y Feature Flags (Fase 5)
+
+Para preparar el terreno hacia un despliegue seguro en producción, se ha implementado un sistema robusto de **Feature Flags** nativo en PostgreSQL. 
+
+### Arquitectura de Feature Flags:
+- **Prisma Schema:** Se añadieron las tablas `FeatureFlag` (para definir el flag globalmente y su porcentaje de rollout) y `OrganizationFeatureFlag` (para forzar/override de funcionalidades a cuentas específicas, ej. VIPs o Beta Testers).
+- **Backend (NestJS):** Se implementó el módulo `FeaturesModule` que expone la ruta `GET /api/features`. Este endpoint resuelve la lógica determinística de porcentajes (hashing) y los overrides.
+- **Frontend (React/PWA):** Se introdujo el `FeatureFlagsProvider` y el hook `useFeatureFlag(flagName)`.
+- **Prueba Piloto UI:** El Layout de la aplicación ahora cuenta con una prueba viva. Si enciendes el flag `BETA_DASHBOARD` en la base de datos para un usuario, aparecerá mágicamente un nuevo botón llamado **"Beta Funcs"** (con un icono de matraz de laboratorio) en el menú de navegación.
+
+> [!WARNING]
+> **Acción Requerida para Despliegue:**
+> Como el sistema no contaba con un `.env` válido con `DATABASE_URL` localmente, **necesitas ejecutar la migración en tu base de datos de producción/local manualmente**:
+> 
+> ```bash
+> cd apps/api
+> npx prisma migrate dev --name init_feature_flags
+> ```
+> O en caso de estar en Railway:
+> ```bash
+> npx prisma db push
+> ```
