@@ -45,7 +45,7 @@ class ApiClient {
   }
 
   async getFeatures() {
-    return this.request('/features');
+    return this.request<{ features: Record<string, boolean> }>('/features');
   }
 
   // ── Auth ──────────────────────────────────────────
