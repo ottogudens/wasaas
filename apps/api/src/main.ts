@@ -76,7 +76,8 @@ async function bootstrap() {
 
   // Instalar manejador de errores global de Sentry
   if (process.env.SENTRY_DSN) {
-    Sentry.setupNestErrorHandler(app as any);
+    const httpAdapter = app.getHttpAdapter();
+    Sentry.setupExpressErrorHandler(httpAdapter.getInstance());
   }
 
   const prisma = app.get(PrismaService);
