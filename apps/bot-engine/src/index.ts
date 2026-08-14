@@ -1,40 +1,31 @@
 import './check-env.js'; // Validar vars de entorno antes de cualquier otra importación
 import 'dotenv/config';
-import { logger, getTenantLogger } from './logger.js';
 import * as Sentry from '@sentry/node';
 
 if (process.env.SENTRY_DSN) {
   Sentry.init({
     dsn: process.env.SENTRY_DSN,
     tracesSampleRate: 1.0,
-    });
+  });
 }
+
 import fs from 'fs';
 import path from 'path';
 import { BotManager, BotManagerApi } from '@builderbot/manager';
 import { BaileysProvider } from '@builderbot/provider-baileys';
-import { MetaProvider } from '@builderbot/provider-meta';
-import { addKeyword, EVENTS } from '@builderbot/bot';
-import { fetchLatestBaileysVersion, downloadMediaMessage } from 'baileys';
-import { WebSocketServer, WebSocket } from 'ws';
-import QRCode from 'qrcode';
-
-import cors from 'cors';
-
-// En Railway se expone un único puerto público (PORT).
-const PORT = process.env.PORT ? parseInt(process.env.PORT) : (process.env.BOT_ENGINE_PORT ? parseInt(process.env.BOT_ENGINE_PORT) : 3005);
-const SESSIONS_DIR = process.env.SESSIONS_DIR || './sessions';
-// INTERNAL_API_KEY es obligatoria — check-env.ts ya validó que existe al arrancar.
-const API_KEY = process.env.INTERNAL_API_KEY as string;
-const rawApiUrl = process.env.API_URL || 'https://wasaas-production.up.railway.app';
-const formatUrl = (url: string) => {
-  let cleaned = url.trim().replace(/\/+$/, '');
-  if (!cleaned.startsWith('http://') && !cleaned.startsWith('https://')) {
-    cleaned = `https://${cleaned}`;
-  }
-  return cleaned;
-};
-const API_URL = formatUrl(rawApiUrl);
+import { fetchLatestBaileysVersion } from 'baileys';
+import { logger } from './logger.js';
+import { SESSIONS_DIR, PORT, API_KEY } from './config.js';
+import { fetchActiveBots } from './services/api.js';
+import { notifyWebhook } from './services/webhook.js';
+import { setupWebSockets, broadcast } from './server/websocket.js';
+import { setupRoutes } from './server/routes.js';
+import { 
+  overrideManagerCreateBot, 
+  bindManagerEventsToBroadcast,
+  createAiFlow,
+  setupProviderListeners
+} from './providers/manager.js';
 
 // Asegurar la creación del directorio de sesiones para volumen persistente
 if (!fs.existsSync(SESSIONS_DIR)) {
@@ -43,503 +34,6 @@ if (!fs.existsSync(SESSIONS_DIR)) {
 } else {
   logger.info(`📂 [BotEngine] Directorio de sesiones listo en: ${path.resolve(SESSIONS_DIR)}`);
 }
-
-// Obtenemos dinámicamente la última versión soportada por las APIs de WhatsApp Web
-const { version } = await fetchLatestBaileysVersion();
-logger.info(`🌐 [Baileys] Versión de WhatsApp Web obtenida de servidores oficiales: ${version.join('.')}`);
-
-// Helpers para formatear extracción de texto y teléfonos de WhatsApp
-const extractMessageText = (payload: any): string => {
-  if (!payload) return '';
-  if (typeof payload === 'string') return payload;
-  if (payload.body && typeof payload.body === 'string') return payload.body;
-  const msg = payload.message || payload;
-  if (typeof msg === 'string') return msg;
-  return (
-    msg?.conversation ||
-    msg?.extendedTextMessage?.text ||
-    msg?.imageMessage?.caption ||
-    msg?.videoMessage?.caption ||
-    msg?.documentMessage?.caption ||
-    msg?.buttonsResponseMessage?.selectedButtonId ||
-    msg?.listResponseMessage?.singleSelectReply?.selectedRowId ||
-    ''
-  );
-};
-
-const cleanPhoneNumber = (raw: string): string => {
-  if (!raw) return '';
-  return raw.replace(/@.*$/, '').replace(/:.*$/, '').replace(/[^\d]/g, '');
-};
-
-// --- Helper HTTP con Timeouts y Reintentos ---
-const fetchWithRetry = async (url: string, options: RequestInit, retries = 2, timeoutMs = 8000) => {
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const res = await fetch(url, { ...options, signal: controller.signal });
-      clearTimeout(timeoutId);
-      if (res.ok) return res;
-      if (res.status >= 500 && attempt < retries) {
-        logger.warn(`⚠️ [HTTP] Status ${res.status} en ${url}. Reintentando (${attempt + 1}/${retries})...`);
-        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt))); // Exponential backoff
-        continue;
-      }
-      return res;
-    } catch (err: any) {
-      clearTimeout(timeoutId);
-      const isTimeout = err.name === 'AbortError';
-      logger.warn(`⚠️ [HTTP] ${isTimeout ? 'Timeout' : 'Error'} en ${url}. Intento ${attempt + 1}/${retries}`);
-      if (attempt >= retries) throw err;
-      await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
-    }
-  }
-  throw new Error('Max retries reached');
-};
-
-// --- Factory de flujos IA por tenant ---
-// Flujo inerte para cumplir con el requisito de BuilderBot de tener al menos un flujo.
-// No atrapamos EVENTS.WELCOME para evitar que BuilderBot secuestre notas de voz o documentos.
-// Todo el procesamiento se hará a nivel nativo en provider.on('message')
-const createAiFlow = (tenantId: string) => {
-  return addKeyword('__IGNORE_THIS_FLOW__')
-    .addAction(async (ctx: any, { flowDynamic }: { flowDynamic: any }) => {
-      // No hace nada
-    });
-};
-
-// 1. Inicializar Orquestador de Instancias Multi-tenant
-const manager = new BotManager({
-  sessionsDir: SESSIONS_DIR,
-  defaultProviderClass: BaileysProvider as any,
-  defaultProviderOptions: {
-    version,
-    writeLog: true,
-  },
-});
-
-// Interceptar la creación de cada bot para soporte multi-proveedor (Baileys / Meta Cloud API)
-const originalCreateBot = manager.createBot.bind(manager);
-manager.createBot = async (tenantConfig: any) => {
-  logger.info(`🚀 [BotEngine] Configurando proveedor para Tenant: ${tenantConfig.tenantId} (Proveedor: ${tenantConfig.provider || 'baileys'})...`);
-
-  // Selección dinámica de clase de proveedor y opciones
-  if (tenantConfig.provider === 'meta') {
-    tenantConfig.providerClass = MetaProvider as any;
-    tenantConfig.providerOptions = {
-      jwtToken: tenantConfig.metaJwtToken || process.env.META_JWT_TOKEN || '',
-      numberId: tenantConfig.metaNumberId || process.env.META_NUMBER_ID || '',
-      verifyToken: tenantConfig.metaVerifyToken || process.env.META_VERIFY_TOKEN || '',
-      version: tenantConfig.metaVersion || 'v18.0',
-      port: PORT,
-    };
-  } else {
-    // Proveedor por defecto: Baileys (Código QR / Pairing Code)
-    tenantConfig.providerClass = BaileysProvider as any;
-    if (!tenantConfig.providerOptions) {
-      tenantConfig.providerOptions = {};
-    }
-    tenantConfig.providerOptions.version = version;
-  }
-
-  // Inyectar flujo dinámico con tenantId en closure si no trae flujos
-  if (!tenantConfig.flows || tenantConfig.flows.length === 0) {
-    tenantConfig.flows = [createAiFlow(tenantConfig.tenantId)];
-  }
-
-  const botInstance = await originalCreateBot(tenantConfig);
-
-  const provider = botInstance.provider;
-  if (provider && tenantConfig.provider !== 'meta') {
-    // Escuchar el evento 'require_action' nativo de BaileysProvider que entrega el payload del QR o Pairing Code
-    provider.on('require_action', async (actionData: any) => {
-      const qrStr = actionData?.payload?.qr;
-      const codeStr = actionData?.payload?.code;
-      logger.info(`⚡ [Baileys Native Event] 'require_action' recibido para Tenant ${tenantConfig.tenantId}. String QR: ${!!qrStr}, Code: ${codeStr || 'N/A'}`);
-      if (qrStr) {
-        (manager as any).emit('bot:qr', tenantConfig.tenantId, { qr: qrStr });
-      }
-      if (codeStr) {
-        (manager as any).emit('bot:code', tenantConfig.tenantId, { code: codeStr });
-      }
-    });
-
-    provider.on('qr', (qrStr: string) => {
-      logger.info(`⚡ [Baileys Native Event] 'qr' directo recibido para Tenant ${tenantConfig.tenantId}`);
-      if (qrStr) {
-        (manager as any).emit('bot:qr', tenantConfig.tenantId, { qr: qrStr });
-      }
-    });
-
-    provider.on('ready', (data: any) => {
-      logger.info(`🎉 [Baileys Native Event] 'ready' recibido para Tenant ${tenantConfig.tenantId}:`, data);
-      (manager as any).emit('bot:connected', tenantConfig.tenantId);
-    });
-
-    provider.on('host', (data: any) => {
-      logger.info(`🎉 [Baileys Native Event] 'host' recibido para Tenant ${tenantConfig.tenantId}:`, data);
-      (manager as any).emit('bot:connected', tenantConfig.tenantId);
-    });
-
-    provider.on('message', async (payload: any) => {
-      const rawFrom = payload?.from || payload?.key?.remoteJid || '';
-      const cleanFrom = cleanPhoneNumber(rawFrom);
-      // Ignorar mensajes salientes o de broadcast
-      if (!cleanFrom || rawFrom.includes('status@broadcast') || payload?.key?.fromMe) return;
-
-      const msgContent = payload?.message || {};
-      const isAudio = !!(msgContent.audioMessage || msgContent.pttMessage);
-      const isDocument = !!(msgContent.documentMessage || msgContent.documentWithCaptionMessage);
-      
-      let bodyText = extractMessageText(payload);
-
-      // 🎙️ A. Procesar Nota de Voz vía OpenAI Whisper (descarga nativa de Baileys)
-      if (isAudio) {
-        logger.info(`🎙️ [Baileys Audio] Recibida nota de voz de ${cleanFrom}...`);
-        try {
-          // Descargar media directamente con Baileys nativo (no depende de BuilderBot)
-          const audioBuffer = await downloadMediaMessage(payload, 'buffer', {}) as Buffer;
-          
-          if (audioBuffer && audioBuffer.length > 0) {
-            logger.info(`🎙️ [Baileys Audio] Descargados ${audioBuffer.length} bytes de audio.`);
-            const audioBase64 = audioBuffer.toString('base64');
-            
-            // /ai/transcribe-voice ya transcribe Y genera respuesta de IA (chatWithContext)
-            const voiceRes = await fetchWithRetry(`${API_URL}/ai/transcribe-voice`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
-              body: JSON.stringify({ tenantId: tenantConfig.tenantId, customerPhone: cleanFrom, audioBase64 }),
-            }, 1, 15000); // Timeout largo para transcripción
-            
-            if (voiceRes.ok) {
-              const voiceData = await voiceRes.json();
-              
-              // Emitir al Live Chat el texto transcrito
-              if (voiceData.transcribedText) {
-                (manager as any).emit('bot:message', tenantConfig.tenantId, {
-                  from: cleanFrom,
-                  body: `🎙️ ${voiceData.transcribedText}`,
-                  name: payload?.pushName || payload?.name || cleanFrom,
-                  timestamp: Date.now()
-                });
-              }
-              
-              // Enviar la respuesta de la IA (ya generada por transcribe-voice)
-              if (voiceData.reply && !voiceData.isHumanMode && typeof provider.sendMessage === 'function') {
-                logger.info(`🤖 [BotEngine Voice Reply] Respondiendo a ${cleanFrom}: "${voiceData.reply}"`);
-                await provider.sendMessage(cleanFrom, voiceData.reply, {});
-              }
-            } else {
-              logger.warn(`⚠️ [BotEngine] transcribe-voice HTTP ${voiceRes.status}`);
-            }
-            return; // Procesado como audio, no continuar al flujo de texto
-          }
-        } catch (audioErr) {
-          logger.error('❌ Error procesando mensaje de voz:', audioErr);
-        }
-      }
-
-      // 📄 B. Procesar Ingesta de Documentos vía RAG (descarga nativa de Baileys)
-      if (isDocument) {
-        const docMsg = msgContent.documentMessage || msgContent.documentWithCaptionMessage?.message?.documentMessage;
-        const docTitle = docMsg?.fileName || 'Documento_WhatsApp.txt';
-        logger.info(`📄 [Baileys Document] Recibido archivo "${docTitle}" de ${cleanFrom}...`);
-        try {
-          const docBuffer = await downloadMediaMessage(payload, 'buffer', {}) as Buffer;
-          
-          if (docBuffer && docBuffer.length > 0) {
-            logger.info(`📄 [Baileys Document] Descargados ${docBuffer.length} bytes del documento.`);
-            const docContent = docBuffer.toString('utf-8');
-            
-            const docRes = await fetchWithRetry(`${API_URL}/rag/process-whatsapp-file`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
-              body: JSON.stringify({ tenantId: tenantConfig.tenantId, title: docTitle, content: docContent }),
-            }, 1, 15000);
-            
-            if (docRes.ok) {
-              const docData = await docRes.json();
-              const ackReply = `📄 He recibido e indexado el documento "${docTitle}" (${docData.chunksProcessed} fragmentos aprendidos). Ya puedo responder preguntas sobre su contenido.`;
-              if (typeof provider.sendMessage === 'function') {
-                await provider.sendMessage(cleanFrom, ackReply, {});
-              }
-            } else {
-              logger.warn(`⚠️ [BotEngine] process-whatsapp-file HTTP ${docRes.status}`);
-              if (typeof provider.sendMessage === 'function') {
-                await provider.sendMessage(cleanFrom, 'Recibí tu documento pero ocurrió un error al procesarlo. Por favor inténtalo de nuevo.', {});
-              }
-            }
-            return; // Procesado como documento, no continuar al flujo de texto
-          }
-        } catch (docErr) {
-          logger.error('❌ Error procesando documento de WhatsApp:', docErr);
-        }
-      }
-
-      // Ignorar si al final no hay texto (ni nativo ni transcrito)
-      if (!bodyText) return;
-
-      logger.info(`📩 [Baileys Incoming Message] Tenant: ${tenantConfig.tenantId}, From: ${cleanFrom} (${rawFrom}), Body: "${bodyText}"`);
-
-      // 1. Emitir evento WebSocket para actualizar Live Chat
-      (manager as any).emit('bot:message', tenantConfig.tenantId, {
-        from: cleanFrom,
-        body: bodyText,
-        name: payload?.pushName || payload?.name || cleanFrom,
-        timestamp: Date.now()
-      });
-
-      // 2. Procesar mensaje con NestJS AI API
-      try {
-        const response = await fetchWithRetry(`${API_URL}/ai/chat-with-context`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': API_KEY,
-          },
-          body: JSON.stringify({
-            tenantId: tenantConfig.tenantId,
-            customerPhone: cleanFrom,
-            message: bodyText,
-          }),
-        }, 2, 8000); // 2 reintentos, 8s timeout
-
-        if (response.ok) {
-          const data = await response.json();
-          if (data.isHumanMode) {
-            logger.info(`✋ [BotEngine] Modo humano activo para ${cleanFrom}. Ignorando IA.`);
-            return;
-          }
-          if (data.reply && typeof provider.sendMessage === 'function') {
-            logger.info(`🤖 [BotEngine] Respondiendo a ${cleanFrom}: "${data.reply}"`);
-            try {
-              await provider.sendMessage(cleanFrom, data.reply, {});
-            } catch (sendErr: any) {
-              const errMsg = sendErr?.message || String(sendErr);
-              const statusCode = sendErr?.output?.statusCode || sendErr?.data?.statusCode;
-              if (errMsg.includes('Connection Closed') || statusCode === 428) {
-                logger.warn(`⚠️ [BotEngine] La conexión de WhatsApp se cerró (428).`);
-                (manager as any).emit('bot:disconnected', tenantConfig.tenantId);
-              } else {
-                logger.error(`❌ [BotEngine] Error al enviar mensaje con Baileys:`, sendErr);
-              }
-            }
-          }
-        } else {
-          logger.warn(`⚠️ [BotEngine] Respuesta HTTP ${response.status} desde /ai/chat-with-context`);
-          if (typeof provider.sendMessage === 'function') {
-            await provider.sendMessage(cleanFrom, 'Estoy teniendo intermitencias técnicas en este momento, por favor intenta en unos minutos.', {});
-          }
-        }
-      } catch (err) {
-        logger.error('❌ Error al enviar mensaje entrante a AI API:', err);
-        if (typeof provider.sendMessage === 'function') {
-          await provider.sendMessage(cleanFrom, 'Disculpa, mi sistema central está tardando en responder. Vuelve a escribirme en breve.', {});
-        }
-      }
-    });
-
-    // Forzar inicio del proveedor vendor de Baileys
-    if (typeof provider.initVendor === 'function') {
-      try {
-        logger.info(`🔄 [BotEngine] Invocando initVendor() explícitamente para Tenant: ${tenantConfig.tenantId}...`);
-        await provider.initVendor();
-      } catch (err) {
-        logger.warn(`⚠️  [BotEngine] Advertencia durante initVendor() para Tenant ${tenantConfig.tenantId}:`, err);
-      }
-    }
-  }
-
-  return botInstance;
-};
-
-// 2. Inicializar Servidor de API REST para el Manager
-const managerApi = new BotManagerApi(manager, {
-  port: PORT,
-  apiKey: API_KEY,
-} as any);
-
-// 3. Iniciar el servidor HTTP Polka
-managerApi.start();
-
-// 4. Adjuntar el servidor de WebSockets con Aislamiento Multi-tenant
-const httpServer = (managerApi as any).app?.server;
-interface TenantWebSocket extends WebSocket {
-  tenantId?: string;
-}
-
-const connectedClients = new Set<TenantWebSocket>();
-
-if (httpServer) {
-  const wss = new WebSocketServer({ server: httpServer });
-
-  wss.on('connection', (ws: TenantWebSocket, req) => {
-    // Extraer tenantId del URL params (ejemplo: ws://host:port/?tenantId=abc-123)
-    const urlString = req.url || '';
-    const queryParams = new URLSearchParams(urlString.includes('?') ? urlString.split('?')[1] : '');
-    const clientTenantId = queryParams.get('tenantId') || undefined;
-
-    ws.tenantId = clientTenantId;
-    connectedClients.add(ws);
-    logger.info(`📡 [WebSocket] Cliente conectado (Tenant Scoped: ${clientTenantId || 'Global'})`);
-
-    ws.on('close', () => {
-      logger.info(`🔌 [WebSocket] Cliente desconectado (Tenant: ${ws.tenantId || 'Global'})`);
-      connectedClients.delete(ws);
-    });
-
-    ws.on('error', (err) => {
-      logger.error('❌ [WebSocket Error en Cliente]:', err);
-    });
-  });
-  logger.info(`🚀 [Bot Engine Worker] REST API & WebSockets compartiendo el puerto ${PORT}`);
-} else {
-  logger.error('❌ [Bot Engine Error] No se pudo obtener el servidor HTTP para adjuntar WebSockets.');
-}
-
-const broadcast = (data: { tenantId?: string; [key: string]: any }) => {
-  const payload = JSON.stringify(data);
-  for (const client of connectedClients) {
-    if (client.readyState === WebSocket.OPEN) {
-      // Filtrar el envío: enviar si el mensaje es global o si el tenantId del cliente coincide
-      if (!data.tenantId || !client.tenantId || client.tenantId === data.tenantId) {
-        client.send(payload);
-      }
-    }
-  }
-};
-
-// 5. Suscribirse a eventos del Manager y generar QR DataURL oficial de Baileys
-manager.on('bot:qr', async (tenantId: string, data: any) => {
-  logger.info(`⚡ [BotManager Event] Evento 'bot:qr' disparado para Tenant: ${tenantId}`);
-  let qrImageBase64 = data.qr;
-
-  if (!data || !data.qr) {
-    logger.error(`❌ [BotManager Error] Se recibió un evento 'bot:qr' pero el payload 'data.qr' está vacío para Tenant: ${tenantId}`);
-    broadcast({
-      event: 'bot:error',
-      tenantId,
-      error: 'El payload del código QR está vacío.',
-    });
-    return;
-  }
-
-  // Convertir string de Baileys a DataURL PNG Base64
-  if (typeof data.qr === 'string' && !data.qr.startsWith('data:image')) {
-    try {
-      qrImageBase64 = await QRCode.toDataURL(data.qr, {
-        margin: 2,
-        scale: 8,
-        errorCorrectionLevel: 'M',
-      });
-      logger.info(`✅ [BotManager Success] String de Baileys convertido a PNG Base64 para Tenant: ${tenantId}`);
-    } catch (err) {
-      logger.error(`❌ [BotManager Error] Falló la conversión de QR string a DataURL para Tenant ${tenantId}:`, err);
-      broadcast({
-        event: 'bot:error',
-        tenantId,
-        error: `Error procesando imagen QR: ${(err as Error).message}`,
-      });
-      return;
-    }
-  }
-
-  broadcast({
-    event: 'bot:qr',
-    tenantId,
-    qr: qrImageBase64,
-  });
-  logger.info(`📡 [BotManager WebSocket] Evento 'bot:qr' emitido a clientes autorizados para Tenant ${tenantId}`);
-});
-
-(manager as any).on('bot:code', (tenantId: string, data: any) => {
-  logger.info(`📱 [BotManager Event] Evento 'bot:code' disparado para Tenant: ${tenantId}, Code: ${data?.code}`);
-  broadcast({
-    event: 'bot:code',
-    tenantId,
-    code: data?.code,
-  });
-});
-
-manager.on('bot:connected', (tenantId: string) => {
-  logger.info(`🎉 [BotManager Event] WhatsApp Conectado exitosamente para Tenant: ${tenantId}`);
-  broadcast({
-    event: 'bot:connected',
-    tenantId,
-    status: 'CONNECTED',
-  });
-});
-
-manager.on('bot:disconnected', (tenantId: string) => {
-  logger.info(`⚠️ [BotManager Event] WhatsApp Desconectado para Tenant: ${tenantId}`);
-  broadcast({
-    event: 'bot:disconnected',
-    tenantId,
-    status: 'DISCONNECTED',
-  });
-});
-
-(manager as any).on('bot:message', (tenantId: string, data: any) => {
-  logger.info(`📡 [BotManager Event] bot:message para ${tenantId}:`, data);
-  broadcast({
-    event: 'bot:message',
-    tenantId,
-    ...data,
-  });
-});
-
-(manager as any).on('error', (err: any) => {
-  logger.error('💥 [BotManager Global Error]:', err);
-  broadcast({
-    event: 'bot:error',
-    error: typeof err === 'string' ? err : err?.message || 'Error interno en BotManager',
-  });
-});
-
-// --- 6. Sincronización Webhook y Rehidratación ---
-const notifyWebhook = async (payload: any) => {
-  try {
-    const res = await fetch(`${API_URL}/bots/internal/webhook`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': API_KEY,
-      },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) {
-      logger.warn(`⚠️ [Webhook] Error ${res.status} al notificar ${payload.event} para ${payload.tenantId}`);
-    }
-  } catch (err) {
-    logger.warn(`⚠️ [Webhook] Fallo de conexión al notificar ${payload.event}: ${err}`);
-  }
-};
-
-// Hookear eventos para Webhook
-manager.on('bot:qr', (tenantId, data) => notifyWebhook({ event: 'bot:qr', tenantId, qr: typeof data?.qr === 'string' && data.qr.startsWith('data:image') ? data.qr : null }));
-manager.on('bot:connected', (tenantId) => notifyWebhook({ event: 'connected', tenantId }));
-manager.on('bot:disconnected', (tenantId) => notifyWebhook({ event: 'disconnected', tenantId }));
-(manager as any).on('error', (err: any) => notifyWebhook({ event: 'error', error: err?.message || 'Error' }));
-
-// --- 6.5 Configurar manejo de error de auth para BotInstances
-const setupProviderListeners = (botInstance: any, tenantId: string) => {
-  if (!botInstance || !botInstance.provider) return;
-  botInstance.provider.on('auth_failure', async (err: any) => {
-    logger.error(`💥 [BotEngine] Error crítico de Auth (auth_failure) para ${tenantId}:`, err);
-    try {
-      await manager.removeBot(tenantId).catch(() => {});
-      const tenantSessionDir = path.join(SESSIONS_DIR, tenantId);
-      if (fs.existsSync(tenantSessionDir)) {
-        fs.rmSync(tenantSessionDir, { recursive: true, force: true });
-        logger.info(`🧹 [BotEngine] Caché limpia para ${tenantId} debido a auth_failure.`);
-      }
-      notifyWebhook({ event: 'disconnected', tenantId });
-    } catch (e) {
-      logger.error(`Error al limpiar sesión tras auth_failure de ${tenantId}:`, e);
-    }
-  });
-};
 
 // 7. Rehidratación (Arranque de Bots Activos) y Limpieza de Caché Huérfano
 const cleanOrphanSessions = (activeTenantIds: string[]) => {
@@ -560,402 +54,85 @@ const cleanOrphanSessions = (activeTenantIds: string[]) => {
   }
 };
 
-const rehydrateBots = async () => {
-  logger.info('🔄 [BotEngine] Iniciando rehidratación de bots y limpieza de caché...');
-  try {
-    const res = await fetch(`${API_URL}/bots/internal/active-bots`, {
-      headers: { 'x-api-key': API_KEY },
-    });
-    if (res.ok) {
-      const bots = await res.json();
-      const activeTenantIds = bots.map((b: any) => b.tenantId).filter(Boolean);
-      
-      // Limpiar de disco cualquier sesión de bots que ya fueron eliminados de la BD
-      cleanOrphanSessions(activeTenantIds);
+const main = async () => {
+  const { version } = await fetchLatestBaileysVersion();
 
-      logger.info(`🔄 [BotEngine] Encontrados ${bots.length} bots activos para rehidratar.`);
-      for (const bot of bots) {
-        if (bot.tenantId) {
-          try {
-            logger.info(`🔄 [BotEngine] Rehidratando ${bot.tenantId}...`);
-            const botInstance = await manager.createBot({ tenantId: bot.tenantId, flows: [createAiFlow(bot.tenantId)] });
-            setupProviderListeners(botInstance, bot.tenantId);
-          } catch (err) {
-            logger.error(`❌ [BotEngine] Error rehidratando ${bot.tenantId}:`, err);
+  // 1. Inicializar Orquestador de Instancias Multi-tenant
+  const manager = new BotManager({
+    sessionsDir: SESSIONS_DIR,
+    defaultProviderClass: BaileysProvider as any,
+    defaultProviderOptions: {
+      version,
+      writeLog: true,
+    },
+  });
+
+  // Interceptar la creación de cada bot para soporte multi-proveedor (Baileys / Meta Cloud API)
+  await overrideManagerCreateBot(manager);
+
+  // 2. Inicializar Servidor de API REST para el Manager
+  const managerApi = new BotManagerApi(manager, {
+    port: PORT,
+    apiKey: API_KEY,
+  } as any);
+
+  // 3. Iniciar el servidor HTTP Polka
+  managerApi.start();
+
+  // 4. Adjuntar el servidor de WebSockets con Aislamiento Multi-tenant
+  const httpServer = (managerApi as any).app?.server;
+  setupWebSockets(httpServer);
+
+  // 5. Suscribirse a eventos del Manager y generar QR DataURL oficial de Baileys
+  bindManagerEventsToBroadcast(manager, broadcast);
+
+  // 6. Sincronización Webhook y Rehidratación
+  manager.on('bot:qr', (tenantId: string, data: any) => notifyWebhook({ event: 'bot:qr', tenantId, qr: typeof data?.qr === 'string' && data.qr.startsWith('data:image') ? data.qr : null }));
+  manager.on('bot:connected', (tenantId: string) => notifyWebhook({ event: 'connected', tenantId }));
+  manager.on('bot:disconnected', (tenantId: string) => notifyWebhook({ event: 'disconnected', tenantId }));
+  (manager as any).on('error', (err: any) => notifyWebhook({ event: 'error', error: err?.message || 'Error' }));
+
+  // 8. Endpoints Custom sobre Polka
+  if ((managerApi as any).app) {
+    setupRoutes((managerApi as any).app, manager);
+  }
+
+  // Ejecutar Rehidratación de bots
+  const rehydrateBots = async () => {
+    logger.info('🔄 [BotEngine] Iniciando rehidratación de bots y limpieza de caché...');
+    try {
+      const res = await fetchActiveBots();
+      if (res.ok) {
+        const bots = await res.json();
+        const activeTenantIds = bots.map((b: any) => b.tenantId).filter(Boolean);
+        
+        // Limpiar de disco cualquier sesión de bots que ya fueron eliminados de la BD
+        cleanOrphanSessions(activeTenantIds);
+
+        logger.info(`🔄 [BotEngine] Encontrados ${bots.length} bots activos para rehidratar.`);
+        for (const bot of bots) {
+          if (bot.tenantId) {
+            try {
+              logger.info(`🔄 [BotEngine] Rehidratando ${bot.tenantId}...`);
+              const botInstance = await manager.createBot({ tenantId: bot.tenantId, flows: [createAiFlow(bot.tenantId)] });
+              setupProviderListeners(manager, botInstance, bot.tenantId);
+            } catch (err) {
+              logger.error(`❌ [BotEngine] Error rehidratando ${bot.tenantId}:`, err);
+            }
           }
         }
+      } else {
+        logger.warn(`⚠️ [BotEngine] No se pudieron obtener bots activos (HTTP ${res.status})`);
       }
-    } else {
-      logger.warn(`⚠️ [BotEngine] No se pudieron obtener bots activos (HTTP ${res.status})`);
+    } catch (err) {
+      logger.warn('⚠️ [BotEngine] API inaccesible para rehidratación:', err);
     }
-  } catch (err) {
-    logger.warn('⚠️ [BotEngine] API inaccesible para rehidratación:', err);
-  }
+  };
+
+  setTimeout(rehydrateBots, 3000); // Esperar 3s antes de rehidratar
 };
 
-setTimeout(rehydrateBots, 3000); // Esperar 3s antes de rehidratar
-
-// 8. Endpoints Custom sobre Polka
-if ((managerApi as any).app) {
-  const app = (managerApi as any).app;
-
-  // Habilitar CORS global para permitir peticiones directas desde el Frontend (ej. generar QR o desconectar)
-  app.use(cors({
-    origin: true,
-    methods: ['GET', 'POST', 'OPTIONS', 'PUT', 'PATCH', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'Accept'],
-    credentials: true
-  }));
-
-  app.post('/internal/start', async (req: any, res: any) => {
-    const processRequest = async (bodyStr: string) => {
-      try {
-        const authHeader = req.headers['authorization'] || '';
-        const apiKey = authHeader.replace('Bearer ', '').trim() || req.headers['x-api-key'];
-        if (apiKey !== API_KEY) {
-          res.statusCode = 401;
-          return res.end(JSON.stringify({ error: 'Unauthorized' }));
-        }
-
-        const data = req.body && Object.keys(req.body).length > 0 ? req.body : JSON.parse(bodyStr || '{}');
-        const { tenantId, name } = data;
-
-        if (!tenantId) {
-          res.statusCode = 400;
-          return res.end(JSON.stringify({ error: 'Missing tenantId' }));
-        }
-
-        // Si ya existe la instancia, la removemos en lugar de retornar 409
-        if (manager.getBot(tenantId)) {
-          logger.info(`🔄 [BotEngine] Bot ${tenantId} ya existía. Removiendo previa para generar QR nuevo (evitando 409)...`);
-          await manager.removeBot(tenantId).catch(() => {});
-        }
-
-        const botInstance = await manager.createBot({
-          tenantId,
-          name: name || tenantId,
-          flows: [createAiFlow(tenantId)],
-        });
-        setupProviderListeners(botInstance, tenantId);
-
-        res.statusCode = 200;
-        return res.end(JSON.stringify({ success: true, tenantId }));
-      } catch (err: any) {
-        logger.error('❌ [BotEngine /internal/start Error]:', err);
-        res.statusCode = 500;
-        return res.end(JSON.stringify({ error: err?.message || String(err) }));
-      }
-    };
-
-    if (req.body && Object.keys(req.body).length > 0) {
-      await processRequest('');
-    } else {
-      let body = '';
-      req.on('data', (chunk: any) => body += chunk.toString());
-      req.on('end', () => processRequest(body));
-    }
-  });
-
-  // Helper para leer body de req dinámicamente
-  const getParsedBody = async (req: any) => {
-    if (req.body && typeof req.body === 'object' && Object.keys(req.body).length > 0) {
-      return req.body;
-    }
-    if (typeof req.body === 'string' && req.body.trim()) {
-      try { return JSON.parse(req.body); } catch (e) {}
-    }
-    return new Promise<any>((resolve) => {
-      let raw = '';
-      req.on('data', (chunk: any) => raw += chunk.toString());
-      req.on('end', () => {
-        try { resolve(JSON.parse(raw || '{}')); } catch (e) { resolve({}); }
-      });
-      if (req.readableEnded || req.complete) {
-        try { resolve(JSON.parse(raw || '{}')); } catch (e) { resolve({}); }
-      }
-    });
-  };
-
-  // Endpoint Manual Send Message
-  app.post('/internal/send-message', async (req: any, res: any) => {
-    try {
-      const apiKey = req.headers['x-api-key'];
-      if (apiKey !== API_KEY) {
-        res.statusCode = 401;
-        return res.end(JSON.stringify({ error: 'Unauthorized' }));
-      }
-
-      const data = await getParsedBody(req);
-      const { tenantId, customerPhone, message } = data;
-
-      if (!tenantId || !customerPhone || !message) {
-        res.statusCode = 400;
-        return res.end(JSON.stringify({ error: 'Missing params', received: data }));
-      }
-
-      const botInstance = manager.getBot(tenantId);
-      if (!botInstance) {
-        res.statusCode = 404;
-        return res.end(JSON.stringify({ error: 'Bot not found or not connected' }));
-      }
-
-      const provider = botInstance.provider as any;
-      if (typeof provider.sendMessage === 'function') {
-        await provider.sendMessage(customerPhone, message, {});
-        res.statusCode = 200;
-        return res.end(JSON.stringify({ success: true }));
-      } else {
-        res.statusCode = 500;
-        return res.end(JSON.stringify({ error: 'Provider does not support sendMessage directly' }));
-      }
-    } catch (err) {
-      res.statusCode = 500;
-      return res.end(JSON.stringify({ error: String(err) }));
-    }
-  });
-
-  // Endpoint para enviar Documentos, Informes o Formularios por WhatsApp
-  app.post('/internal/send-document', async (req: any, res: any) => {
-    try {
-      const apiKey = req.headers['x-api-key'];
-      if (apiKey !== API_KEY) {
-        res.statusCode = 401;
-        return res.end(JSON.stringify({ error: 'Unauthorized' }));
-      }
-
-      const data = await getParsedBody(req);
-      const { tenantId, customerPhone, documentTitle, documentContent } = data;
-
-      if (!tenantId || !customerPhone || !documentContent) {
-        res.statusCode = 400;
-        return res.end(JSON.stringify({ error: 'Missing params', received: data }));
-      }
-
-      const botInstance = manager.getBot(tenantId);
-      if (!botInstance) {
-        res.statusCode = 404;
-        return res.end(JSON.stringify({ error: 'Bot not found or not connected' }));
-      }
-
-      const provider = botInstance.provider as any;
-      const formattedDocText = `📄 *DOCUMENTO GENERADO: ${documentTitle || 'Informe / Formulario'}*\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n${documentContent}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n_Generado automáticamente por miBot_`;
-
-      if (typeof provider.sendMessage === 'function') {
-        await provider.sendMessage(customerPhone, formattedDocText, {});
-        res.statusCode = 200;
-        return res.end(JSON.stringify({ success: true, message: 'Documento enviado con éxito por WhatsApp' }));
-      } else {
-        res.statusCode = 500;
-        return res.end(JSON.stringify({ error: 'Provider does not support sendMessage' }));
-      }
-    } catch (err) {
-      res.statusCode = 500;
-      return res.end(JSON.stringify({ error: String(err) }));
-    }
-  });
-
-  // Endpoint de Prueba Simulación de Mensaje Entrante
-  app.post('/internal/test-message', async (req: any, res: any) => {
-    try {
-      const apiKey = req.headers['x-api-key'];
-      if (apiKey !== API_KEY) {
-        res.statusCode = 401;
-        return res.end(JSON.stringify({ error: 'Unauthorized' }));
-      }
-      const data = await getParsedBody(req);
-      const botInstance = manager.getBot(data.tenantId);
-      if (botInstance && botInstance.provider) {
-        botInstance.provider.emit('message', {
-          from: data.phone || '1234567890',
-          body: data.message || 'hola',
-          message: { conversation: data.message || 'hola' }
-        });
-        res.statusCode = 200;
-        return res.end(JSON.stringify({ success: true, text: 'emitted' }));
-      }
-      res.statusCode = 404;
-      return res.end(JSON.stringify({ error: 'Bot not found' }));
-    } catch (err) {
-      res.statusCode = 500;
-      return res.end(JSON.stringify({ error: String(err) }));
-    }
-  });
-
-  // Endpoint para obtener estado de un bot
-  app.get('/internal/bot-status/:tenantId', async (req: any, res: any) => {
-    try {
-      const apiKey = req.headers['x-api-key'];
-      if (apiKey !== API_KEY) {
-        res.statusCode = 401;
-        return res.end(JSON.stringify({ error: 'Unauthorized' }));
-      }
-
-      const tenantId = req.params?.tenantId || '';
-      const botInstance = manager.getBot(tenantId);
-
-      if (!botInstance) {
-        res.statusCode = 200;
-        return res.end(JSON.stringify({ status: 'NOT_RUNNING', tenantId }));
-      }
-
-      res.statusCode = 200;
-      return res.end(JSON.stringify({
-        status: botInstance.status || 'unknown',
-        tenantId,
-        isConnected: botInstance.status === 'connected',
-      }));
-    } catch (err) {
-      res.statusCode = 500;
-      return res.end(JSON.stringify({ error: String(err) }));
-    }
-  });
-
-  // Helper para eliminar archivos de sesión en disco
-  const cleanSessionFiles = (tenantId: string) => {
-    try {
-      if (!fs.existsSync(SESSIONS_DIR)) return;
-      const files = fs.readdirSync(SESSIONS_DIR);
-      for (const file of files) {
-        if (file.includes(tenantId)) {
-          const fullPath = path.join(SESSIONS_DIR, file);
-          fs.rmSync(fullPath, { recursive: true, force: true });
-          logger.info(`🗑️ [SessionClean] Sesión borrada de disco: ${fullPath}`);
-        }
-      }
-    } catch (err) {
-      logger.warn(`⚠️ Error borrando sesión en disco para ${tenantId}:`, err);
-    }
-  };
-
-  // Endpoint de pairing code (vincular por teléfono)
-  app.post('/internal/pair-phone', async (req: any, res: any) => {
-    const processRequest = async (bodyStr: string) => {
-      try {
-        const apiKey = req.headers['x-api-key'];
-        if (apiKey !== API_KEY) {
-          res.statusCode = 401;
-          return res.end(JSON.stringify({ error: 'Unauthorized' }));
-        }
-
-        const data = req.body && Object.keys(req.body).length > 0 ? req.body : JSON.parse(bodyStr || '{}');
-        const { tenantId, phoneNumber } = data;
-
-        if (!tenantId || !phoneNumber) {
-          res.statusCode = 400;
-          return res.end(JSON.stringify({ error: 'Missing tenantId or phoneNumber' }));
-        }
-
-        const cleanNumber = phoneNumber.replace(/[\s\-\+]/g, '');
-
-        let botInstance = manager.getBot(tenantId);
-        if (botInstance) {
-          logger.info(`📱 [BotEngine] Removiendo bot anterior para pairing code...`);
-          await manager.removeBot(tenantId).catch(() => {});
-        }
-        cleanSessionFiles(tenantId);
-
-        logger.info(`📱 [BotEngine] Creando instancia con pairing code para ${cleanNumber} (Tenant: ${tenantId})...`);
-        
-        botInstance = await manager.createBot({
-          tenantId,
-          flows: [createAiFlow(tenantId)],
-        });
-        setupProviderListeners(botInstance, tenantId);
-
-        const provider = botInstance.provider as any;
-
-        const code = await new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => reject(new Error('Timeout esperando código de Baileys')), 25000);
-          
-          setTimeout(async () => {
-            try {
-               const sock = provider.vendor || provider.socket || provider.sock;
-               if (!sock || !sock.requestPairingCode) {
-                 clearTimeout(timeout);
-                 return reject(new Error('El proveedor de WhatsApp no soporta pairing code'));
-               }
-               const rawCode = await sock.requestPairingCode(cleanNumber);
-               clearTimeout(timeout);
-               resolve(rawCode);
-            } catch (err) {
-               clearTimeout(timeout);
-               reject(err);
-            }
-          }, 3000); // Wait for Baileys WS to connect
-        });
-
-        logger.info(`✅ [BotEngine] Pairing code generado para ${tenantId}: ${code}`);
-        res.statusCode = 200;
-        return res.end(JSON.stringify({ success: true, code }));
-
-      } catch (err: any) {
-        logger.error('❌ [BotEngine] Error generando pairing code:', err);
-        res.statusCode = 500;
-        return res.end(JSON.stringify({ error: err?.message || String(err) }));
-      }
-    };
-
-    if (req.body && Object.keys(req.body).length > 0) {
-      await processRequest('');
-    } else {
-      let body = '';
-      req.on('data', (chunk: any) => body += chunk.toString());
-      req.on('end', () => processRequest(body));
-    }
-  });
-
-  // Endpoint para desconectar un bot y notificar a la API
-  app.post('/internal/disconnect', async (req: any, res: any) => {
-    const processRequest = async (bodyStr: string) => {
-      try {
-        const apiKey = req.headers['x-api-key'];
-        if (apiKey !== API_KEY) {
-          res.statusCode = 401;
-          return res.end(JSON.stringify({ error: 'Unauthorized' }));
-        }
-
-        const data = req.body && Object.keys(req.body).length > 0 ? req.body : JSON.parse(bodyStr || '{}');
-        const { tenantId } = data;
-
-        if (!tenantId) {
-          res.statusCode = 400;
-          return res.end(JSON.stringify({ error: 'Missing tenantId' }));
-        }
-
-        const botInstance = manager.getBot(tenantId);
-        if (botInstance) {
-          const provider = botInstance.provider as any;
-          const sock = provider?.vendor || provider?.globalVendorArgs || provider?.socket || provider?.sock;
-          if (sock && typeof sock.logout === 'function') {
-            try {
-              logger.info(`🚪 [BotEngine] Cerrando sesión WhatsApp (logout) para ${tenantId}...`);
-              await sock.logout();
-            } catch (e) {
-              logger.warn(`⚠️ Error durante sock.logout() para ${tenantId}:`, e);
-            }
-          }
-        }
-
-        const removed = await manager.removeBot(tenantId);
-        cleanSessionFiles(tenantId);
-
-        // Notificar a la API que se desconectó
-        await notifyWebhook({ event: 'disconnected', tenantId });
-
-        res.statusCode = 200;
-        return res.end(JSON.stringify({ success: true, removed }));
-      } catch (err) {
-        res.statusCode = 500;
-        return res.end(JSON.stringify({ error: String(err) }));
-      }
-    };
-
-    if (req.body && Object.keys(req.body).length > 0) {
-      await processRequest('');
-    } else {
-      let body = '';
-      req.on('data', (chunk: any) => body += chunk.toString());
-      req.on('end', () => processRequest(body));
-    }
-  });
-}
+main().catch(err => {
+  logger.error('❌ Error fatal en Bot Engine:', err);
+  process.exit(1);
+});
