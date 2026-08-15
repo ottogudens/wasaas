@@ -188,8 +188,8 @@ export class TenantsController {
     }
 
     if (existingSub) {
-      await this.prisma.subscription.update({
-        where: { id: existingSub.id },
+      await this.prisma.subscription.updateMany({
+        where: { organizationId: id },
         data: {
           plan: dto.plan,
           customPlanName: dto.customPlanName,
@@ -306,7 +306,7 @@ _Generado por miBot SaaS_`,
 
     const subscription = await this.prisma.subscription.findFirst({
       where: { organizationId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { updatedAt: 'desc' },
     });
 
     if (!subscription) {
