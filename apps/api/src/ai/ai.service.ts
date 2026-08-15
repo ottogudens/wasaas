@@ -58,6 +58,70 @@ export class AiService {
   }
 
   /**
+   * Simular interacción con el bot dentro de la app (Playground / Simulador de Pruebas)
+   */
+  async simulateBotResponse(
+    botId: string,
+    organizationId: string,
+    userMessage: string,
+    history: Array<{ role: 'user' | 'assistant'; content: string }> = [],
+    isSuperAdmin: boolean = false,
+  ): Promise<{ reply: string; sources: string[]; model: string }> {
+    const where = isSuperAdmin ? { id: botId } : { id: botId, organizationId };
+    const bot = await this.prisma.botInstance.findFirst({ where });
+    if (!bot) {
+      throw new Error('Bot no encontrado o no pertenece a tu organización.');
+    }
+
+    // 1. Buscar contexto relevante en la base de conocimiento RAG
+    const ragChunks = await this.ragService.searchSimilarChunks(
+      userMessage,
+      bot.organizationId,
+      4,
+      0.25,
+    );
+
+    const contextText = ragChunks.length > 0
+      ? `\n\n[INFORMACIÓN DE CONTEXTO RAG - DOCUMENTOS DE LA EMPRESA]:\n${ragChunks.map(c => c.content).join('\n---\n')}\n\nInstrucción RAG: Utiliza la información de contexto anterior cuando sea relevante para responder con precisión comercial.`
+      : '';
+
+    const systemPrompt = `${bot.systemPrompt || 'Eres un asistente virtual profesional y amable para atención al cliente.'}${contextText}`;
+
+    const formattedHistory = (history || []).slice(-10).map((h) => ({
+      role: h.role as 'user' | 'assistant',
+      content: h.content,
+    }));
+
+    const modelToUse = bot.aiModel || 'gpt-4o-mini';
+
+    try {
+      const response = await this.openai.chat.completions.create({
+        model: modelToUse,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...formattedHistory,
+          { role: 'user', content: userMessage },
+        ],
+        temperature: 0.7,
+        max_tokens: 600,
+      });
+
+      return {
+        reply: response.choices[0]?.message?.content || 'No se pudo generar una respuesta.',
+        sources: ragChunks.map((c) => c.content.slice(0, 80) + '...'),
+        model: modelToUse,
+      };
+    } catch (error) {
+      this.logger.error('Error simulando respuesta del bot:', error);
+      return {
+        reply: 'Lo siento, ocurrió un error procesando tu consulta en el simulador. Revisa que tu API key de OpenAI esté configurada.',
+        sources: [],
+        model: modelToUse,
+      };
+    }
+  }
+
+  /**
    * Chat con contexto completo: historial + RAG + system prompt de BD
    * Usado por el bot-engine para mensajes entrantes de WhatsApp
    */

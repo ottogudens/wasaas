@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Headers, UseGuards, UnauthorizedException } from '@nestjs/common';
+import { Controller, Post, Body, Headers, UseGuards, UnauthorizedException, Param, Req } from '@nestjs/common';
 import { AiService } from './ai.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { SkipThrottle } from '@nestjs/throttler';
@@ -14,6 +14,26 @@ export class AiController {
     if (!apiKey || apiKey !== expectedKey) {
       throw new UnauthorizedException('Invalid API Key');
     }
+  }
+
+  /**
+   * Simular interacción con el bot dentro de la app (Playground / Chat de Prueba)
+   */
+  @Post('simulate/:botId')
+  @UseGuards(JwtAuthGuard)
+  async simulateBot(
+    @Param('botId') botId: string,
+    @Req() req: any,
+    @Body() body: { message: string; history?: Array<{ role: 'user' | 'assistant'; content: string }> }
+  ) {
+    const isSuperAdmin = req.user?.role === 'SUPER_ADMIN';
+    return this.aiService.simulateBotResponse(
+      botId,
+      req.user.organizationId,
+      body.message,
+      body.history || [],
+      isSuperAdmin,
+    );
   }
 
   /**

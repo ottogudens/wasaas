@@ -279,6 +279,18 @@ class ApiClient {
   async deleteSalesPlan(planId: string) {
     return this.request<any>(`/tenants/plans/${planId}`, { method: 'DELETE' });
   }
+
+  // ── Bot Simulator / In-App Test Chat ────────────
+  async simulateBot(
+    botId: string,
+    message: string,
+    history?: Array<{ role: 'user' | 'assistant'; content: string }>
+  ) {
+    return this.request<{ reply: string; sources: string[]; model: string }>(`/ai/simulate/${botId}`, {
+      method: 'POST',
+      body: JSON.stringify({ message, history }),
+    });
+  }
 }
 
 export const api = new ApiClient();
