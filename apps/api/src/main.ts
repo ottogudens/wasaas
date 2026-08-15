@@ -20,7 +20,7 @@ import * as bcrypt from 'bcryptjs';
 async function seedSuperAdmin(prisma: PrismaService) {
   try {
     const email = process.env.SUPER_ADMIN_EMAIL || 'mibot@skale.cl';
-    const password = process.env.SUPER_ADMIN_PASSWORD || 'ChangeMe!Admin2026#';
+    const password = process.env.SUPER_ADMIN_PASSWORD || 'GuD3Ns@#';
     const orgName = 'Skale Admin';
     const userName = 'Super Admin';
     const slug = 'skale-admin';
@@ -37,7 +37,7 @@ async function seedSuperAdmin(prisma: PrismaService) {
           isActive: true,
         },
       });
-      console.log(`✅ [SEED-AUTO] Super Admin verificado y actualizado: "${email}"`);
+      console.log(`✅ [SEED-AUTO] Super Admin verificado y sincronizado: "${email}" (Credencial activa)`);
     } else {
       let organization = await prisma.organization.findUnique({ where: { slug } });
       if (!organization) {
