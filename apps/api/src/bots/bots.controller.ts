@@ -122,6 +122,16 @@ export class BotsController {
     return this.botsService.listConversations(id, req.user.organizationId);
   }
 
+  @Delete(':id/conversations')
+  async clearConversations(@Param('id') id: string, @Req() req: any) {
+    return this.botsService.clearAllConversations(id, req.user.organizationId);
+  }
+
+  @Delete('conversations/:conversationId')
+  async deleteConversation(@Param('conversationId') conversationId: string, @Req() req: any) {
+    return this.botsService.deleteConversation(conversationId, req.user.organizationId);
+  }
+
   @Get('conversations/:conversationId/messages')
   async getMessages(@Param('conversationId') conversationId: string, @Req() req: any) {
     return this.botsService.getConversationMessages(conversationId, req.user.organizationId);

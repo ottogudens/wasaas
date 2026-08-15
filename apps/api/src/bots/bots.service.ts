@@ -227,6 +227,41 @@ export class BotsService {
   }
 
   /**
+   * Vaciar todas las conversaciones de un bot
+   */
+  async clearAllConversations(botId: string, organizationId: string) {
+    await this.getBot(botId, organizationId); // Valida propiedad y existencia
+
+    const deleted = await this.prisma.conversation.deleteMany({
+      where: { botId },
+    });
+
+    this.logger.log(`🧹 ${deleted.count} conversaciones eliminadas para el bot ${botId}`);
+    return { success: true, count: deleted.count };
+  }
+
+  /**
+   * Eliminar una conversación individual
+   */
+  async deleteConversation(conversationId: string, organizationId: string) {
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: { bot: { select: { organizationId: true } } },
+    });
+
+    if (!conversation) throw new NotFoundException('Conversación no encontrada.');
+    if (conversation.bot.organizationId !== organizationId) {
+      throw new ForbiddenException('No tienes acceso a esta conversación.');
+    }
+
+    await this.prisma.conversation.delete({
+      where: { id: conversationId },
+    });
+
+    return { success: true };
+  }
+
+  /**
    * Internal: Get all registered bots for rehydration after restart/deploy
    */
   async getActiveBots() {
@@ -235,7 +270,7 @@ export class BotsService {
     });
   }
 
-  /**
+  /**
    * Internal: Handle webhook events from bot-engine
    */
   async handleWebhook(data: any) {
@@ -361,71 +396,85 @@ export class BotsService {
       throw new ForbiddenException('No tienes acceso a esta conversación.');
     }
 
-    const nextMode = isHumanMode !== undefined ? isHumanMode : !conversation.isHumanMode;
+    const newMode = isHumanMode !== undefined ? isHumanMode : !conversation.isHumanMode;
+
     const updated = await this.prisma.conversation.update({
-      where: { id: conversation.id },
-      data: { isHumanMode: nextMode, updatedAt: new Date() },
+      where: { id: conversationId },
+      data: { isHumanMode: newMode },
     });
 
-    this.logger.log(`👤 Modo Humano ${nextMode ? 'ACTIVADO' : 'DESACTIVADO'} para conversación ${conversation.id}`);
+    this.logger.log(`👤 Modo Humano ${newMode ? 'ACTIVADO' : 'DESACTIVADO'} para conversación ${conversationId} (${conversation.customerPhone})`);
     return updated;
   }
 
   /**
-   * Enviar documento generado por WhatsApp a través del bot-engine.
-   * Este método actúa como proxy server-side para que la INTERNAL_API_KEY
-   * NUNCA salga al navegador del usuario.
+   * Send a Document / Invoicing / Quotation PDF
    */
-  async sendDocument(botId: string, organizationId: string, dto: {
-    customerPhone: string;
-    documentTitle?: string;
-    documentContent: string;
-  }) {
+  async sendDocument(botId: string, organizationId: string, dto: { customerPhone: string; documentTitle?: string; documentContent: string }) {
     const bot = await this.getBot(botId, organizationId);
 
-    const botEngineUrl = process.env.BOT_ENGINE_URL || 'https://whatsapp-service-production-e6f2.up.railway.app';
-    const apiKey = process.env.INTERNAL_API_KEY;
-
-    const res = await fetch(`${botEngineUrl}/internal/send-document`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-      },
-      body: JSON.stringify({
-        tenantId: bot.tenantId,
-        customerPhone: dto.customerPhone,
-        documentTitle: dto.documentTitle,
-        documentContent: dto.documentContent,
-      }),
+    // 1. Buscar o crear la conversación para asociar el mensaje en el historial
+    let conversation = await this.prisma.conversation.findFirst({
+      where: { botId: bot.id, customerPhone: dto.customerPhone },
     });
 
-    if (!res.ok) {
-      const errText = await res.text().catch(() => '');
-      this.logger.error(`Error enviando documento a bot-engine: HTTP ${res.status} — ${errText}`);
-      throw new Error(`Error al enviar documento por WhatsApp: HTTP ${res.status}`);
+    if (!conversation) {
+      conversation = await this.prisma.conversation.create({
+        data: {
+          botId: bot.id,
+          customerPhone: dto.customerPhone,
+        },
+      });
     }
 
-    return res.json();
-  }
-
-  /**
-   * Solicitar código de vinculación por número telefónico
-   */
-  async requestPairingCode(botId: string, organizationId: string, phoneNumber: string) {
-    const bot = await this.getBot(botId, organizationId);
-    
-    // update status to connecting
-    await this.prisma.botInstance.update({
-      where: { id: bot.id },
-      data: { status: 'CONNECTING' },
+    // 2. Guardar mensaje en base de datos
+    const message = await this.prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        sender: 'AGENT',
+        content: `📄 [DOCUMENTO GENERADO: ${dto.documentTitle || 'Documento'}]\n\n${dto.documentContent}`,
+      },
     });
 
+    // 3. Enviar a través de bot-engine por WhatsApp
     try {
       const botEngineUrl = process.env.BOT_ENGINE_URL || 'https://whatsapp-service-production-e6f2.up.railway.app';
       const apiKey = process.env.INTERNAL_API_KEY;
-      
-      const res = await fetch(`${botEngineUrl}/internal/pair-phone`, {
+
+      const res = await fetch(`${botEngineUrl}/internal/send-document`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+        },
+        body: JSON.stringify({
+          tenantId: bot.tenantId,
+          customerPhone: dto.customerPhone,
+          documentTitle: dto.documentTitle,
+          documentContent: dto.documentContent,
+        }),
+      });
+
+      if (!res.ok) {
+        this.logger.error(`Error enviando documento a bot-engine: HTTP ${res.status}`);
+      }
+    } catch (err) {
+      this.logger.error('Excepción enviando documento a bot-engine:', err);
+    }
+
+    return message;
+  }
+
+  /**
+   * Request pairing code from bot engine
+   */
+  async requestPairingCode(botId: string, organizationId: string, phoneNumber: string) {
+    const bot = await this.getBot(botId, organizationId);
+    const botEngineUrl = process.env.BOT_ENGINE_URL || 'https://whatsapp-service-production-e6f2.up.railway.app';
+    const apiKey = process.env.INTERNAL_API_KEY;
+
+    try {
+      const res = await fetch(`${botEngineUrl}/internal/request-code`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -438,13 +487,14 @@ export class BotsService {
       });
 
       if (!res.ok) {
-        throw new Error(`Error en bot-engine pair-phone: HTTP ${res.status}`);
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to request pairing code');
       }
 
-      return await res.json();
-    } catch (err) {
-      this.logger.error('Excepción requestPairingCode:', err);
-      throw new Error('No se pudo solicitar el código de vinculación');
+      return res.json();
+    } catch (err: any) {
+      this.logger.error(`Error requesting pairing code: ${err.message}`);
+      throw new Error(`Engine error: ${err.message}`);
     }
   }
 }

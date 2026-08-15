@@ -37,7 +37,7 @@ export function LiveChatPanel() {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [chatInput, setChatInput] = useState('');
   const [pairingPhone, setPairingPhone] = useState('');
-  const [showPairingModal, setShowPairingModal] = useState(false);
+  const [isClearingAll, setIsClearingAll] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
   // Simulator state
@@ -74,10 +74,14 @@ export function LiveChatPanel() {
 
   const {
     conversations,
+    refetchConversations,
+    isRefetching,
     useMessages,
     sendMessage,
     toggleHumanMode,
     isSending,
+    clearConversations,
+    deleteConversation,
   } = useConversations(selectedBotId);
 
   const { data: messages = [] } = useMessages(selectedConversationId);
@@ -120,6 +124,36 @@ export function LiveChatPanel() {
       await toggleHumanMode({ conversationId: selectedConversationId, isHumanMode: newMode });
     } catch (err: any) {
       console.error('Error cambiando modo humano:', err);
+    }
+  };
+
+  const handleClearAllConversations = async () => {
+    if (!selectedBotId || conversations.length === 0) return;
+    if (!window.confirm('¿Estás seguro de que deseas vaciar todos los chats de este agente? Esta acción no se puede deshacer.')) {
+      return;
+    }
+    try {
+      setIsClearingAll(true);
+      await clearConversations();
+      setSelectedConversationId(null);
+    } catch (err: any) {
+      console.error('Error vaciando conversaciones:', err);
+      alert('Error al vaciar chats: ' + (err.message || 'Error desconocido'));
+    } finally {
+      setIsClearingAll(false);
+    }
+  };
+
+  const handleDeleteSingleConversation = async (e: React.MouseEvent, conversationId: string) => {
+    e.stopPropagation();
+    if (!window.confirm('¿Deseas eliminar este chat y su historial?')) return;
+    try {
+      await deleteConversation(conversationId);
+      if (selectedConversationId === conversationId) {
+        setSelectedConversationId(null);
+      }
+    } catch (err: any) {
+      console.error('Error eliminando conversación:', err);
     }
   };
 
@@ -283,7 +317,7 @@ export function LiveChatPanel() {
       {/* Top Bar: Bot Switcher Dropdown & View Mode Switcher */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 p-3 rounded-2xl shadow-sm backdrop-blur-md">
         {/* Bot Switcher */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="text-xs font-bold text-slate-500 uppercase tracking-wider pl-1">Agente:</span>
           <div className="relative">
             <select
@@ -301,7 +335,7 @@ export function LiveChatPanel() {
           </div>
 
           <span
-            className={`text-[10px] font-bold px-2 py-1 rounded-lg border hidden md:inline-block ${
+            className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border hidden md:inline-block ${
               botStatusData?.status === 'CONNECTED'
                 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
                 : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30'
@@ -350,22 +384,46 @@ export function LiveChatPanel() {
           {/* Lista de Conversaciones */}
           <div className="w-full md:w-1/3 flex flex-col gap-4 border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-800 pb-4 md:pb-0 md:pr-6 h-full overflow-hidden">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <MessageSquare className="w-5 h-5 text-emerald-600 dark:text-emerald-400" /> Chats en Vivo
-              </h2>
-              <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 font-mono font-semibold border border-slate-200 dark:border-slate-700">
-                {conversations.length} activos
-              </span>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <MessageSquare className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Chats en Vivo
+                </h2>
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 font-mono font-semibold border border-slate-200 dark:border-slate-700">
+                  {conversations.length}
+                </span>
+              </div>
+
+              {/* Botones de Actualizar y Vaciar Chats */}
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => refetchConversations()}
+                  className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-colors"
+                  title="Actualizar lista de chats"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isRefetching ? 'animate-spin text-emerald-500' : ''}`} />
+                </button>
+
+                {conversations.length > 0 && (
+                  <button
+                    onClick={handleClearAllConversations}
+                    disabled={isClearingAll}
+                    className="p-1.5 rounded-lg bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/30 transition-colors disabled:opacity-50"
+                    title="Vaciar todos los chats"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
             </div>
 
             {botStatusData && botStatusData.status !== 'CONNECTED' && (
-              <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 text-amber-800 dark:text-amber-300 text-xs flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
+              <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 text-amber-800 dark:text-amber-300 text-xs flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                   <span>WhatsApp no vinculado</span>
                 </div>
                 <a href="/dashboard/bots" className="font-bold underline text-amber-700 dark:text-amber-400 hover:opacity-80">
-                  Vincular QR
+                  QR
                 </a>
               </div>
             )}
@@ -384,27 +442,39 @@ export function LiveChatPanel() {
                   <div
                     key={conv.id}
                     onClick={() => setSelectedConversationId(conv.id)}
-                    className={`p-4 rounded-2xl cursor-pointer border transition-all duration-200 ${
+                    className={`p-3.5 rounded-2xl cursor-pointer border transition-all duration-200 relative group ${
                       selectedConversationId === conv.id
                         ? 'bg-emerald-50 dark:bg-slate-800/90 border-emerald-400 dark:border-emerald-500/50 shadow-md ring-1 ring-emerald-500/30'
                         : 'bg-slate-50 dark:bg-slate-950/40 border-slate-200 dark:border-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800/60'
                     }`}
                   >
-                    <div className="flex justify-between items-center mb-1.5">
+                    <div className="flex justify-between items-center mb-1">
                       <span className="font-semibold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full bg-emerald-500 dark:bg-emerald-400" />
                         {conv.customerPhone}
                       </span>
-                      {conv.isHumanMode ? (
-                        <span className="text-[10px] bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-bold px-2 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-500/30">
-                          👤 Humano
-                        </span>
-                      ) : (
-                        <span className="text-[10px] bg-cyan-100 dark:bg-cyan-500/10 text-cyan-800 dark:text-cyan-400 font-bold px-2 py-0.5 rounded-full border border-cyan-300 dark:border-cyan-500/20">
-                          🤖 miBot IA
-                        </span>
-                      )}
+
+                      <div className="flex items-center gap-1.5">
+                        {conv.isHumanMode ? (
+                          <span className="text-[9px] bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-bold px-1.5 py-0.2 rounded-full border border-emerald-300 dark:border-emerald-500/30">
+                            👤 Humano
+                          </span>
+                        ) : (
+                          <span className="text-[9px] bg-cyan-100 dark:bg-cyan-500/10 text-cyan-800 dark:text-cyan-400 font-bold px-1.5 py-0.2 rounded-full border border-cyan-300 dark:border-cyan-500/20">
+                            🤖 IA
+                          </span>
+                        )}
+
+                        <button
+                          onClick={(e) => handleDeleteSingleConversation(e, conv.id)}
+                          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 dark:hover:bg-red-500/20 text-red-500 rounded-md transition-all"
+                          title="Eliminar este chat"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
                     </div>
+
                     <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
                       {conv.messages?.[0]?.content || 'Sin mensajes'}
                     </p>
@@ -434,16 +504,16 @@ export function LiveChatPanel() {
                   const isHuman = activeConv?.isHumanMode || false;
 
                   return (
-                    <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 flex items-center justify-between flex-wrap gap-3">
-                      <div className="flex items-center gap-3">
+                    <div className="p-3.5 sm:p-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2.5">
                         <div
-                          className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold border ${
+                          className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold border ${
                             isHuman
                               ? 'bg-emerald-50 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/30'
                               : 'bg-cyan-50 dark:bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 border-cyan-200 dark:border-cyan-500/30'
                           }`}
                         >
-                          {isHuman ? <User className="w-5 h-5" /> : <Bot className="w-5 h-5" />}
+                          {isHuman ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
                         </div>
                         <div>
                           <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
@@ -455,23 +525,33 @@ export function LiveChatPanel() {
                         </div>
                       </div>
 
-                      <button
-                        onClick={handleToggleHumanMode}
-                        className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border shadow-sm ${
-                          isHuman
-                            ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
-                            : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700'
-                        }`}
-                      >
-                        <User className="w-3.5 h-3.5" />
-                        {isHuman ? 'Desactivar Modo Humano' : 'Tomar Control (Handoff)'}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={handleToggleHumanMode}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border shadow-sm ${
+                            isHuman
+                              ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700'
+                          }`}
+                        >
+                          <User className="w-3.5 h-3.5" />
+                          {isHuman ? 'Desactivar Modo Humano' : 'Tomar Control (Handoff)'}
+                        </button>
+
+                        <button
+                          onClick={(e) => handleDeleteSingleConversation(e, selectedConversationId)}
+                          className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-500/20 text-slate-500 hover:text-red-600 dark:hover:text-red-400 border border-slate-200 dark:border-slate-700 transition-colors"
+                          title="Eliminar este chat"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   );
                 })()}
 
                 {/* Mensajes */}
-                <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+                <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 custom-scrollbar">
                   {messages.map((msg: any) => {
                     const isUser = msg.sender === 'USER';
                     const isAgent = msg.sender === 'AGENT';
@@ -498,8 +578,8 @@ export function LiveChatPanel() {
                 </div>
 
                 {/* Input Form */}
-                <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90">
-                  <form onSubmit={handleSendMessage} className="flex gap-3">
+                <div className="p-3.5 sm:p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90">
+                  <form onSubmit={handleSendMessage} className="flex gap-2.5">
                     <input
                       type="text"
                       value={chatInput}

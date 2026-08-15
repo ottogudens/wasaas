@@ -133,6 +133,18 @@ class ApiClient {
     return this.request<any[]>(`/bots/${botId}/conversations`);
   }
 
+  async clearConversations(botId: string) {
+    return this.request<{ success: boolean; count: number }>(`/bots/${botId}/conversations`, {
+      method: 'DELETE',
+    });
+  }
+
+  async deleteConversation(conversationId: string) {
+    return this.request<{ success: boolean }>(`/bots/conversations/${conversationId}`, {
+      method: 'DELETE',
+    });
+  }
+
   async getMessages(conversationId: string) {
     return this.request<any[]>(`/bots/conversations/${conversationId}/messages`);
   }
