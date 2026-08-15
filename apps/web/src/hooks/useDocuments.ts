@@ -24,6 +24,26 @@ export function useDocuments(token: string | null) {
     },
   });
 
+  const processUrlMutation = useMutation({
+    mutationFn: async (body: { url: string; title?: string }) => {
+      const data = await api.processUrlDocument(body);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+    },
+  });
+
+  const resyncUrlMutation = useMutation({
+    mutationFn: async (documentId: string) => {
+      const data = await api.resyncUrlDocument(documentId);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+    },
+  });
+
   const deleteDocumentMutation = useMutation({
     mutationFn: async (id: string) => {
       await api.deleteDocument(id);
@@ -37,8 +57,13 @@ export function useDocuments(token: string | null) {
     documents: documentsQuery.data || [],
     isLoading: documentsQuery.isLoading,
     isError: documentsQuery.isError,
+    refetchDocuments: documentsQuery.refetch,
     processDocument: processDocumentMutation.mutateAsync,
     isProcessing: processDocumentMutation.isPending,
+    processUrl: processUrlMutation.mutateAsync,
+    isProcessingUrl: processUrlMutation.isPending,
+    resyncUrl: resyncUrlMutation.mutateAsync,
+    isResyncing: resyncUrlMutation.isPending,
     deleteDocument: deleteDocumentMutation.mutateAsync,
     isDeleting: deleteDocumentMutation.isPending,
   };

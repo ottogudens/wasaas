@@ -28,12 +28,17 @@ export class RagService {
     organizationId: string,
     title: string,
     content: string,
+    sourceType: string = 'TEXT',
+    sourceUrl?: string,
   ): Promise<{ documentId: string; chunksProcessed: number }> {
     // 1. Crear el registro del documento
     const document = await this.prisma.knowledgeDocument.create({
       data: {
         organizationId,
         title,
+        sourceType,
+        sourceUrl,
+        lastSyncedAt: sourceType === 'URL' ? new Date() : undefined,
       },
     });
 
@@ -46,7 +51,7 @@ export class RagService {
       try {
         const embedding = await this.generateEmbedding(chunkText);
 
-        // Insertar con embedding vectorial via raw SQL (Prisma no soporta Unsupported nativamente)
+        // Insertar con embedding vectorial via raw SQL
         await this.prisma.$executeRaw`
           INSERT INTO "DocumentVectorChunk" (id, "documentId", content, embedding, "createdAt")
           VALUES (
@@ -72,6 +77,209 @@ export class RagService {
     return {
       documentId: document.id,
       chunksProcessed,
+    };
+  }
+
+  /**
+   * Scraper y extractor de contenido limpio de sitios web
+   */
+  async scrapeWebsite(url: string): Promise<{ title: string; content: string }> {
+    try {
+      let formattedUrl = url.trim();
+      if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
+        formattedUrl = `https://${formattedUrl}`;
+      }
+
+      this.logger.log(`🌐 Extrayendo contenido web de: ${formattedUrl}`);
+
+      const response = await fetch(formattedUrl, {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+        },
+        signal: AbortSignal.timeout(15000), // 15s timeout
+      });
+
+      if (!response.ok) {
+        throw new Error(`No se pudo acceder a la página web (HTTP ${response.status})`);
+      }
+
+      const html = await response.text();
+
+      // 1. Extraer título de la página
+      const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+      const h1Match = html.match(/<h1[^>]*>([^<]+)<\/h1>/i);
+      const pageTitle = (titleMatch?.[1] || h1Match?.[1] || new URL(formattedUrl).hostname).trim();
+
+      // 2. Limpieza de elementos irrelevantes (scripts, estilos, navegación, footer, etc.)
+      let cleanHtml = html
+        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
+        .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')
+        .replace(/<noscript\b[^<]*(?:(?!<\/noscript>)<[^<]*)*<\/noscript>/gi, ' ')
+        .replace(/<svg\b[^<]*(?:(?!<\/svg>)<[^<]*)*<\/svg>/gi, ' ')
+        .replace(/<nav\b[^<]*(?:(?!<\/nav>)<[^<]*)*<\/nav>/gi, ' ')
+        .replace(/<header\b[^<]*(?:(?!<\/header>)<[^<]*)*<\/header>/gi, ' ')
+        .replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gi, ' ')
+        .replace(/<aside\b[^<]*(?:(?!<\/aside>)<[^<]*)*<\/aside>/gi, ' ')
+        .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, ' ')
+        .replace(/<!--[\s\S]*?-->/g, ' ');
+
+      // 3. Reemplazar saltos de bloque por nuevas líneas
+      cleanHtml = cleanHtml
+        .replace(/<\/(p|div|h1|h2|h3|h4|h5|h6|li|tr|section|article)>/gi, '\n')
+        .replace(/<br\s*[\/]?>/gi, '\n');
+
+      // 4. Eliminar todas las etiquetas HTML restantes
+      let plainText = cleanHtml.replace(/<[^>]+>/g, ' ');
+
+      // 5. Decodificar entidades HTML comunes
+      plainText = plainText
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&aacute;/g, 'á')
+        .replace(/&eacute;/g, 'é')
+        .replace(/&iacute;/g, 'í')
+        .replace(/&oacute;/g, 'ó')
+        .replace(/&uacute;/g, 'ú')
+        .replace(/&ntilde;/g, 'ñ')
+        .replace(/&Aacute;/g, 'Á')
+        .replace(/&Eacute;/g, 'É')
+        .replace(/&Iacute;/g, 'Í')
+        .replace(/&Oacute;/g, 'Ó')
+        .replace(/&Uacute;/g, 'Ú')
+        .replace(/&Ntilde;/g, 'Ñ');
+
+      // 6. Normalizar espacios en blanco y líneas
+      const normalizedContent = plainText
+        .split('\n')
+        .map((line) => line.trim().replace(/\s+/g, ' '))
+        .filter((line) => line.length > 0)
+        .join('\n');
+
+      if (normalizedContent.length < 20) {
+        throw new Error('La página web no contiene suficiente texto legible o requiere inicio de sesión/JavaScript.');
+      }
+
+      this.logger.log(`✅ Contenido web extraído (${normalizedContent.length} caracteres, Título: "${pageTitle}")`);
+
+      return {
+        title: pageTitle,
+        content: normalizedContent,
+      };
+    } catch (err: any) {
+      this.logger.error(`Error al extraer contenido web de ${url}:`, err);
+      throw new Error(`Error al escanear la URL: ${err.message}`);
+    }
+  }
+
+  /**
+   * Procesar y almacenar una URL de un sitio web en la base de conocimientos RAG
+   */
+  async processAndStoreUrl(
+    organizationId: string,
+    url: string,
+    customTitle?: string,
+  ): Promise<{ documentId: string; title: string; chunksProcessed: number; sourceUrl: string }> {
+    const { title: scrapedTitle, content } = await this.scrapeWebsite(url);
+    const finalTitle = customTitle?.trim() || scrapedTitle || url;
+
+    const result = await this.processAndStoreDocument(
+      organizationId,
+      finalTitle,
+      content,
+      'URL',
+      url,
+    );
+
+    return {
+      documentId: result.documentId,
+      title: finalTitle,
+      chunksProcessed: result.chunksProcessed,
+      sourceUrl: url,
+    };
+  }
+
+  /**
+   * Re-sincronizar y actualizar la información de una página web existente
+   */
+  async resyncUrlDocument(
+    documentId: string,
+    organizationId: string,
+  ): Promise<{ success: boolean; documentId: string; title: string; chunksProcessed: number; lastSyncedAt: Date }> {
+    const doc = await this.prisma.knowledgeDocument.findFirst({
+      where: { id: documentId, organizationId },
+    });
+
+    if (!doc) {
+      throw new Error('Documento no encontrado o no pertenece a tu organización.');
+    }
+
+    if (!doc.sourceUrl) {
+      throw new Error('Este documento no tiene una URL asociada para re-sincronizar.');
+    }
+
+    this.logger.log(`🔄 Re-sincronizando URL "${doc.sourceUrl}" para el documento ${doc.id}...`);
+
+    // 1. Volver a extraer el contenido en vivo de la página web
+    const { title: scrapedTitle, content } = await this.scrapeWebsite(doc.sourceUrl);
+
+    // 2. Eliminar chunks anteriores en pgvector
+    await this.prisma.$executeRaw`
+      DELETE FROM "DocumentVectorChunk" WHERE "documentId" = ${doc.id}
+    `;
+
+    // 3. Generar nuevos chunks y embeddings vectoriales
+    const chunks = this.chunkText(content);
+    let chunksProcessed = 0;
+    for (const chunkText of chunks) {
+      try {
+        const embedding = await this.generateEmbedding(chunkText);
+
+        await this.prisma.$executeRaw`
+          INSERT INTO "DocumentVectorChunk" (id, "documentId", content, embedding, "createdAt")
+          VALUES (
+            gen_random_uuid(),
+            ${doc.id},
+            ${chunkText},
+            ${JSON.stringify(embedding)}::vector,
+            NOW()
+          )
+        `;
+
+        chunksProcessed++;
+      } catch (err) {
+        this.logger.error(`Error procesando chunk actualizado para doc ${doc.id}:`, err);
+      }
+    }
+
+    // 4. Actualizar metadata del documento
+    const now = new Date();
+    const updated = await this.prisma.knowledgeDocument.update({
+      where: { id: doc.id },
+      data: {
+        title: doc.title || scrapedTitle,
+        lastSyncedAt: now,
+        updatedAt: now,
+      },
+    });
+
+    // 5. Invalidar caché semántica
+    await this.invalidateSemanticCache(organizationId);
+
+    this.logger.log(`✅ URL re-sincronizada exitosamente (${chunksProcessed} chunks actualizados) para doc ${doc.id}`);
+
+    return {
+      success: true,
+      documentId: updated.id,
+      title: updated.title,
+      chunksProcessed,
+      lastSyncedAt: now,
     };
   }
 
@@ -154,10 +362,8 @@ export class RagService {
   ): Promise<{ replyText: string; similarity: number } | null> {
     try {
       const queryEmbedding = await this.generateEmbedding(query);
-
-      // Solo retornar entradas más recientes que N días (TTL: ej. 7 días)
       const ttlDays = 7;
-      
+
       const results = await this.prisma.$queryRaw<
         Array<{ id: string; replyText: string; similarity: number }>
       >`
@@ -168,15 +374,14 @@ export class RagService {
         FROM "SemanticMemoryCache" smc
         WHERE smc."organizationId" = ${organizationId}
           AND smc."queryEmbedding" IS NOT NULL
-          AND smc."createdAt" >= NOW() - INTERVAL '${Prisma.sql`${ttlDays} days`}'
           AND 1 - (smc."queryEmbedding" <=> ${JSON.stringify(queryEmbedding)}::vector) >= ${minSimilarity}
+          AND smc."updatedAt" >= NOW() - INTERVAL '7 days'
         ORDER BY smc."queryEmbedding" <=> ${JSON.stringify(queryEmbedding)}::vector
         LIMIT 1
       `;
 
       if (results && results.length > 0) {
         const match = results[0];
-        // Incrementar contador de hits
         await this.prisma.$executeRaw`
           UPDATE "SemanticMemoryCache"
           SET "hitCount" = "hitCount" + 1, "updatedAt" = NOW()

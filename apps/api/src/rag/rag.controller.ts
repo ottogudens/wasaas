@@ -1,18 +1,40 @@
-import { Controller, Post, Get, Delete, Body, Param, Headers, UseGuards, Req, BadRequestException, UnauthorizedException } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Delete,
+  Body,
+  Param,
+  Headers,
+  UseGuards,
+  Req,
+  BadRequestException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { RagService } from './rag.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { SkipThrottle } from '@nestjs/throttler';
-import { IsString, IsOptional, MaxLength, MinLength } from 'class-validator';
+import { IsString, IsOptional, MaxLength, MinLength, IsUrl } from 'class-validator';
 
 class ProcessTextDto {
   @IsString()
   @MinLength(2)
-  @MaxLength(100)
+  @MaxLength(150)
   title: string;
 
   @IsString()
   @MinLength(10)
   content: string;
+}
+
+class ProcessUrlDto {
+  @IsString()
+  url: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(150)
+  title?: string;
 }
 
 class SearchDto {
@@ -34,7 +56,6 @@ export class InternalRagController {
   constructor(private readonly ragService: RagService) {}
 
   private validateApiKey(apiKey: string) {
-    // INTERNAL_API_KEY es obligatoria — check-env.ts ya validó que existe al arrancar.
     const expectedKey = process.env.INTERNAL_API_KEY;
     if (!apiKey || apiKey !== expectedKey) {
       throw new UnauthorizedException('Invalid API Key');
@@ -43,7 +64,6 @@ export class InternalRagController {
 
   /**
    * Endpoint interno para procesar documentos de WhatsApp (usado por bot-engine)
-   * Protegido por API key interna — NO requiere JWT
    */
   @Post('process-whatsapp-file')
   async processWhatsAppFile(
@@ -70,11 +90,11 @@ export class InternalRagController {
       const buffer = Buffer.from(body.contentBase64, 'base64');
       const ext = body.title.split('.').pop()?.toLowerCase() || '';
       let mimetype = 'text/plain';
-      
+
       if (ext === 'pdf') mimetype = 'application/pdf';
       else if (ext === 'docx') mimetype = 'docx';
       else if (ext === 'xlsx' || ext === 'xls') mimetype = 'xlsx';
-      
+
       finalContent = await this.ragService.extractTextFromBuffer(buffer, mimetype);
     }
 
@@ -82,6 +102,7 @@ export class InternalRagController {
       bot.organizationId,
       body.title,
       finalContent,
+      'FILE',
     );
 
     return {
@@ -101,7 +122,7 @@ export class RagController {
   constructor(private readonly ragService: RagService) {}
 
   /**
-   * Procesar documento de texto y almacenar embeddings en pgvector
+   * Procesar documento de texto manual
    */
   @Post('process-text')
   async processTextDocument(@Req() req: any, @Body() body: ProcessTextDto) {
@@ -109,6 +130,7 @@ export class RagController {
       req.user.organizationId,
       body.title,
       body.content,
+      'TEXT',
     );
 
     return {
@@ -118,6 +140,51 @@ export class RagController {
       documentTitle: body.title,
       totalChunksProcessed: result.chunksProcessed,
     };
+  }
+
+  /**
+   * Procesar e indexar un sitio web / URL en la base de conocimientos
+   */
+  @Post('process-url')
+  async processUrlDocument(@Req() req: any, @Body() body: ProcessUrlDto) {
+    if (!body.url) {
+      throw new BadRequestException('La URL del sitio web es requerida.');
+    }
+
+    try {
+      const result = await this.ragService.processAndStoreUrl(
+        req.user.organizationId,
+        body.url,
+        body.title,
+      );
+
+      return {
+        status: 'success',
+        organizationId: req.user.organizationId,
+        documentId: result.documentId,
+        documentTitle: result.title,
+        sourceUrl: result.sourceUrl,
+        totalChunksProcessed: result.chunksProcessed,
+      };
+    } catch (err: any) {
+      throw new BadRequestException(err.message || 'No se pudo procesar la URL');
+    }
+  }
+
+  /**
+   * Re-sincronizar y actualizar la información de una página web
+   */
+  @Post('resync-url/:id')
+  async resyncUrlDocument(@Param('id') id: string, @Req() req: any) {
+    try {
+      const result = await this.ragService.resyncUrlDocument(id, req.user.organizationId);
+      return {
+        status: 'success',
+        ...result,
+      };
+    } catch (err: any) {
+      throw new BadRequestException(err.message || 'Error al re-sincronizar la URL');
+    }
   }
 
   /**

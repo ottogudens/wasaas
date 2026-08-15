@@ -180,6 +180,20 @@ class ApiClient {
     );
   }
 
+  async processUrlDocument(body: { url: string; title?: string }) {
+    return this.request<{ documentId: string; documentTitle: string; sourceUrl: string; totalChunksProcessed: number }>(
+      '/rag/process-url',
+      { method: 'POST', body: JSON.stringify(body) },
+    );
+  }
+
+  async resyncUrlDocument(documentId: string) {
+    return this.request<{ success: boolean; documentId: string; title: string; chunksProcessed: number; lastSyncedAt: string }>(
+      `/rag/resync-url/${documentId}`,
+      { method: 'POST' },
+    );
+  }
+
   async searchKnowledge(query: string, topK?: number) {
     return this.request<{ results: any[] }>(
       '/rag/search',
