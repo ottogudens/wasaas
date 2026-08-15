@@ -10,9 +10,6 @@ import {
   Check,
   X,
   AlertCircle,
-  Bot,
-  FileText,
-  DollarSign,
   Package,
   Users,
   ToggleLeft,
@@ -24,9 +21,7 @@ import {
   Gift,
   ShieldCheck,
   Copy,
-  ExternalLink,
   RefreshCw,
-  Sparkles,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth-context';
@@ -122,18 +117,15 @@ function PlanModal({
               <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">
                 Precio (CLP/mes) *
               </label>
-              <div className="relative">
-                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input
-                  type="number"
-                  required
-                  min={0}
-                  value={form.price}
-                  onChange={(e) => setForm({ ...form, price: e.target.value === '' ? '' : Number(e.target.value) })}
-                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl pl-9 pr-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500"
-                  placeholder="29000"
-                />
-              </div>
+              <input
+                type="number"
+                required
+                min={0}
+                value={form.price}
+                onChange={(e) => setForm({ ...form, price: e.target.value === '' ? '' : Number(e.target.value) })}
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500"
+                placeholder="29000"
+              />
             </div>
 
             <div>
@@ -256,7 +248,7 @@ function EditSubscriptionModal({
                   setStatus('ACTIVE');
                   setCustomPlanName('Cuenta de Cortesía Vitalicia');
                 }}
-                className="px-2.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-[11px] transition-all"
+                className="px-2.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-[11px] transition-all shadow-sm"
               >
                 Activar Cortesía
               </button>
@@ -273,7 +265,7 @@ function EditSubscriptionModal({
             <select
               value={selectedPlan}
               onChange={(e) => setSelectedPlan(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500"
+              className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 font-medium"
             >
               <option value="CORTESIA">🎁 CORTESIA (Cortesía / Gratuito Vitalicio)</option>
               <option value="STARTER">STARTER (Plan Básico 1 Bot)</option>
@@ -303,7 +295,7 @@ function EditSubscriptionModal({
               value={status}
               disabled={selectedPlan === 'CORTESIA'}
               onChange={(e) => setStatus(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 disabled:opacity-60"
+              className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 disabled:opacity-60 font-medium"
             >
               <option value="ACTIVE">ACTIVE (Activo - Acceso Permitido)</option>
               <option value="PENDING">PENDING (Pendiente de Pago)</option>
@@ -323,7 +315,7 @@ function EditSubscriptionModal({
             <button
               type="submit"
               disabled={isSaving}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 font-bold text-sm hover:opacity-90 disabled:opacity-50"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 font-bold text-sm hover:opacity-90 disabled:opacity-50 shadow-md"
             >
               {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
               Guardar Suscripción
@@ -529,15 +521,22 @@ function TenantsTab() {
   const toggleStatusMutation = useMutation({
     mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
       api.toggleTenantStatus(id, isActive),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tenants'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tenants'] });
+      queryClient.refetchQueries({ queryKey: ['tenants', 'all'] });
+    },
   });
 
   const updateSubMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) =>
       api.updateTenantSubscription(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tenants'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['tenants'] });
+      await queryClient.refetchQueries({ queryKey: ['tenants', 'all'] });
       setEditingSubTenant(null);
+    },
+    onError: (err: any) => {
+      alert(`Error al guardar suscripción: ${err.message || 'Error desconocido'}`);
     },
   });
 
@@ -576,6 +575,14 @@ function TenantsTab() {
           <h3 className="text-lg font-bold text-slate-900 dark:text-white">Clientes / Organizaciones</h3>
           <p className="text-xs text-slate-500 mt-0.5">{tenants.length} organizaciones registradas</p>
         </div>
+        <button
+          onClick={() => tenantsQuery.refetch()}
+          disabled={tenantsQuery.isRefetching}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-colors"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${tenantsQuery.isRefetching ? 'animate-spin text-emerald-500' : ''}`} />
+          Actualizar
+        </button>
       </div>
 
       {tenantsQuery.isLoading ? (
@@ -638,7 +645,7 @@ function TenantsTab() {
                       <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 text-xs border border-slate-200 dark:border-slate-700/50">
                         <p className="text-slate-500 mb-1">Plan & Facturación</p>
                         <p className="text-slate-900 dark:text-slate-200 font-bold">
-                          {isCourteous ? '🎁 Cortesía Gratuita' : activeSub ? `${activeSub.plan} (${activeSub.status})` : 'Sin Plan'}
+                          {isCourteous ? '🎁 Cortesía Gratuita' : activeSub ? `${activeSub.customPlanName || activeSub.plan} (${activeSub.status})` : 'Sin Plan'}
                         </p>
                       </div>
                     </div>
@@ -703,7 +710,7 @@ function MercadoPagoPlatformTab() {
 
   const saveMutation = useMutation({
     mutationFn: (body: any) => api.savePlatformMpConfig(body),
-    onSuccess: (data) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mercadopago', 'platform-config'] });
       setAccessToken('');
       setTestResult({ success: true, message: 'Credenciales de Mercado Pago guardadas con éxito.' });
@@ -821,7 +828,7 @@ function MercadoPagoPlatformTab() {
               value={accessToken}
               onChange={(e) => setAccessToken(e.target.value)}
               placeholder={config?.maskedToken ? `Actual: ${config.maskedToken}` : 'APP_USR-XXXXXX-XXXXXX...'}
-              className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500 font-mono text-xs"
+              className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500 font-mono text-xs"
             />
             <p className="text-[11px] text-slate-500 mt-1">
               Obtén tu Access Token en el panel de desarrolladores de Mercado Pago (Tus integraciones &gt; Credenciales).
@@ -837,7 +844,7 @@ function MercadoPagoPlatformTab() {
               value={publicKey}
               onChange={(e) => setPublicKey(e.target.value)}
               placeholder={config?.publicKey || 'APP_USR-XXXXXX-XXXXXX...'}
-              className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500 font-mono text-xs"
+              className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500 font-mono text-xs"
             />
           </div>
 
@@ -887,7 +894,7 @@ type Tab = 'plans' | 'tenants' | 'mercadopago';
 
 export function AdminPanel() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<Tab>('plans');
+  const [activeTab, setActiveTab] = useState<Tab>('tenants');
 
   if (user?.role !== 'SUPER_ADMIN') {
     return (
@@ -914,8 +921,8 @@ export function AdminPanel() {
       {/* Tabs */}
       <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl w-fit flex-wrap">
         {[
-          { id: 'plans' as Tab, label: 'Planes de Servicio', icon: <Package className="w-4 h-4" /> },
           { id: 'tenants' as Tab, label: 'Clientes & Cortesías', icon: <Users className="w-4 h-4" /> },
+          { id: 'plans' as Tab, label: 'Planes de Servicio', icon: <Package className="w-4 h-4" /> },
           { id: 'mercadopago' as Tab, label: 'Mercado Pago Plataforma', icon: <CreditCard className="w-4 h-4" /> },
         ].map((tab) => (
           <button
@@ -934,8 +941,8 @@ export function AdminPanel() {
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'plans' && <PlansTab />}
       {activeTab === 'tenants' && <TenantsTab />}
+      {activeTab === 'plans' && <PlansTab />}
       {activeTab === 'mercadopago' && <MercadoPagoPlatformTab />}
     </div>
   );

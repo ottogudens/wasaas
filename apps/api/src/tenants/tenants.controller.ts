@@ -118,7 +118,9 @@ export class TenantsController {
         users: {
           select: { id: true, email: true, name: true, role: true, isActive: true, createdAt: true },
         },
-        subscriptions: true,
+        subscriptions: {
+          orderBy: { updatedAt: 'desc' },
+        },
         invoices: {
           orderBy: { createdAt: 'desc' },
         },
@@ -170,6 +172,7 @@ export class TenantsController {
 
     const existingSub = await this.prisma.subscription.findFirst({
       where: { organizationId: id },
+      orderBy: { updatedAt: 'desc' },
     });
 
     let currentPeriodEnd = existingSub?.currentPeriodEnd;
