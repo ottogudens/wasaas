@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Bot, Plus, Loader2, CheckCircle2, X, Pencil, Trash2, QrCode } from 'lucide-react';
+import { Bot, Plus, Loader2, CheckCircle2, X, Pencil, Trash2, QrCode, Settings } from 'lucide-react';
 import { useBotContext } from '../../lib/bot-context';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../lib/auth-context';
@@ -9,13 +9,18 @@ import { useBots } from '../../hooks/useBots';
 
 export function BotsPanel() {
   const { token } = useAuth();
-  const { bots, isLoading, isCreating, createBot, updateBot, deleteBot } = useBots(token);
+  const { bots, isLoading, isCreating, createBot, updateBot, deleteBot, isUpdating } = useBots(token);
   const { setSelectedBotId, setSelectedBot } = useBotContext();
   const router = useRouter();
 
   const [newBotName, setNewBotName] = useState('');
   const [editingBotId, setEditingBotId] = useState<string | null>(null);
+  
+  const [configBot, setConfigBot] = useState<any | null>(null);
   const [editBotName, setEditBotName] = useState('');
+  const [editSystemPrompt, setEditSystemPrompt] = useState('');
+  const [editAiModel, setEditAiModel] = useState('gpt-4o-mini');
+  
   const [deletingBotId, setDeletingBotId] = useState<string | null>(null);
 
   const handleCreateBot = async (e: React.FormEvent) => {
@@ -36,6 +41,23 @@ export function BotsPanel() {
       setEditingBotId(null);
     } catch (err) {
       console.error('Error editing bot', err);
+    }
+  };
+
+  const handleSaveConfig = async (id: string) => {
+    if (!editBotName.trim()) return;
+    try {
+      await updateBot({ 
+        id, 
+        data: { 
+          name: editBotName,
+          systemPrompt: editSystemPrompt,
+          aiModel: editAiModel
+        } 
+      });
+      setConfigBot(null);
+    } catch (err) {
+      console.error('Error saving bot config', err);
     }
   };
 
@@ -127,10 +149,10 @@ export function BotsPanel() {
                     <QrCode className="w-3 h-3" /> Vincular
                   </button>
                   <button
-                    onClick={() => { setEditingBotId(b.id); setEditBotName(b.name); }}
+                    onClick={() => { setConfigBot(b); setEditBotName(b.name); setEditSystemPrompt(b.systemPrompt || ''); setEditAiModel(b.aiModel || 'gpt-4o-mini'); }}
                     className="text-xs px-3 py-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-700 transition-all flex items-center gap-1.5"
                   >
-                    <Pencil className="w-3 h-3" /> Editar
+                    <Settings className="w-3 h-3" /> Configurar
                   </button>
                   {deletingBotId === b.id ? (
                     <div className="flex items-center gap-2 ml-auto">
@@ -150,6 +172,74 @@ export function BotsPanel() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {configBot && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg overflow-hidden flex flex-col shadow-2xl">
+            <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <Settings className="w-5 h-5 text-emerald-400" />
+                Configurar Agente
+              </h3>
+              <button onClick={() => setConfigBot(null)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4 overflow-y-auto max-h-[60vh]">
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1.5">Nombre del Agente</label>
+                <input
+                  type="text"
+                  value={editBotName}
+                  onChange={e => setEditBotName(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1.5">Modelo de IA</label>
+                <select
+                  value={editAiModel}
+                  onChange={e => setEditAiModel(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
+                >
+                  <option value="gpt-4o-mini">GPT-4o Mini (Recomendado)</option>
+                  <option value="gpt-4o">GPT-4o (Avanzado)</option>
+                  <option value="claude-3-haiku">Claude 3 Haiku</option>
+                  <option value="claude-3-5-sonnet">Claude 3.5 Sonnet</option>
+                  <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1.5">Instrucciones del Sistema (Prompt)</label>
+                <textarea
+                  value={editSystemPrompt}
+                  onChange={e => setEditSystemPrompt(e.target.value)}
+                  rows={6}
+                  placeholder="Ej: Eres un asistente de ventas cordial..."
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-emerald-500 custom-scrollbar"
+                />
+                <p className="text-xs text-slate-500 mt-2">Define el comportamiento, tono y objetivo principal del agente.</p>
+              </div>
+            </div>
+            <div className="p-6 border-t border-slate-800 bg-slate-900/50 flex justify-end gap-3">
+              <button 
+                onClick={() => setConfigBot(null)}
+                className="px-5 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-800 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={() => handleSaveConfig(configBot.id)}
+                disabled={isUpdating}
+                className="px-5 py-2.5 rounded-xl text-sm font-bold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition-colors flex items-center gap-2 disabled:opacity-50"
+              >
+                {isUpdating ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                Guardar Cambios
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

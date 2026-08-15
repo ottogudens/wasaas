@@ -108,6 +108,13 @@ class ApiClient {
     });
   }
 
+  async requestPairingCode(botId: string, phoneNumber: string) {
+    return this.request<any>(`/bots/${botId}/pair-phone`, {
+      method: 'POST',
+      body: JSON.stringify({ phoneNumber }),
+    });
+  }
+
   // ── RAG ───────────────────────────────────────────
   async processDocument(body: { title: string; content: string }) {
     return this.request<{ documentId: string; totalChunksProcessed: number }>(

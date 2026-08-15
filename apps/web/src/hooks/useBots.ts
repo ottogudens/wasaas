@@ -71,5 +71,10 @@ export function useBots(token: string | null) {
     isDeleting: deleteBotMutation.isPending,
     updateBot: updateBotMutation.mutateAsync,
     isUpdating: updateBotMutation.isPending,
+    requestPairingCode: useMutation({
+      mutationFn: async ({ id, phoneNumber }: { id: string, phoneNumber: string }) => {
+        return api.requestPairingCode(id, phoneNumber);
+      },
+    }).mutateAsync,
   };
 }

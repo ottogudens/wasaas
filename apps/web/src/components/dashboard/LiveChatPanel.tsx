@@ -13,6 +13,9 @@ export function LiveChatPanel() {
   const [chatInput, setChatInput] = useState('');
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
+  const [pairingPhone, setPairingPhone] = useState('');
+  const [isRequestingPairing, setIsRequestingPairing] = useState(false);
+
   const {
     conversations,
     useMessages,
@@ -23,7 +26,7 @@ export function LiveChatPanel() {
 
   const { data: messages = [] } = useMessages(selectedConversationId);
   const { token } = useAuth();
-  const { useBotStatus } = useBots(token);
+  const { useBotStatus, requestPairingCode } = useBots(token);
   const { data: botData } = useBotStatus(selectedBotId || '');
 
   useEffect(() => {
@@ -61,6 +64,19 @@ export function LiveChatPanel() {
     }
   };
 
+  const handleRequestPairingCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pairingPhone || !selectedBotId) return;
+    setIsRequestingPairing(true);
+    try {
+      await requestPairingCode({ id: selectedBotId, phoneNumber: pairingPhone });
+    } catch (err) {
+      console.error('Error requesting pairing code:', err);
+    } finally {
+      setIsRequestingPairing(false);
+    }
+  };
+
   if (!selectedBotId) {
     return (
       <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-2xl h-[650px] flex items-center justify-center">
@@ -71,9 +87,9 @@ export function LiveChatPanel() {
 
   if (botData && botData.status !== 'CONNECTED') {
     return (
-      <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800 rounded-3xl p-8 shadow-2xl h-[650px] flex flex-col items-center justify-center text-center">
+      <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800 rounded-3xl p-8 shadow-2xl h-[650px] flex flex-col items-center justify-center text-center overflow-y-auto">
         <h2 className="text-2xl font-bold text-white mb-3">Vincular WhatsApp</h2>
-        <p className="text-slate-400 mb-8 max-w-md leading-relaxed">Para activar este agente, debes escanear el código QR con la aplicación de WhatsApp en tu teléfono (Dispositivos vinculados).</p>
+        <p className="text-slate-400 mb-8 max-w-md leading-relaxed">Escanea el código QR o usa tu número de teléfono para vincular el agente.</p>
         
         {botData.status === 'QR_READY' && botData.qrCode ? (
           <div className="bg-white p-4 rounded-xl shadow-lg mb-6 ring-4 ring-emerald-500/20">
@@ -86,16 +102,40 @@ export function LiveChatPanel() {
           </div>
         )}
         
-        <div className="space-y-4">
-          <p className="text-sm font-medium text-emerald-400 bg-emerald-500/10 px-5 py-2.5 rounded-xl inline-block border border-emerald-500/20">
-            {botData.status === 'CONNECTING' ? 'Estableciendo conexión...' : 'Esperando a que escanees el código...'}
+        <div className="space-y-4 w-full max-w-md">
+          <p className="text-sm font-medium text-emerald-400 bg-emerald-500/10 px-5 py-2.5 rounded-xl inline-block border border-emerald-500/20 mb-4">
+            {botData.status === 'CONNECTING' ? 'Estableciendo conexión...' : 'Esperando vinculación...'}
           </p>
-          {botData.pairingCode && (
-            <div className="mt-6 pt-6 border-t border-slate-800">
-              <p className="text-xs text-slate-500 mb-2 font-medium uppercase tracking-wider">O usa el código de vinculación</p>
-              <p className="font-mono text-2xl font-bold tracking-widest text-slate-200 bg-slate-950 px-6 py-3 rounded-xl border border-slate-700/50 inline-block shadow-inner">{botData.pairingCode}</p>
-            </div>
-          )}
+          
+          <div className="border-t border-slate-800 pt-6 mt-4 w-full">
+            <p className="text-sm font-medium text-slate-300 mb-3">Vincular con número telefónico</p>
+            {botData.pairingCode ? (
+              <div className="mt-2">
+                <p className="text-xs text-slate-500 mb-2 uppercase tracking-wider">Código de vinculación</p>
+                <p className="font-mono text-3xl font-bold tracking-widest text-emerald-400 bg-slate-950 px-6 py-4 rounded-xl border border-emerald-500/30 inline-block shadow-inner">{botData.pairingCode}</p>
+                <p className="text-xs text-slate-400 mt-3">Ingresa este código en tu WhatsApp (Dispositivos Vinculados &gt; Vincular con número).</p>
+              </div>
+            ) : (
+              <form onSubmit={handleRequestPairingCode} className="flex gap-2 w-full">
+                <input 
+                  type="text" 
+                  value={pairingPhone}
+                  onChange={(e) => setPairingPhone(e.target.value)}
+                  placeholder="Ej: 521XXXXXXXXXX" 
+                  className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-emerald-500/50"
+                  required
+                />
+                <button 
+                  type="submit" 
+                  disabled={isRequestingPairing || !pairingPhone}
+                  className="bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-bold px-4 py-2 rounded-xl text-sm whitespace-nowrap flex items-center gap-2"
+                >
+                  {isRequestingPairing ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                  Obtener Código
+                </button>
+              </form>
+            )}
+          </div>
         </div>
       </div>
     );

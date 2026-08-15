@@ -145,4 +145,13 @@ export class BotsController {
   ) {
     return this.botsService.toggleHumanMode(conversationId, req.user.organizationId, isHumanMode);
   }
+
+  @Post(':id/pair-phone')
+  async requestPairingCode(
+    @Param('id') id: string,
+    @Req() req: any,
+    @Body('phoneNumber') phoneNumber: string,
+  ) {
+    return this.botsService.requestPairingCode(id, req.user.organizationId, phoneNumber);
+  }
 }
