@@ -14,7 +14,6 @@ export function LiveChatPanel() {
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
   const [pairingPhone, setPairingPhone] = useState('');
-  const [isRequestingPairing, setIsRequestingPairing] = useState(false);
 
   const {
     conversations,
@@ -26,7 +25,7 @@ export function LiveChatPanel() {
 
   const { data: messages = [] } = useMessages(selectedConversationId);
   const { token } = useAuth();
-  const { useBotStatus, requestPairingCode } = useBots(token);
+  const { useBotStatus, requestPairingCode, isRequestingPairing } = useBots(token);
   const { data: botData } = useBotStatus(selectedBotId || '');
 
   useEffect(() => {
@@ -67,13 +66,10 @@ export function LiveChatPanel() {
   const handleRequestPairingCode = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pairingPhone || !selectedBotId) return;
-    setIsRequestingPairing(true);
     try {
       await requestPairingCode({ id: selectedBotId, phoneNumber: pairingPhone });
     } catch (err) {
       console.error('Error requesting pairing code:', err);
-    } finally {
-      setIsRequestingPairing(false);
     }
   };
 

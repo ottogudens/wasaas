@@ -48,6 +48,7 @@ import { TranscriptionService } from './ai/transcription.service';
 
     // Feature modules
     BotsModule,
+    FeaturesModule,
   ],
   controllers: [
     AiController,

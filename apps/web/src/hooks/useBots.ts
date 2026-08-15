@@ -60,6 +60,16 @@ export function useBots(token: string | null) {
     },
   });
 
+  // Request Pairing Code
+  const requestPairingCodeMutation = useMutation({
+    mutationFn: async ({ id, phoneNumber }: { id: string, phoneNumber: string }) => {
+      return api.requestPairingCode(id, phoneNumber);
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['botStatus', variables.id] });
+    },
+  });
+
   return {
     bots: botsQuery.data || [],
     isLoading: botsQuery.isLoading,
@@ -71,10 +81,7 @@ export function useBots(token: string | null) {
     isDeleting: deleteBotMutation.isPending,
     updateBot: updateBotMutation.mutateAsync,
     isUpdating: updateBotMutation.isPending,
-    requestPairingCode: useMutation({
-      mutationFn: async ({ id, phoneNumber }: { id: string, phoneNumber: string }) => {
-        return api.requestPairingCode(id, phoneNumber);
-      },
-    }).mutateAsync,
+    requestPairingCode: requestPairingCodeMutation.mutateAsync,
+    isRequestingPairing: requestPairingCodeMutation.isPending,
   };
 }
