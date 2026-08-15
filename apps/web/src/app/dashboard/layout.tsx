@@ -1,15 +1,30 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Bot, MessageSquare, Database, CreditCard, Menu, FlaskConical, LogOut, ChevronDown, Building2, UserCircle, ShieldCheck } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import {
+  Bot,
+  MessageSquare,
+  Database,
+  CreditCard,
+  Menu,
+  FlaskConical,
+  LogOut,
+  ChevronDown,
+  Building2,
+  UserCircle,
+  ShieldCheck,
+  HelpCircle,
+  Sparkles,
+} from 'lucide-react';
 import { BotConnectionBadge } from '../../components/dashboard/BotConnectionBadge';
 import { useFeatureFlag } from '../../lib/feature-flags-context';
 import { useAuth } from '../../lib/auth-context';
 import { useBillingGuard } from '../../hooks/useBillingGuard';
+import { InteractiveHelpModal } from '../../components/InteractiveHelpModal';
 
-function UserMenu() {
+function UserMenu({ onOpenHelp }: { onOpenHelp: () => void }) {
   const { user, org, logout } = useAuth();
   const [open, setOpen] = React.useState(false);
   const menuRef = React.useRef<HTMLDivElement>(null);
@@ -68,15 +83,21 @@ function UserMenu() {
           {/* Menu items */}
           <div className="py-1">
             <button
-              onClick={() => { setOpen(false); }}
-              className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+              onClick={() => {
+                setOpen(false);
+                onOpenHelp();
+              }}
+              className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-emerald-400 hover:bg-slate-700 hover:text-emerald-300 transition-colors"
             >
-              <UserCircle className="w-4 h-4 text-slate-400" />
-              Ver perfil
+              <HelpCircle className="w-4 h-4" />
+              Guía Interactiva
             </button>
             <button
-              onClick={() => { setOpen(false); logout(); }}
-              className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors"
+              onClick={() => {
+                setOpen(false);
+                logout();
+              }}
+              className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors border-t border-slate-700/60"
             >
               <LogOut className="w-4 h-4" />
               Cerrar sesión
@@ -91,8 +112,12 @@ function UserMenu() {
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const isBetaDashboardEnabled = useFeatureFlag('BETA_DASHBOARD');
   const pathname = usePathname();
+  const router = useRouter();
   const { user } = useAuth();
   useBillingGuard();
+
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navItems = [
     { label: 'Bots', href: '/dashboard/bots', icon: <Bot className="w-5 h-5" /> },
@@ -109,19 +134,46 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     navItems.push({ label: 'Admin', href: '/dashboard/admin', icon: <ShieldCheck className="w-5 h-5 text-amber-400" /> });
   }
 
-  const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+  const handleNavigateTab = (tab: 'bots' | 'qr' | 'prompt' | 'rag' | 'chat') => {
+    switch (tab) {
+      case 'bots':
+      case 'qr':
+      case 'prompt':
+        router.push('/dashboard/bots');
+        break;
+      case 'rag':
+        router.push('/dashboard/knowledge');
+        break;
+      case 'chat':
+        router.push('/dashboard/chat');
+        break;
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col md:flex-row text-slate-100 font-sans selection:bg-emerald-500/30">
-      
       {/* Desktop Sidebar (Left) */}
       <aside className="hidden md:flex flex-col w-64 bg-slate-900 border-r border-slate-800 p-4">
-        <div className="flex items-center gap-3 px-2 py-4 mb-6">
+        <div className="flex items-center gap-3 px-2 py-4 mb-4">
           <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center">
             <Bot className="text-slate-950 w-5 h-5" />
           </div>
           <span className="font-bold text-xl tracking-tight text-white">miBot SaaS</span>
         </div>
+
+        {/* Guía Interactiva Button in Sidebar */}
+        <button
+          onClick={() => setIsHelpOpen(true)}
+          className="mb-4 flex items-center justify-between w-full px-3 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-cyan-500/10 border border-emerald-500/30 text-emerald-300 hover:text-emerald-200 hover:border-emerald-500/50 transition-all group shadow-sm"
+        >
+          <div className="flex items-center gap-2.5">
+            <Sparkles className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform animate-pulse" />
+            <span className="font-bold text-xs">Guía Interactiva</span>
+          </div>
+          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400">
+            5 Pasos
+          </span>
+        </button>
 
         <nav className="flex-1 space-y-1">
           {navItems.map((item) => {
@@ -146,7 +198,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* User Menu (Bottom Sidebar) */}
         <div className="pt-4 border-t border-slate-800 mt-auto">
-          <UserMenu />
+          <UserMenu onOpenHelp={() => setIsHelpOpen(true)} />
         </div>
       </aside>
 
@@ -154,7 +206,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <main className="flex-1 flex flex-col h-screen overflow-hidden pb-16 md:pb-0">
         {/* Desktop Header */}
         <header className="hidden md:flex items-center justify-between px-8 py-4 border-b border-slate-800 bg-slate-900/50 backdrop-blur-md">
-          <h1 className="text-xl font-semibold text-slate-200">Panel de Control</h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-xl font-semibold text-slate-200">Panel de Control</h1>
+            <button
+              onClick={() => setIsHelpOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 text-emerald-400 hover:text-emerald-300 text-xs font-semibold transition-colors"
+            >
+              <HelpCircle className="w-3.5 h-3.5" />
+              <span>Ver Guía Rápida</span>
+            </button>
+          </div>
           <BotConnectionBadge />
         </header>
 
@@ -164,18 +225,34 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <Bot className="text-emerald-500 w-6 h-6" />
             <span className="font-bold text-lg text-white">miBot</span>
           </div>
-          <button
-            className="p-2 text-slate-400 hover:text-white"
-            onClick={() => setMobileMenuOpen((v) => !v)}
-          >
-            <Menu className="w-5 h-5" />
-          </button>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsHelpOpen(true)}
+              className="p-2 text-emerald-400 hover:text-emerald-300 bg-slate-800 rounded-lg"
+              title="Guía Interactiva"
+            >
+              <HelpCircle className="w-4 h-4" />
+            </button>
+            <button
+              className="p-2 text-slate-400 hover:text-white"
+              onClick={() => setMobileMenuOpen((v) => !v)}
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          </div>
         </header>
 
         {/* Mobile Slide-down Menu */}
         {mobileMenuOpen && (
           <div className="md:hidden bg-slate-900 border-b border-slate-800 px-4 pb-4 z-10">
-            <MobileUserMenu onClose={() => setMobileMenuOpen(false)} />
+            <MobileUserMenu
+              onClose={() => setMobileMenuOpen(false)}
+              onOpenHelp={() => {
+                setMobileMenuOpen(false);
+                setIsHelpOpen(true);
+              }}
+            />
           </div>
         )}
 
@@ -203,12 +280,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           );
         })}
       </nav>
-      
+
+      {/* Interactive Guide Modal */}
+      <InteractiveHelpModal
+        isOpen={isHelpOpen}
+        onClose={() => setIsHelpOpen(false)}
+        onNavigateTab={handleNavigateTab}
+      />
     </div>
   );
 }
 
-function MobileUserMenu({ onClose }: { onClose: () => void }) {
+function MobileUserMenu({
+  onClose,
+  onOpenHelp,
+}: {
+  onClose: () => void;
+  onOpenHelp: () => void;
+}) {
   const { user, org, logout } = useAuth();
   const initials = user?.name
     ? user.name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
@@ -227,14 +316,17 @@ function MobileUserMenu({ onClose }: { onClose: () => void }) {
         </div>
       </div>
       <button
-        onClick={() => { onClose(); }}
-        className="flex items-center gap-3 w-full px-4 py-3 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
+        onClick={onOpenHelp}
+        className="flex items-center gap-3 w-full px-4 py-3 text-sm text-emerald-400 hover:bg-slate-700 transition-colors"
       >
-        <UserCircle className="w-4 h-4 text-slate-400" />
-        Ver perfil
+        <HelpCircle className="w-4 h-4" />
+        Guía Interactiva (5 Pasos)
       </button>
       <button
-        onClick={() => { onClose(); logout(); }}
+        onClick={() => {
+          onClose();
+          logout();
+        }}
         className="flex items-center gap-3 w-full px-4 py-3 text-sm text-red-400 hover:bg-red-500/10 transition-colors border-t border-slate-700"
       >
         <LogOut className="w-4 h-4" />
