@@ -5,6 +5,7 @@ import { ReactNode, useState } from 'react';
 import { AuthProvider } from '../lib/auth-context';
 import { BotProvider } from '../lib/bot-context';
 import { FeatureFlagsProvider } from '../lib/feature-flags-context';
+import { ThemeProvider } from '../lib/theme-context';
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(() => new QueryClient({
@@ -18,13 +19,15 @@ export function Providers({ children }: { children: ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <FeatureFlagsProvider>
-          <BotProvider>
-            {children}
-          </BotProvider>
-        </FeatureFlagsProvider>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <FeatureFlagsProvider>
+            <BotProvider>
+              {children}
+            </BotProvider>
+          </FeatureFlagsProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

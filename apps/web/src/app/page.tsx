@@ -33,6 +33,7 @@ import {
   Lightbulb,
 } from 'lucide-react';
 import { MiBotLogo } from '../components/MiBotLogo';
+import { ThemeToggle } from '../components/ThemeToggle';
 import { useAuth } from '../lib/auth-context';
 import { InteractiveHelpModal } from '../components/InteractiveHelpModal';
 
@@ -49,7 +50,7 @@ export default function HomePage() {
       stepNumber: '01',
       title: 'Crear tu Agente de WhatsApp',
       badge: 'Paso 1: Configuración Inicial',
-      icon: <Bot className="w-5 h-5 text-emerald-400" />,
+      icon: <Bot className="w-5 h-5 text-emerald-500 dark:text-emerald-400" />,
       image: '/images/hero-dashboard.jpg',
       description: 'El primer paso es darle una identidad, nombre y propósito a tu nuevo asistente inteligente.',
       details: [
@@ -65,7 +66,7 @@ export default function HomePage() {
       stepNumber: '02',
       title: 'Vincular por Código QR o Número Telefónico',
       badge: 'Paso 2: Conexión Inmediata',
-      icon: <QrCode className="w-5 h-5 text-amber-400" />,
+      icon: <QrCode className="w-5 h-5 text-amber-500 dark:text-amber-400" />,
       image: '/images/guide-qr.jpg',
       description: 'Conecta tu número comercial en menos de 60 segundos sin procesos engorrosos.',
       details: [
@@ -81,7 +82,7 @@ export default function HomePage() {
       stepNumber: '03',
       title: 'Entrenar con Documentos (RAG & pgvector)',
       badge: 'Paso 3: Base de Conocimiento',
-      icon: <Database className="w-5 h-5 text-cyan-400" />,
+      icon: <Database className="w-5 h-5 text-cyan-500 dark:text-cyan-400" />,
       image: '/images/feature-rag.jpg',
       description: 'Capacita a tu bot con tus catálogos, listas de precios, manuales y políticas en PDF o Excel.',
       details: [
@@ -97,7 +98,7 @@ export default function HomePage() {
       stepNumber: '04',
       title: 'Supervisión en Vivo & Modo Humano (Handoff)',
       badge: 'Paso 4: Control Total',
-      icon: <Headphones className="w-5 h-5 text-teal-400" />,
+      icon: <Headphones className="w-5 h-5 text-teal-500 dark:text-teal-400" />,
       image: '/images/feature-handoff.jpg',
       description: 'Monitorea las conversaciones en vivo y toma el control manual cuando sea necesario.',
       details: [
@@ -113,7 +114,7 @@ export default function HomePage() {
       stepNumber: '05',
       title: 'Cobros & Facturación con MercadoPago',
       badge: 'Paso 5: Monetización',
-      icon: <CreditCard className="w-5 h-5 text-emerald-400" />,
+      icon: <CreditCard className="w-5 h-5 text-emerald-500 dark:text-emerald-400" />,
       image: '/images/feature-payments.jpg',
       description: 'Genera cotizaciones en PDF, links de pago y facturas automáticas directo en el chat.',
       details: [
@@ -172,41 +173,43 @@ export default function HomePage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#090d16] text-slate-100 selection:bg-emerald-500 selection:text-black font-sans relative overflow-x-hidden">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] text-slate-900 dark:text-slate-100 selection:bg-emerald-500 selection:text-black font-sans relative overflow-x-hidden transition-colors duration-200">
       {/* Background ambient lighting */}
       <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-gradient-to-b from-emerald-500/20 via-teal-500/5 to-transparent rounded-full blur-[140px]" />
-        <div className="absolute top-[30%] -left-40 w-[600px] h-[600px] bg-cyan-500/10 rounded-full blur-[160px]" />
-        <div className="absolute top-[60%] -right-40 w-[600px] h-[600px] bg-emerald-500/10 rounded-full blur-[160px]" />
+        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-gradient-to-b from-emerald-500/15 dark:from-emerald-500/20 via-teal-500/5 to-transparent rounded-full blur-[140px]" />
+        <div className="absolute top-[30%] -left-40 w-[600px] h-[600px] bg-cyan-500/5 dark:bg-cyan-500/10 rounded-full blur-[160px]" />
+        <div className="absolute top-[60%] -right-40 w-[600px] h-[600px] bg-emerald-500/5 dark:bg-emerald-500/10 rounded-full blur-[160px]" />
       </div>
 
       {/* ── HEADER / NAVBAR ────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-50 backdrop-blur-xl bg-[#090d16]/85 border-b border-slate-800/80 transition-all">
+      <header className="sticky top-0 z-50 backdrop-blur-xl bg-white/85 dark:bg-[#090d16]/85 border-b border-slate-200/80 dark:border-slate-800/80 transition-colors duration-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <MiBotLogo className="w-9 h-9" textClassName="text-2xl" />
           </Link>
 
-          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
-            <a href="#guia-interactiva" className="hover:text-emerald-400 transition-colors flex items-center gap-1.5 font-semibold text-emerald-400">
+          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-700 dark:text-slate-300">
+            <a href="#guia-interactiva" className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors flex items-center gap-1.5 font-semibold text-emerald-600 dark:text-emerald-400">
               <Sparkles className="w-3.5 h-3.5" />
               Guía Interactiva
             </a>
-            <a href="#soluciones" className="hover:text-emerald-400 transition-colors">
+            <a href="#soluciones" className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
               Soluciones
             </a>
-            <a href="#caracteristicas" className="hover:text-emerald-400 transition-colors">
+            <a href="#caracteristicas" className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
               Características
             </a>
-            <a href="#planes" className="hover:text-emerald-400 transition-colors">
+            <a href="#planes" className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
               Planes
             </a>
-            <a href="#preguntas" className="hover:text-emerald-400 transition-colors">
+            <a href="#preguntas" className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
               Preguntas
             </a>
           </nav>
 
           <div className="flex items-center gap-3">
+            <ThemeToggle />
+
             {token ? (
               <Link
                 href="/dashboard"
@@ -219,7 +222,7 @@ export default function HomePage() {
               <>
                 <Link
                   href="/login"
-                  className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-800/70 transition-all"
+                  className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/70 transition-all"
                 >
                   Iniciar Sesión
                 </Link>
@@ -239,24 +242,24 @@ export default function HomePage() {
       {/* ── HERO SECTION ────────────────────────────────────────────────── */}
       <section className="relative z-10 pt-16 pb-20 md:pt-24 md:pb-28 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto text-center">
         {/* Top badge */}
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs sm:text-sm font-semibold mb-8 animate-fade-in shadow-inner">
-          <Sparkles className="w-4 h-4 text-emerald-400" />
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-300 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-xs sm:text-sm font-semibold mb-8 animate-fade-in shadow-inner">
+          <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
           <span>Agentes de WhatsApp con IA Generativa & RAG</span>
-          <span className="hidden sm:inline-block w-1.5 h-1.5 rounded-full bg-emerald-400" />
-          <span className="hidden sm:inline-block text-slate-400 font-normal">7 Días de Prueba Gratis</span>
+          <span className="hidden sm:inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400" />
+          <span className="hidden sm:inline-block text-slate-600 dark:text-slate-400 font-normal">7 Días de Prueba Gratis</span>
         </div>
 
         {/* Hero Title */}
-        <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-white max-w-5xl mx-auto leading-[1.12]">
+        <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-slate-900 dark:text-white max-w-5xl mx-auto leading-[1.12]">
           Automatiza tus ventas y atención en{' '}
-          <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent">
+          <span className="bg-gradient-to-r from-emerald-600 via-teal-500 to-cyan-600 dark:from-emerald-400 dark:via-teal-300 dark:to-cyan-400 bg-clip-text text-transparent">
             WhatsApp con IA
           </span>{' '}
           24/7
         </h1>
 
         {/* Hero Subtitle */}
-        <p className="mt-6 text-lg sm:text-xl text-slate-300 max-w-3xl mx-auto font-normal leading-relaxed">
+        <p className="mt-6 text-lg sm:text-xl text-slate-700 dark:text-slate-300 max-w-3xl mx-auto font-normal leading-relaxed">
           Conecta tu número en 60 segundos. Entrena a tus agentes con tus catálogos, PDFs y listas de precios para responder clientes, cotizar y cerrar ventas en tiempo real sin intervención humana.
         </p>
 
@@ -271,33 +274,33 @@ export default function HomePage() {
           </Link>
           <a
             href="#guia-interactiva"
-            className="w-full sm:w-auto flex items-center justify-center gap-2 px-7 py-4 rounded-2xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700/80 text-white font-semibold text-base transition-all"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-7 py-4 rounded-2xl bg-white dark:bg-slate-900/80 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700/80 text-slate-900 dark:text-white font-semibold text-base shadow-sm transition-all"
           >
-            <Play className="w-4 h-4 text-emerald-400" />
+            <Play className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             Ver Guía Interactiva
           </a>
         </div>
 
         {/* Trust bullet points */}
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-6 text-xs sm:text-sm text-slate-400">
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-6 text-xs sm:text-sm text-slate-600 dark:text-slate-400">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
             <span>Sin tarjeta de crédito requerida</span>
           </div>
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
             <span>Activación en menos de 2 minutos</span>
           </div>
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
             <span>Compatible con WhatsApp Web & Celular</span>
           </div>
         </div>
 
         {/* ── HERO IMAGE SHOWCASE ───────────────────────────────────────── */}
         <div className="mt-14 max-w-5xl mx-auto relative group">
-          <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-500 rounded-3xl blur-xl opacity-30 group-hover:opacity-50 transition duration-700" />
-          <div className="relative rounded-3xl overflow-hidden border border-slate-700/80 bg-slate-950 shadow-2xl">
+          <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-500 rounded-3xl blur-xl opacity-20 dark:opacity-30 group-hover:opacity-40 transition duration-700" />
+          <div className="relative rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-950 shadow-2xl">
             <img
               src="/images/hero-dashboard.jpg"
               alt="miBot AI WhatsApp Dashboard Interface"
@@ -308,15 +311,15 @@ export default function HomePage() {
       </section>
 
       {/* ── STATS BAR ───────────────────────────────────────────────────── */}
-      <section className="relative z-10 border-y border-slate-800/80 bg-slate-950/60 backdrop-blur-md py-12">
+      <section className="relative z-10 border-y border-slate-200 dark:border-slate-800/80 bg-white/60 dark:bg-slate-950/60 backdrop-blur-md py-12 transition-colors duration-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 text-center">
             {stats.map((st, i) => (
               <div key={i} className="space-y-1">
-                <p className="text-3xl sm:text-4xl lg:text-5xl font-black bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
+                <p className="text-3xl sm:text-4xl lg:text-5xl font-black bg-gradient-to-r from-emerald-600 to-cyan-600 dark:from-emerald-400 dark:to-cyan-400 bg-clip-text text-transparent">
                   {st.value}
                 </p>
-                <p className="text-xs sm:text-sm text-slate-400 font-medium">{st.label}</p>
+                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 font-medium">{st.label}</p>
               </div>
             ))}
           </div>
@@ -326,21 +329,21 @@ export default function HomePage() {
       {/* ── INTERACTIVE GUIDE CAROUSEL SECTION ─────────────────────────── */}
       <section
         id="guia-interactiva"
-        className="relative z-10 py-24 bg-gradient-to-b from-slate-950 via-[#070b12] to-slate-950 border-b border-slate-800/80"
+        className="relative z-10 py-24 bg-slate-100/70 dark:bg-gradient-to-b dark:from-slate-950 dark:via-[#070b12] dark:to-slate-950 border-b border-slate-200 dark:border-slate-800/80 transition-colors duration-200"
         onMouseEnter={() => setIsAutoPlay(false)}
         onMouseLeave={() => setIsAutoPlay(true)}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Section Header */}
           <div className="text-center max-w-3xl mx-auto mb-12">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider mb-3">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-300 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs font-bold uppercase tracking-wider mb-3">
               <Sparkles className="w-3.5 h-3.5" />
               Guía Interactiva Paso a Paso
             </div>
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-900 dark:text-white tracking-tight">
               Aprende a configurar tu agente en 5 pasos
             </h2>
-            <p className="mt-4 text-slate-400 text-base sm:text-lg">
+            <p className="mt-4 text-slate-600 dark:text-slate-400 text-base sm:text-lg">
               Explora el flujo completo desde la creación del bot hasta la automatización de cobros y atención en vivo.
             </p>
           </div>
@@ -355,12 +358,12 @@ export default function HomePage() {
                   onClick={() => setActiveGuideStep(idx)}
                   className={`flex items-center gap-2.5 px-4 py-3 rounded-2xl border text-xs sm:text-sm font-bold whitespace-nowrap transition-all duration-300 shrink-0 ${
                     isActive
-                      ? 'bg-gradient-to-r from-emerald-500/20 via-teal-500/20 to-cyan-500/20 border-emerald-500 text-emerald-300 shadow-lg shadow-emerald-500/10 scale-[1.02]'
-                      : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                      ? 'bg-white dark:bg-gradient-to-r dark:from-emerald-500/20 dark:via-teal-500/20 dark:to-cyan-500/20 border-emerald-500 text-emerald-700 dark:text-emerald-300 shadow-md shadow-emerald-500/10 scale-[1.02]'
+                      : 'bg-white dark:bg-slate-900/60 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-slate-700'
                   }`}
                 >
                   <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black ${
-                    isActive ? 'bg-emerald-400 text-slate-950' : 'bg-slate-800 text-slate-400'
+                    isActive ? 'bg-emerald-500 text-white dark:text-slate-950' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                   }`}>
                     {idx + 1}
                   </span>
@@ -371,21 +374,21 @@ export default function HomePage() {
           </div>
 
           {/* Main Carousel Display Card */}
-          <div className="relative rounded-3xl bg-slate-900/70 border border-slate-800 overflow-hidden shadow-2xl p-6 sm:p-10">
+          <div className="relative rounded-3xl bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xl p-6 sm:p-10 transition-colors duration-200">
             <div className="grid lg:grid-cols-12 gap-8 lg:gap-12 items-center">
               {/* Left Column: Image Showcase with Zoom */}
               <div className="lg:col-span-7 relative group">
-                <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/30 via-teal-500/30 to-cyan-500/30 rounded-2xl blur-lg opacity-40 group-hover:opacity-70 transition duration-500" />
-                <div className="relative rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-2xl aspect-[16/10]">
+                <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/20 via-teal-500/20 to-cyan-500/20 rounded-2xl blur-lg opacity-40 group-hover:opacity-70 transition duration-500" />
+                <div className="relative rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-950 shadow-2xl aspect-[16/10]">
                   <img
                     src={currentGuide.image}
                     alt={currentGuide.title}
                     className="w-full h-full object-cover rounded-2xl transition-transform duration-700 group-hover:scale-105"
                   />
                   {/* Step Overlay Pill */}
-                  <div className="absolute top-4 left-4 bg-slate-950/90 backdrop-blur-md border border-slate-700/80 px-3.5 py-1.5 rounded-full flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                    <span className="text-xs font-bold text-emerald-400">{currentGuide.badge}</span>
+                  <div className="absolute top-4 left-4 bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border border-slate-200 dark:border-slate-700/80 px-3.5 py-1.5 rounded-full flex items-center gap-2 shadow-sm">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-ping" />
+                    <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">{currentGuide.badge}</span>
                   </div>
                 </div>
               </div>
@@ -393,20 +396,20 @@ export default function HomePage() {
               {/* Right Column: Step Content & Actions */}
               <div className="lg:col-span-5 space-y-6 text-left">
                 <div className="flex items-center justify-between">
-                  <span className="text-3xl font-black text-emerald-400 font-mono">
+                  <span className="text-3xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
                     {currentGuide.stepNumber} <span className="text-xs font-normal text-slate-500">/ 05</span>
                   </span>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => setActiveGuideStep((prev) => (prev === 0 ? guideSteps.length - 1 : prev - 1))}
-                      className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors"
+                      className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-colors"
                       title="Paso Anterior"
                     >
                       <ChevronLeft className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => setActiveGuideStep((prev) => (prev + 1) % guideSteps.length)}
-                      className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors"
+                      className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-colors"
                       title="Paso Siguiente"
                     >
                       <ChevronRight className="w-4 h-4" />
@@ -415,20 +418,20 @@ export default function HomePage() {
                 </div>
 
                 <div>
-                  <h3 className="text-2xl sm:text-3xl font-bold text-white leading-tight mb-2">
+                  <h3 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white leading-tight mb-2">
                     {currentGuide.title}
                   </h3>
-                  <p className="text-sm text-slate-300 leading-relaxed">
+                  <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
                     {currentGuide.description}
                   </p>
                 </div>
 
                 {/* Step Details List */}
-                <div className="p-4 sm:p-5 rounded-2xl bg-slate-950/80 border border-slate-800/80 space-y-2.5 text-xs sm:text-sm text-slate-300">
-                  <p className="font-bold text-slate-200 flex items-center gap-1.5 text-xs uppercase tracking-wide">
-                    <Play className="w-3.5 h-3.5 text-emerald-400" /> Instrucciones Clave:
+                <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800/80 space-y-2.5 text-xs sm:text-sm text-slate-700 dark:text-slate-300">
+                  <p className="font-bold text-slate-900 dark:text-slate-200 flex items-center gap-1.5 text-xs uppercase tracking-wide">
+                    <Play className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> Instrucciones Clave:
                   </p>
-                  <ul className="space-y-2 pl-4 list-disc text-slate-300 leading-relaxed">
+                  <ul className="space-y-2 pl-4 list-disc text-slate-700 dark:text-slate-300 leading-relaxed">
                     {currentGuide.details.map((d, i) => (
                       <li key={i}>{d}</li>
                     ))}
@@ -436,7 +439,7 @@ export default function HomePage() {
                 </div>
 
                 {/* Pro Tip Box */}
-                <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-start gap-2.5">
+                <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 text-amber-800 dark:text-amber-300 text-xs flex items-start gap-2.5">
                   <Lightbulb className="w-4 h-4 flex-shrink-0 mt-0.5" />
                   <span>{currentGuide.tip}</span>
                 </div>
@@ -453,9 +456,9 @@ export default function HomePage() {
 
                   <button
                     onClick={() => setIsHelpModalOpen(true)}
-                    className="w-full sm:w-auto px-4 py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-semibold whitespace-nowrap transition-colors flex items-center justify-center gap-1.5"
+                    className="w-full sm:w-auto px-4 py-3.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-xs font-semibold whitespace-nowrap transition-colors flex items-center justify-center gap-1.5"
                   >
-                    <HelpCircle className="w-3.5 h-3.5 text-emerald-400" />
+                    <HelpCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                     Ver modal completo
                   </button>
                 </div>
@@ -470,28 +473,28 @@ export default function HomePage() {
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           {/* Text Content */}
           <div className="space-y-6 text-left">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-300 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs font-bold uppercase tracking-wider">
               <Database className="w-3.5 h-3.5" />
               Inteligencia Documental RAG
             </div>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-white leading-tight">
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white leading-tight">
               Entrena a tu bot con los archivos de tu empresa en segundos
             </h2>
-            <p className="text-base text-slate-300 leading-relaxed">
+            <p className="text-base text-slate-700 dark:text-slate-300 leading-relaxed">
               Olvídate de configurar flujos rígidos tipo árbol. Sube tus manuales, catálogos en PDF, tablas de Excel o documentos Word. Nuestro motor de búsqueda semántica vectorial (pgvector) extrae la respuesta exacta y la redacta con tono profesional para cada cliente.
             </p>
 
-            <ul className="space-y-3 text-sm text-slate-300">
+            <ul className="space-y-3 text-sm text-slate-700 dark:text-slate-300">
               <li className="flex items-start gap-3">
-                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
                 <span><strong>Cero alucinaciones:</strong> El bot solo responde basándose en los documentos que tú apruebes.</span>
               </li>
               <li className="flex items-start gap-3">
-                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
                 <span><strong>Soporta PDF, Word, Excel y TXT:</strong> Procesa automáticamente tablas, precios y condiciones.</span>
               </li>
               <li className="flex items-start gap-3">
-                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
                 <span><strong>Actualización instantánea:</strong> Agrega o elimina documentos y el bot sabrá los cambios de inmediato.</span>
               </li>
             </ul>
@@ -499,7 +502,7 @@ export default function HomePage() {
             <div className="pt-2">
               <Link
                 href="/register"
-                className="inline-flex items-center gap-2 text-emerald-400 font-bold text-sm hover:text-emerald-300 transition-colors group"
+                className="inline-flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold text-sm hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors group"
               >
                 Probar carga de documentos gratis
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -509,8 +512,8 @@ export default function HomePage() {
 
           {/* Image Showcase */}
           <div className="relative group">
-            <div className="absolute -inset-1 bg-gradient-to-tr from-emerald-500/30 to-cyan-500/30 rounded-3xl blur-lg opacity-40 group-hover:opacity-70 transition duration-500" />
-            <div className="relative rounded-3xl overflow-hidden border border-slate-800 bg-slate-900 shadow-2xl">
+            <div className="absolute -inset-1 bg-gradient-to-tr from-emerald-500/20 to-cyan-500/20 rounded-3xl blur-lg opacity-40 group-hover:opacity-70 transition duration-500" />
+            <div className="relative rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl">
               <img
                 src="/images/feature-rag.jpg"
                 alt="RAG Document Intelligence with pgvector"
@@ -522,13 +525,13 @@ export default function HomePage() {
       </section>
 
       {/* ── SPOTLIGHT FEATURE 2: LIVE CHAT & HUMAN HANDOFF ─────────────── */}
-      <section className="relative z-10 py-24 bg-slate-950/70 border-t border-slate-800/70">
+      <section className="relative z-10 py-24 bg-slate-100/60 dark:bg-slate-950/70 border-t border-slate-200 dark:border-slate-800/70 transition-colors duration-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
             {/* Image Showcase */}
             <div className="relative group order-2 lg:order-1">
-              <div className="absolute -inset-1 bg-gradient-to-tr from-cyan-500/30 to-emerald-500/30 rounded-3xl blur-lg opacity-40 group-hover:opacity-70 transition duration-500" />
-              <div className="relative rounded-3xl overflow-hidden border border-slate-800 bg-slate-900 shadow-2xl">
+              <div className="absolute -inset-1 bg-gradient-to-tr from-cyan-500/20 to-emerald-500/20 rounded-3xl blur-lg opacity-40 group-hover:opacity-70 transition duration-500" />
+              <div className="relative rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl">
                 <img
                   src="/images/feature-handoff.jpg"
                   alt="Live Chat and Human Handoff Mode"
@@ -539,28 +542,28 @@ export default function HomePage() {
 
             {/* Text Content */}
             <div className="space-y-6 text-left order-1 lg:order-2">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-bold uppercase tracking-wider">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-50 dark:bg-cyan-500/10 border border-cyan-300 dark:border-cyan-500/20 text-cyan-700 dark:text-cyan-400 text-xs font-bold uppercase tracking-wider">
                 <Headphones className="w-3.5 h-3.5" />
                 Handoff Humano & Live Chat
               </div>
-              <h2 className="text-3xl sm:text-4xl font-extrabold text-white leading-tight">
+              <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white leading-tight">
                 Control total: Intervén en cualquier conversación en vivo
               </h2>
-              <p className="text-base text-slate-300 leading-relaxed">
+              <p className="text-base text-slate-700 dark:text-slate-300 leading-relaxed">
                 Tus ejecutivos y tu inteligencia artificial colaboran en perfecta armonía. Monitorea todas las conversaciones de WhatsApp en tiempo real y activa el Modo Humano cuando un cliente requiera atención personalizada.
               </p>
 
-              <ul className="space-y-3 text-sm text-slate-300">
+              <ul className="space-y-3 text-sm text-slate-700 dark:text-slate-300">
                 <li className="flex items-start gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
+                  <CheckCircle2 className="w-5 h-5 text-cyan-600 dark:text-cyan-400 shrink-0 mt-0.5" />
                   <span><strong>Modo Humano con 1 clic:</strong> Pausa las respuestas de la IA instantáneamente para responder como agente.</span>
                 </li>
                 <li className="flex items-start gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
+                  <CheckCircle2 className="w-5 h-5 text-cyan-600 dark:text-cyan-400 shrink-0 mt-0.5" />
                   <span><strong>Historial centralizado:</strong> Consulta todos los chats de WhatsApp con etiquetas y filtros de búsqueda.</span>
                 </li>
                 <li className="flex items-start gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
+                  <CheckCircle2 className="w-5 h-5 text-cyan-600 dark:text-cyan-400 shrink-0 mt-0.5" />
                   <span><strong>Notificaciones instantáneas:</strong> Detecta leads de alto valor y oportunidades de venta inmediata.</span>
                 </li>
               </ul>
@@ -568,7 +571,7 @@ export default function HomePage() {
               <div className="pt-2">
                 <Link
                   href="/register"
-                  className="inline-flex items-center gap-2 text-cyan-400 font-bold text-sm hover:text-cyan-300 transition-colors group"
+                  className="inline-flex items-center gap-2 text-cyan-600 dark:text-cyan-400 font-bold text-sm hover:text-cyan-700 dark:hover:text-cyan-300 transition-colors group"
                 >
                   Conectar tu WhatsApp para probar el Live Chat
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -584,28 +587,28 @@ export default function HomePage() {
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           {/* Text Content */}
           <div className="space-y-6 text-left">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-400 text-xs font-bold uppercase tracking-wider">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-50 dark:bg-teal-500/10 border border-teal-300 dark:border-teal-500/20 text-teal-700 dark:text-teal-400 text-xs font-bold uppercase tracking-wider">
               <CreditCard className="w-3.5 h-3.5" />
               Cobros & MercadoPago
             </div>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-white leading-tight">
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white leading-tight">
               Cierra ventas y cobra directamente por WhatsApp
             </h2>
-            <p className="text-base text-slate-300 leading-relaxed">
+            <p className="text-base text-slate-700 dark:text-slate-300 leading-relaxed">
               Integra tu cuenta de MercadoPago para emitir links de pago automáticos, comprobantes digitales y facturas en PDF que tu bot envía al cliente tan pronto confirma su compra o servicio.
             </p>
 
-            <ul className="space-y-3 text-sm text-slate-300">
+            <ul className="space-y-3 text-sm text-slate-700 dark:text-slate-300">
               <li className="flex items-start gap-3">
-                <CheckCircle2 className="w-5 h-5 text-teal-400 shrink-0 mt-0.5" />
+                <CheckCircle2 className="w-5 h-5 text-teal-600 dark:text-teal-400 shrink-0 mt-0.5" />
                 <span><strong>Links de pago generados al vuelo:</strong> Tarjeta de crédito, débito y transferencias seguras.</span>
               </li>
               <li className="flex items-start gap-3">
-                <CheckCircle2 className="w-5 h-5 text-teal-400 shrink-0 mt-0.5" />
+                <CheckCircle2 className="w-5 h-5 text-teal-600 dark:text-teal-400 shrink-0 mt-0.5" />
                 <span><strong>Envío automático de documentos:</strong> Cotizaciones y recibos oficiales en formato PDF por WhatsApp.</span>
               </li>
               <li className="flex items-start gap-3">
-                <CheckCircle2 className="w-5 h-5 text-teal-400 shrink-0 mt-0.5" />
+                <CheckCircle2 className="w-5 h-5 text-teal-600 dark:text-teal-400 shrink-0 mt-0.5" />
                 <span><strong>Webhooks en tiempo real:</strong> Confirma pagos y actualiza el estado del pedido automáticamente.</span>
               </li>
             </ul>
@@ -613,7 +616,7 @@ export default function HomePage() {
             <div className="pt-2">
               <Link
                 href="/register"
-                className="inline-flex items-center gap-2 text-teal-400 font-bold text-sm hover:text-teal-300 transition-colors group"
+                className="inline-flex items-center gap-2 text-teal-600 dark:text-teal-400 font-bold text-sm hover:text-teal-700 dark:hover:text-teal-300 transition-colors group"
               >
                 Comenzar ahora con 7 días de prueba
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -623,8 +626,8 @@ export default function HomePage() {
 
           {/* Image Showcase */}
           <div className="relative group">
-            <div className="absolute -inset-1 bg-gradient-to-tr from-teal-500/30 to-emerald-500/30 rounded-3xl blur-lg opacity-40 group-hover:opacity-70 transition duration-500" />
-            <div className="relative rounded-3xl overflow-hidden border border-slate-800 bg-slate-900 shadow-2xl">
+            <div className="absolute -inset-1 bg-gradient-to-tr from-teal-500/20 to-emerald-500/20 rounded-3xl blur-lg opacity-40 group-hover:opacity-70 transition duration-500" />
+            <div className="relative rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl">
               <img
                 src="/images/feature-payments.jpg"
                 alt="Automated Payments and Invoicing via MercadoPago"
@@ -636,83 +639,83 @@ export default function HomePage() {
       </section>
 
       {/* ── CORE CAPABILITIES GRID ─────────────────────────────────────── */}
-      <section id="caracteristicas" className="relative z-10 py-24 bg-slate-950/80 border-t border-slate-800/70">
+      <section id="caracteristicas" className="relative z-10 py-24 bg-slate-100/60 dark:bg-slate-950/80 border-t border-slate-200 dark:border-slate-800/70 transition-colors duration-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto mb-16">
-            <h2 className="text-xs sm:text-sm font-extrabold text-emerald-400 uppercase tracking-widest mb-3">
+            <h2 className="text-xs sm:text-sm font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mb-3">
               Arquitectura Robusta
             </h2>
-            <p className="text-3xl sm:text-4xl font-extrabold text-white">
+            <p className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white">
               Todo lo que necesitas para operar a escala
             </p>
-            <p className="mt-4 text-slate-400 text-base">
+            <p className="mt-4 text-slate-600 dark:text-slate-400 text-base">
               Construido con tecnología moderna para empresas que no pueden permitirse caídas ni demoras en sus canales de venta.
             </p>
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* Capability 1 */}
-            <div className="p-7 rounded-3xl bg-slate-900/50 border border-slate-800/90 hover:border-emerald-500/40 hover:bg-slate-900/80 transition-all duration-300 group">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-5 group-hover:scale-110 transition-transform">
+            <div className="p-7 rounded-3xl bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800/90 hover:border-emerald-500/40 hover:bg-slate-50 dark:hover:bg-slate-900/80 transition-all duration-300 group shadow-sm">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 mb-5 group-hover:scale-110 transition-transform">
                 <Mic className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold text-white mb-2">Entendimiento de Notas de Voz</h3>
-              <p className="text-sm text-slate-400 leading-relaxed">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Entendimiento de Notas de Voz</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
                 Tus clientes pueden enviar audios de cualquier duración. La IA los transcribe con precisión y genera una respuesta contextual inmediata.
               </p>
             </div>
 
             {/* Capability 2 */}
-            <div className="p-7 rounded-3xl bg-slate-900/50 border border-slate-800/90 hover:border-emerald-500/40 hover:bg-slate-900/80 transition-all duration-300 group">
-              <div className="w-12 h-12 rounded-2xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-400 mb-5 group-hover:scale-110 transition-transform">
+            <div className="p-7 rounded-3xl bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800/90 hover:border-emerald-500/40 hover:bg-slate-50 dark:hover:bg-slate-900/80 transition-all duration-300 group shadow-sm">
+              <div className="w-12 h-12 rounded-2xl bg-teal-50 dark:bg-teal-500/10 border border-teal-200 dark:border-teal-500/20 flex items-center justify-center text-teal-600 dark:text-teal-400 mb-5 group-hover:scale-110 transition-transform">
                 <Zap className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold text-white mb-2">Caché Semántica Vectorial</h3>
-              <p className="text-sm text-slate-400 leading-relaxed">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Caché Semántica Vectorial</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
                 Las preguntas frecuentes se responden en milisegundos sin consumir cuota de modelos de lenguaje, optimizando tiempos y costos.
               </p>
             </div>
 
             {/* Capability 3 */}
-            <div className="p-7 rounded-3xl bg-slate-900/50 border border-slate-800/90 hover:border-emerald-500/40 hover:bg-slate-900/80 transition-all duration-300 group">
-              <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 mb-5 group-hover:scale-110 transition-transform">
+            <div className="p-7 rounded-3xl bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800/90 hover:border-emerald-500/40 hover:bg-slate-50 dark:hover:bg-slate-900/80 transition-all duration-300 group shadow-sm">
+              <div className="w-12 h-12 rounded-2xl bg-cyan-50 dark:bg-cyan-500/10 border border-cyan-200 dark:border-cyan-500/20 flex items-center justify-center text-cyan-600 dark:text-cyan-400 mb-5 group-hover:scale-110 transition-transform">
                 <QrCode className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold text-white mb-2">Conexión por QR o Teléfono</h3>
-              <p className="text-sm text-slate-400 leading-relaxed">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Conexión por QR o Teléfono</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
                 Vincula tu número escaneando el código QR en pantalla o solicitando un código de 8 dígitos directo a tu app de WhatsApp.
               </p>
             </div>
 
             {/* Capability 4 */}
-            <div className="p-7 rounded-3xl bg-slate-900/50 border border-slate-800/90 hover:border-emerald-500/40 hover:bg-slate-900/80 transition-all duration-300 group">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-5 group-hover:scale-110 transition-transform">
+            <div className="p-7 rounded-3xl bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800/90 hover:border-emerald-500/40 hover:bg-slate-50 dark:hover:bg-slate-900/80 transition-all duration-300 group shadow-sm">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 mb-5 group-hover:scale-110 transition-transform">
                 <Layers className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold text-white mb-2">Múltiples Modelos de IA</h3>
-              <p className="text-sm text-slate-400 leading-relaxed">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Múltiples Modelos de IA</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
                 Elige entre GPT-4o-mini, GPT-4o o modelos dedicados según el nivel de razonamiento y complejidad de tus requerimientos.
               </p>
             </div>
 
             {/* Capability 5 */}
-            <div className="p-7 rounded-3xl bg-slate-900/50 border border-slate-800/90 hover:border-emerald-500/40 hover:bg-slate-900/80 transition-all duration-300 group">
-              <div className="w-12 h-12 rounded-2xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-400 mb-5 group-hover:scale-110 transition-transform">
+            <div className="p-7 rounded-3xl bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800/90 hover:border-emerald-500/40 hover:bg-slate-50 dark:hover:bg-slate-900/80 transition-all duration-300 group shadow-sm">
+              <div className="w-12 h-12 rounded-2xl bg-teal-50 dark:bg-teal-500/10 border border-teal-200 dark:border-teal-500/20 flex items-center justify-center text-teal-600 dark:text-teal-400 mb-5 group-hover:scale-110 transition-transform">
                 <Lock className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold text-white mb-2">Privacidad y Multi-Tenant</h3>
-              <p className="text-sm text-slate-400 leading-relaxed">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Privacidad y Multi-Tenant</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
                 Tus datos e historiales de conversación están aislados de forma segura con cifrado en tránsito y en reposo.
               </p>
             </div>
 
             {/* Capability 6 */}
-            <div className="p-7 rounded-3xl bg-slate-900/50 border border-slate-800/90 hover:border-emerald-500/40 hover:bg-slate-900/80 transition-all duration-300 group">
-              <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 mb-5 group-hover:scale-110 transition-transform">
+            <div className="p-7 rounded-3xl bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800/90 hover:border-emerald-500/40 hover:bg-slate-50 dark:hover:bg-slate-900/80 transition-all duration-300 group shadow-sm">
+              <div className="w-12 h-12 rounded-2xl bg-cyan-50 dark:bg-cyan-500/10 border border-cyan-200 dark:border-cyan-500/20 flex items-center justify-center text-cyan-600 dark:text-cyan-400 mb-5 group-hover:scale-110 transition-transform">
                 <BarChart3 className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold text-white mb-2">Panel Super Admin</h3>
-              <p className="text-sm text-slate-400 leading-relaxed">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Panel Super Admin</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
                 Gestión completa de organizaciones, suscripciones, estados de servicio y planes de facturación centralizados.
               </p>
             </div>
@@ -721,86 +724,86 @@ export default function HomePage() {
       </section>
 
       {/* ── PRICING SECTION ─────────────────────────────────────────────── */}
-      <section id="planes" className="relative z-10 py-24 bg-slate-950/80 border-t border-slate-800/70">
+      <section id="planes" className="relative z-10 py-24 bg-white/70 dark:bg-slate-950/80 border-t border-slate-200 dark:border-slate-800/70 transition-colors duration-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto mb-16">
-            <h2 className="text-xs sm:text-sm font-extrabold text-emerald-400 uppercase tracking-widest mb-3">
+            <h2 className="text-xs sm:text-sm font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mb-3">
               Planes Transparentes
             </h2>
-            <p className="text-3xl sm:text-4xl font-extrabold text-white">
+            <p className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white">
               Comienza hoy con 7 días de prueba gratis
             </p>
-            <p className="mt-4 text-slate-400 text-base">
+            <p className="mt-4 text-slate-600 dark:text-slate-400 text-base">
               Elige el plan que mejor se adapte al tamaño de tu empresa. Cancela o cambia de plan cuando quieras con MercadoPago.
             </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto items-stretch">
             {/* Plan Starter */}
-            <div className="p-8 rounded-3xl bg-slate-900/60 border border-slate-800 flex flex-col justify-between space-y-6">
+            <div className="p-8 rounded-3xl bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 flex flex-col justify-between space-y-6 shadow-sm">
               <div>
-                <h3 className="text-xl font-bold text-white">Plan Starter</h3>
-                <p className="text-xs text-slate-400 mt-1">Ideal para profesionales y pequeños negocios.</p>
-                <p className="text-4xl font-black text-white mt-6">
-                  $29.000 <span className="text-sm text-slate-400 font-normal">CLP / mes</span>
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white">Plan Starter</h3>
+                <p className="text-xs text-slate-500 mt-1">Ideal para profesionales y pequeños negocios.</p>
+                <p className="text-4xl font-black text-slate-900 dark:text-white mt-6">
+                  $29.000 <span className="text-sm text-slate-500 font-normal">CLP / mes</span>
                 </p>
-                <ul className="mt-8 space-y-3 text-sm text-slate-300">
+                <ul className="mt-8 space-y-3 text-sm text-slate-700 dark:text-slate-300">
                   <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                     <span><strong>1 Agente</strong> de WhatsApp activo</span>
                   </li>
                   <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                     <span>Mensajes ilimitados</span>
                   </li>
                   <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                     <span>RAG de hasta 50 documentos</span>
                   </li>
                   <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                     <span>Soporte estándar</span>
                   </li>
                 </ul>
               </div>
               <Link
                 href="/register"
-                className="w-full py-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 font-bold text-center text-sm text-white transition-all block"
+                className="w-full py-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 font-bold text-center text-sm text-slate-900 dark:text-white border border-slate-300 dark:border-transparent transition-all block"
               >
                 Probar 7 Días Gratis
               </Link>
             </div>
 
             {/* Plan Pro (Destacado) */}
-            <div className="p-8 rounded-3xl bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 border-2 border-emerald-500/50 flex flex-col justify-between space-y-6 relative shadow-2xl shadow-emerald-500/10">
+            <div className="p-8 rounded-3xl bg-gradient-to-b from-white via-slate-50 to-white dark:from-slate-900 dark:via-slate-950 dark:to-slate-900 border-2 border-emerald-500 flex flex-col justify-between space-y-6 relative shadow-2xl shadow-emerald-500/10">
               <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 text-xs font-black px-4 py-1 rounded-full uppercase tracking-wider shadow-md">
                 Más Popular
               </div>
               <div>
-                <h3 className="text-xl font-bold text-emerald-400">Plan Pro</h3>
-                <p className="text-xs text-slate-400 mt-1">Para empresas con alto volumen de atención y ventas.</p>
-                <p className="text-4xl font-black text-white mt-6">
-                  $79.000 <span className="text-sm text-slate-400 font-normal">CLP / mes</span>
+                <h3 className="text-xl font-bold text-emerald-600 dark:text-emerald-400">Plan Pro</h3>
+                <p className="text-xs text-slate-500 mt-1">Para empresas con alto volumen de atención y ventas.</p>
+                <p className="text-4xl font-black text-slate-900 dark:text-white mt-6">
+                  $79.000 <span className="text-sm text-slate-500 font-normal">CLP / mes</span>
                 </p>
-                <ul className="mt-8 space-y-3 text-sm text-slate-300">
+                <ul className="mt-8 space-y-3 text-sm text-slate-700 dark:text-slate-300">
                   <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                     <span><strong>5 Agentes</strong> de WhatsApp simultáneos</span>
                   </li>
                   <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                     <span>Mensajes ilimitados</span>
                   </li>
                   <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                     <span>RAG de hasta 200 documentos</span>
                   </li>
                   <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                     <span>Transcripción de audios incluida</span>
                   </li>
                   <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                     <span>Soporte prioritario 24/7</span>
                   </li>
                 </ul>
@@ -814,35 +817,35 @@ export default function HomePage() {
             </div>
 
             {/* Plan Enterprise */}
-            <div className="p-8 rounded-3xl bg-slate-900/60 border border-slate-800 flex flex-col justify-between space-y-6">
+            <div className="p-8 rounded-3xl bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 flex flex-col justify-between space-y-6 shadow-sm">
               <div>
-                <h3 className="text-xl font-bold text-white">Plan Enterprise</h3>
-                <p className="text-xs text-slate-400 mt-1">Solución personalizada para grandes corporaciones.</p>
-                <p className="text-4xl font-black text-white mt-6">
-                  $199.000 <span className="text-sm text-slate-400 font-normal">CLP / mes</span>
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white">Plan Enterprise</h3>
+                <p className="text-xs text-slate-500 mt-1">Solución personalizada para grandes corporaciones.</p>
+                <p className="text-4xl font-black text-slate-900 dark:text-white mt-6">
+                  $199.000 <span className="text-sm text-slate-500 font-normal">CLP / mes</span>
                 </p>
-                <ul className="mt-8 space-y-3 text-sm text-slate-300">
+                <ul className="mt-8 space-y-3 text-sm text-slate-700 dark:text-slate-300">
                   <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                     <span>Hasta <strong>20 Agentes</strong> de WhatsApp</span>
                   </li>
                   <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                     <span>RAG de hasta 1.000 documentos</span>
                   </li>
                   <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                     <span>Instancia de IA dedicada</span>
                   </li>
                   <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                     <span>Account Manager exclusivo</span>
                   </li>
                 </ul>
               </div>
               <Link
                 href="/register"
-                className="w-full py-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 font-bold text-center text-sm text-white transition-all block"
+                className="w-full py-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 font-bold text-center text-sm text-slate-900 dark:text-white border border-slate-300 dark:border-transparent transition-all block"
               >
                 Contactar Ventas
               </Link>
@@ -854,10 +857,10 @@ export default function HomePage() {
       {/* ── FAQ SECTION ─────────────────────────────────────────────────── */}
       <section id="preguntas" className="relative z-10 py-24 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
-          <h2 className="text-xs sm:text-sm font-extrabold text-emerald-400 uppercase tracking-widest mb-3">
+          <h2 className="text-xs sm:text-sm font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mb-3">
             Dudas Frecuentes
           </h2>
-          <p className="text-3xl sm:text-4xl font-extrabold text-white">
+          <p className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white">
             Preguntas Frecuentes
           </p>
         </div>
@@ -868,21 +871,21 @@ export default function HomePage() {
             return (
               <div
                 key={idx}
-                className="rounded-2xl bg-slate-900/60 border border-slate-800 overflow-hidden transition-colors"
+                className="rounded-2xl bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm transition-colors"
               >
                 <button
                   onClick={() => setOpenFaq(isOpen ? null : idx)}
-                  className="w-full p-6 text-left flex items-center justify-between gap-4 font-semibold text-white text-base hover:text-emerald-400 transition-colors"
+                  className="w-full p-6 text-left flex items-center justify-between gap-4 font-semibold text-slate-900 dark:text-white text-base hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
                 >
                   <span>{faq.q}</span>
                   <ChevronDown
                     className={`w-5 h-5 text-slate-400 shrink-0 transition-transform duration-200 ${
-                      isOpen ? 'rotate-180 text-emerald-400' : ''
+                      isOpen ? 'rotate-180 text-emerald-600 dark:text-emerald-400' : ''
                     }`}
                   />
                 </button>
                 {isOpen && (
-                  <div className="px-6 pb-6 pt-0 text-sm text-slate-400 leading-relaxed border-t border-slate-800/40 mt-1">
+                  <div className="px-6 pb-6 pt-0 text-sm text-slate-600 dark:text-slate-400 leading-relaxed border-t border-slate-100 dark:border-slate-800/40 mt-1">
                     <p className="pt-3">{faq.a}</p>
                   </div>
                 )}
@@ -894,13 +897,13 @@ export default function HomePage() {
 
       {/* ── CTA FINAL BANNER ────────────────────────────────────────────── */}
       <section className="relative z-10 py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        <div className="rounded-3xl p-8 sm:p-14 bg-gradient-to-r from-emerald-900/40 via-slate-900 to-cyan-900/40 border border-emerald-500/30 text-center relative overflow-hidden shadow-2xl">
+        <div className="rounded-3xl p-8 sm:p-14 bg-gradient-to-r from-emerald-100 via-slate-100 to-cyan-100 dark:from-emerald-900/40 dark:via-slate-900 dark:to-cyan-900/40 border border-emerald-300 dark:border-emerald-500/30 text-center relative overflow-hidden shadow-2xl transition-colors duration-200">
           <div className="absolute -right-20 -bottom-20 w-80 h-80 bg-emerald-500/10 rounded-full blur-[100px]" />
           <div className="relative z-10 max-w-3xl mx-auto space-y-6">
-            <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight">
+            <h2 className="text-3xl sm:text-5xl font-extrabold text-slate-900 dark:text-white tracking-tight">
               ¿Listo para transformar tu canal de WhatsApp?
             </h2>
-            <p className="text-base sm:text-lg text-slate-300 font-normal">
+            <p className="text-base sm:text-lg text-slate-700 dark:text-slate-300 font-normal">
               Crea tu cuenta gratuita hoy y activa tu primer agente de inteligencia artificial en menos de 2 minutos.
             </p>
             <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -913,7 +916,7 @@ export default function HomePage() {
               </Link>
               <Link
                 href="/login"
-                className="w-full sm:w-auto px-7 py-4 rounded-2xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700 text-white font-semibold text-base transition-all"
+                className="w-full sm:w-auto px-7 py-4 rounded-2xl bg-white dark:bg-slate-900/80 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-semibold text-base shadow-sm transition-all"
               >
                 Ingresar a mi cuenta
               </Link>
@@ -923,21 +926,21 @@ export default function HomePage() {
       </section>
 
       {/* ── FOOTER ───────────────────────────────────────────────────────── */}
-      <footer className="relative z-10 border-t border-slate-800/80 bg-slate-950 py-12">
+      <footer className="relative z-10 border-t border-slate-200 dark:border-slate-800/80 bg-white dark:bg-slate-950 py-12 transition-colors duration-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-3">
             <MiBotLogo className="w-7 h-7" textClassName="text-xl" />
             <span className="text-xs text-slate-500">© 2026 miBot SaaS. Todos los derechos reservados.</span>
           </div>
 
-          <div className="flex items-center gap-6 text-xs text-slate-400">
-            <Link href="/login" className="hover:text-emerald-400 transition-colors">
+          <div className="flex items-center gap-6 text-xs text-slate-600 dark:text-slate-400">
+            <Link href="/login" className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
               Iniciar Sesión
             </Link>
-            <Link href="/register" className="hover:text-emerald-400 transition-colors">
+            <Link href="/register" className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
               Registrarse
             </Link>
-            <a href="#planes" className="hover:text-emerald-400 transition-colors">
+            <a href="#planes" className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
               Planes
             </a>
           </div>
