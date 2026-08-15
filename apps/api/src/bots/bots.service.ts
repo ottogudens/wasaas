@@ -333,44 +333,6 @@ export class BotsService {
         body: JSON.stringify({
           tenantId: conversation.bot.tenantId,
           customerPhone: conversation.customerPhone,
-   */
-  async toggleHumanMode(conversationId: string, organizationId: string, isHumanMode?: boolean) {
-    const conversation = await this.prisma.conversation.findUnique({
-      where: { id: conversationId },
-    if (!conversation) throw new NotFoundException('Conversación no encontrada.');
-    if (conversation.bot.organizationId !== organizationId) {
-      throw new ForbiddenException('No tienes acceso a esta conversación.');
-    }
-
-    // Activar modo humano (Handoff)
-    await this.prisma.conversation.update({
-      where: { id: conversation.id },
-      data: { isHumanMode: true, updatedAt: new Date() },
-    });
-
-    // Guardar mensaje en DB
-    const message = await this.prisma.message.create({
-      data: {
-        conversationId: conversation.id,
-        sender: 'AGENT',
-        content,
-      },
-    });
-
-    // Enviar mensaje real a WhatsApp a través del bot-engine
-    try {
-      const botEngineUrl = process.env.BOT_ENGINE_URL || 'https://whatsapp-service-production-e6f2.up.railway.app';
-      const apiKey = process.env.INTERNAL_API_KEY;
-      
-      const res = await fetch(`${botEngineUrl}/internal/send-message`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-        },
-        body: JSON.stringify({
-          tenantId: conversation.bot.tenantId,
-          customerPhone: conversation.customerPhone,
           message: content,
         }),
       });
