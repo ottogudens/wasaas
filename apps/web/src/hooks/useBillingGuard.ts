@@ -9,6 +9,7 @@ import { useAuth } from '../lib/auth-context';
 /**
  * useBillingGuard — Protege el acceso al dashboard si el trial ha expirado.
  * Redirige a /dashboard/billing para que el cliente elija un plan.
+ * Las cuentas de Cortesía (CORTESIA), cuentas activas y SUPER_ADMIN nunca son bloqueadas.
  */
 export function useBillingGuard() {
   const { token, user } = useAuth();
@@ -31,6 +32,12 @@ export function useBillingGuard() {
     if (isSuperAdmin || isOnBilling || billingQuery.isLoading || !billingQuery.data) return;
 
     const billing = billingQuery.data;
+
+    // Cuentas de cortesía o con suscripción activa nunca son bloqueadas
+    if (billing.plan === 'CORTESIA' || billing.isCourteous || billing.status === 'ACTIVE') {
+      return;
+    }
+
     const isBlocked =
       billing.status === 'TRIAL_EXPIRED' ||
       billing.status === 'CANCELLED' ||

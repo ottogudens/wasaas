@@ -15,14 +15,14 @@ class UpdateTenantAiDto {
 
 class UpdateSubscriptionDto {
   @IsString()
-  plan: 'STARTER' | 'PRO' | 'ENTERPRISE';
+  plan: 'TRIAL' | 'STARTER' | 'PRO' | 'ENTERPRISE' | 'CORTESIA';
 
   @IsOptional()
   @IsString()
   customPlanName?: string;
 
   @IsString()
-  status: 'ACTIVE' | 'PENDING' | 'CANCELLED';
+  status: 'ACTIVE' | 'PENDING' | 'CANCELLED' | 'TRIAL_EXPIRED';
 }
 
 class ToggleTenantStatusDto {
@@ -172,13 +172,26 @@ export class TenantsController {
       where: { organizationId: id },
     });
 
+    let currentPeriodEnd = existingSub?.currentPeriodEnd;
+    let status = dto.status as any;
+
+    if (dto.plan === 'CORTESIA') {
+      status = 'ACTIVE';
+      currentPeriodEnd = new Date('2099-12-31T23:59:59.999Z');
+    } else if (dto.plan === 'TRIAL') {
+      currentPeriodEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    } else if (status === 'ACTIVE' && (!currentPeriodEnd || currentPeriodEnd < new Date())) {
+      currentPeriodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    }
+
     if (existingSub) {
       await this.prisma.subscription.update({
         where: { id: existingSub.id },
         data: {
           plan: dto.plan,
           customPlanName: dto.customPlanName,
-          status: dto.status as any,
+          status,
+          currentPeriodEnd,
         },
       });
     } else {
@@ -187,12 +200,16 @@ export class TenantsController {
           organizationId: id,
           plan: dto.plan,
           customPlanName: dto.customPlanName,
-          status: dto.status as any,
+          status,
+          currentPeriodEnd,
         },
       });
     }
 
-    return { success: true, message: 'Suscripción actualizada exitosamente' };
+    return {
+      success: true,
+      message: `Suscripción actualizada exitosamente: Plan ${dto.plan} (${status})`,
+    };
   }
 
   @Patch(':id/status')
@@ -291,6 +308,21 @@ _Generado por miBot SaaS_`,
 
     if (!subscription) {
       return { plan: 'NONE', status: 'NONE', trialDaysLeft: 0 };
+    }
+
+    if (subscription.plan === 'CORTESIA') {
+      return {
+        id: subscription.id,
+        plan: 'CORTESIA',
+        customPlanName: subscription.customPlanName || 'Cuenta de Cortesía (Gratuita)',
+        status: 'ACTIVE',
+        trialDaysLeft: 9999,
+        isCourteous: true,
+        trialEndsAt: subscription.currentPeriodEnd,
+        currentPeriodStart: subscription.currentPeriodStart,
+        currentPeriodEnd: subscription.currentPeriodEnd,
+        mpPreapprovalId: subscription.mpPreapprovalId,
+      };
     }
 
     let trialDaysLeft = 0;

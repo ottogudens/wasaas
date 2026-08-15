@@ -65,7 +65,9 @@ class ApiClient {
       customPlanName: string | null;
       status: string;
       trialDaysLeft: number;
+      isCourteous?: boolean;
       trialEndsAt: string | null;
+      currentPeriodStart?: string | null;
       currentPeriodEnd: string | null;
       mpPreapprovalId: string | null;
     }>('/tenants/billing/me');
@@ -290,6 +292,63 @@ class ApiClient {
 
   async deleteSalesPlan(planId: string) {
     return this.request<any>(`/tenants/plans/${planId}`, { method: 'DELETE' });
+  }
+
+  // ── MercadoPago Integration (Platform & Client) ──
+  async getPlatformMpConfig() {
+    return this.request<{
+      isConfigured: boolean;
+      connectionStatus: 'CONNECTED' | 'ERROR' | 'UNCONFIGURED';
+      accountInfo?: { id: number; nickname: string; email: string; siteId: string };
+      publicKey: string;
+      webhookUrl: string;
+      maskedToken: string;
+      webhookSecret: string;
+    }>('/mercadopago/platform-config');
+  }
+
+  async savePlatformMpConfig(body: { accessToken?: string; publicKey?: string; webhookSecret?: string }) {
+    return this.request<any>('/mercadopago/platform-config', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  }
+
+  async testPlatformMpConnection(token?: string) {
+    return this.request<{ success: boolean; data?: any; error?: string }>('/mercadopago/test-platform-connection', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    });
+  }
+
+  async getClientMpConfig() {
+    return this.request<{
+      isConfigured: boolean;
+      connectionStatus: 'CONNECTED' | 'ERROR' | 'UNCONFIGURED';
+      accountInfo?: { id: number; nickname: string; email: string; siteId: string };
+      publicKey: string;
+      maskedToken: string;
+    }>('/mercadopago/client-config');
+  }
+
+  async saveClientMpConfig(body: { accessToken: string; publicKey?: string }) {
+    return this.request<{ success: boolean; isConfigured: boolean; maskedToken: string; accountInfo: any }>(
+      '/mercadopago/client-config',
+      {
+        method: 'POST',
+        body: JSON.stringify(body),
+      },
+    );
+  }
+
+  async createPaymentPreference(body: { title: string; amount: number; customerPhone?: string }) {
+    return this.request<{ initPoint: string; sandboxInitPoint?: string; preferenceId: string }>(
+      '/mercadopago/create-payment-preference',
+      {
+        method: 'POST',
+        body: JSON.stringify(body),
+      },
+    );
   }
 
   // ── Bot Simulator / In-App Test Chat ────────────

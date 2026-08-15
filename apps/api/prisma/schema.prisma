@@ -21,6 +21,7 @@ enum PlanType {
   STARTER
   PRO
   ENTERPRISE
+  CORTESIA
 }
 
 enum SubscriptionStatus {
@@ -49,6 +50,9 @@ model Organization {
   name              String
   slug              String         @unique
   isActive          Boolean        @default(true)
+  mpAccessToken     String?        @db.Text // Credencial MercadoPago para cobros directos de la organización
+  mpPublicKey       String?
+  mpWebhookSecret   String?
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 
@@ -59,6 +63,12 @@ model Organization {
   semanticCaches    SemanticMemoryCache[]
   invoices          Invoice[]
   featureFlags      OrganizationFeatureFlag[]
+}
+
+model PlatformSetting {
+  key       String   @id
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt
 }
 
 model User {
