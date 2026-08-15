@@ -52,6 +52,35 @@ class CreatePlanDto {
   features?: string[];
 }
 
+class UpdatePlanDto {
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsNumber()
+  price?: number;
+
+  @IsOptional()
+  @IsNumber()
+  maxBots?: number;
+
+  @IsOptional()
+  @IsNumber()
+  maxDocs?: number;
+
+  @IsOptional()
+  @IsArray()
+  features?: string[];
+
+  @IsOptional()
+  isActive?: boolean;
+}
+
 class CreateInvoiceDto {
   @IsNumber()
   amount: number;
@@ -250,7 +279,59 @@ _Generado por miBot SaaS_`,
     return { success: true, message: 'Tenant eliminado exitosamente' };
   }
 
+  // ── BILLING (Cliente autenticado) ────────────────────────────────
+  @Get('billing/me')
+  async getBillingStatus(@Req() req: any) {
+    const { organizationId } = req.user;
+
+    const subscription = await this.prisma.subscription.findFirst({
+      where: { organizationId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!subscription) {
+      return { plan: 'NONE', status: 'NONE', trialDaysLeft: 0 };
+    }
+
+    let trialDaysLeft = 0;
+    if (subscription.plan === 'TRIAL' && subscription.currentPeriodEnd) {
+      const now = new Date();
+      const diff = subscription.currentPeriodEnd.getTime() - now.getTime();
+      trialDaysLeft = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+
+      // Si el trial expiró y aún figura ACTIVE, lo marcamos TRIAL_EXPIRED
+      if (trialDaysLeft === 0 && subscription.status === 'ACTIVE') {
+        await this.prisma.subscription.update({
+          where: { id: subscription.id },
+          data: { status: 'TRIAL_EXPIRED' },
+        });
+        subscription.status = 'TRIAL_EXPIRED' as any;
+      }
+    }
+
+    return {
+      id: subscription.id,
+      plan: subscription.plan,
+      customPlanName: subscription.customPlanName,
+      status: subscription.status,
+      trialDaysLeft,
+      trialEndsAt: subscription.currentPeriodEnd,
+      currentPeriodStart: subscription.currentPeriodStart,
+      currentPeriodEnd: subscription.currentPeriodEnd,
+      mpPreapprovalId: subscription.mpPreapprovalId,
+    };
+  }
+
   // ── PLANS MANAGEMENT ──────────────────────────────────────────────
+  @Get('plans/public')
+  async listPublicPlans() {
+    // Sin guard — accesible por todos los clientes autenticados
+    return this.prisma.plan.findMany({
+      where: { isActive: true },
+      orderBy: { price: 'asc' },
+    });
+  }
+
   @Get('plans/all')
   async listPlans() {
     return this.prisma.plan.findMany({
@@ -278,5 +359,26 @@ _Generado por miBot SaaS_`,
     this.checkSuperAdmin(req);
     await this.prisma.plan.delete({ where: { id: planId } });
     return { success: true, message: 'Plan eliminado' };
+  }
+
+  @Patch('plans/:planId')
+  async updatePlan(
+    @Param('planId') planId: string,
+    @Req() req: any,
+    @Body() dto: UpdatePlanDto,
+  ) {
+    this.checkSuperAdmin(req);
+    return this.prisma.plan.update({
+      where: { id: planId },
+      data: {
+        ...(dto.name !== undefined && { name: dto.name }),
+        ...(dto.description !== undefined && { description: dto.description }),
+        ...(dto.price !== undefined && { price: dto.price }),
+        ...(dto.maxBots !== undefined && { maxBots: dto.maxBots }),
+        ...(dto.maxDocs !== undefined && { maxDocs: dto.maxDocs }),
+        ...(dto.features !== undefined && { features: dto.features }),
+        ...(dto.isActive !== undefined && { isActive: dto.isActive }),
+      },
+    });
   }
 }

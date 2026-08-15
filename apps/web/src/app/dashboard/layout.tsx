@@ -3,10 +3,11 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Bot, MessageSquare, Database, CreditCard, Menu, FlaskConical, LogOut, ChevronDown, Building2, UserCircle } from 'lucide-react';
+import { Bot, MessageSquare, Database, CreditCard, Menu, FlaskConical, LogOut, ChevronDown, Building2, UserCircle, ShieldCheck } from 'lucide-react';
 import { BotConnectionBadge } from '../../components/dashboard/BotConnectionBadge';
 import { useFeatureFlag } from '../../lib/feature-flags-context';
 import { useAuth } from '../../lib/auth-context';
+import { useBillingGuard } from '../../hooks/useBillingGuard';
 
 function UserMenu() {
   const { user, org, logout } = useAuth();
@@ -90,6 +91,8 @@ function UserMenu() {
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const isBetaDashboardEnabled = useFeatureFlag('BETA_DASHBOARD');
   const pathname = usePathname();
+  const { user } = useAuth();
+  useBillingGuard();
 
   const navItems = [
     { label: 'Bots', href: '/dashboard/bots', icon: <Bot className="w-5 h-5" /> },
@@ -100,6 +103,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (isBetaDashboardEnabled) {
     navItems.push({ label: 'Beta Funcs', href: '/dashboard', icon: <FlaskConical className="w-5 h-5 text-emerald-400" /> });
+  }
+
+  if (user?.role === 'SUPER_ADMIN') {
+    navItems.push({ label: 'Admin', href: '/dashboard/admin', icon: <ShieldCheck className="w-5 h-5 text-amber-400" /> });
   }
 
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);

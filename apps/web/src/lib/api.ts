@@ -48,6 +48,39 @@ class ApiClient {
     return this.request<{ features: Record<string, boolean> }>('/features');
   }
 
+  async getBillingStatus() {
+    return this.request<{
+      id: string;
+      plan: string;
+      customPlanName: string | null;
+      status: string;
+      trialDaysLeft: number;
+      trialEndsAt: string | null;
+      currentPeriodEnd: string | null;
+      mpPreapprovalId: string | null;
+    }>('/tenants/billing/me');
+  }
+
+  async getPublicPlans() {
+    return this.request<{
+      id: string;
+      name: string;
+      description: string | null;
+      price: number;
+      maxBots: number;
+      maxDocs: number;
+      features: string[];
+      isActive: boolean;
+    }[]>('/tenants/plans/public');
+  }
+
+  async subscribeToPlan(planId: string) {
+    return this.request<{ initPoint: string; subscriptionId: string }>(
+      `/mercadopago/subscribe-plan/${planId}`,
+      { method: 'POST' },
+    );
+  }
+
   // ── Auth ──────────────────────────────────────────
   async register(body: { organizationName: string; email: string; password: string; userName?: string }) {
     return this.request<{
@@ -214,6 +247,21 @@ class ApiClient {
   async createSalesPlan(body: { name: string; description?: string; price: number; maxBots: number; maxDocs: number }) {
     return this.request<any>('/tenants/plans/create', {
       method: 'POST',
+      body: JSON.stringify(body),
+    });
+  }
+
+  async updatePlan(planId: string, body: {
+    name?: string;
+    description?: string;
+    price?: number;
+    maxBots?: number;
+    maxDocs?: number;
+    features?: string[];
+    isActive?: boolean;
+  }) {
+    return this.request<any>(`/tenants/plans/${planId}`, {
+      method: 'PATCH',
       body: JSON.stringify(body),
     });
   }
