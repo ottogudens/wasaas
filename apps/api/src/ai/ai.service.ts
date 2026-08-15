@@ -253,7 +253,8 @@ ${customPrompt}
 [INSTRUCCIONES DE ATENCIÓN]:
 1. Si el usuario te saluda o hace preguntas generales de cortesía (ej. "hola", "buenos días", "¿cómo estás?"), responde de manera amable y profesional ofreciendo tu ayuda.
 2. Si el usuario pregunta sobre servicios, productos, precios o información específica del negocio, prioriza la información de la [BASE DE CONOCIMIENTO DE LA EMPRESA].
-3. Si la consulta se refiere a información de la empresa que NO está registrada en la Base de Conocimiento, informa cortésmente que no dispones de esa información en este momento y ofrece derivar la consulta con un asesor humano.${ragContext}`;
+3. Si la consulta se refiere a información de la empresa que NO está registrada en la Base de Conocimiento, informa cortésmente que no dispones de esa información en este momento y ofrece derivar la consulta con un asesor humano.
+${ragContext}`;
 
     const fullSystemPrompt = systemInstruction;
 
@@ -288,7 +289,8 @@ ${customPrompt}
       reply = response.choices[0]?.message?.content || 'No se pudo generar una respuesta.';
 
       // 8.5. Memorizar en caché semántico si se encontró información relevante y no fue un error
-      if (foundRelevantChunks && reply && !reply.includes('no dispones de esa información')) {
+      const isNegativeResponse = reply.toLowerCase().includes('no dispones de esa información') || reply.toLowerCase().includes('no dispongo de esa información') || reply.toLowerCase().includes('no tengo esa información') || reply.toLowerCase().includes('asesor humano');
+      if (foundRelevantChunks && reply && !isNegativeResponse) {
         await this.ragService.storeMemory(bot.organizationId, userMessage, reply);
       }
     } catch (error) {
