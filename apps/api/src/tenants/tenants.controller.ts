@@ -178,6 +178,8 @@ export class TenantsController {
     let currentPeriodEnd = existingSub?.currentPeriodEnd;
     let status = dto.status as any;
 
+    console.log(`[SuperAdmin] Updating subscription for Org ${id} to Plan: ${dto.plan}, Status: ${status}`);
+
     if (dto.plan === 'CORTESIA') {
       status = 'ACTIVE';
       currentPeriodEnd = new Date('2099-12-31T23:59:59.999Z');
@@ -188,25 +190,27 @@ export class TenantsController {
     }
 
     if (existingSub) {
-      await this.prisma.subscription.updateMany({
+      const updateRes = await this.prisma.subscription.updateMany({
         where: { organizationId: id },
         data: {
-          plan: dto.plan,
-          customPlanName: dto.customPlanName,
+          plan: dto.plan as any,
+          customPlanName: dto.customPlanName !== undefined ? dto.customPlanName : null,
           status,
           currentPeriodEnd,
         },
       });
+      console.log(`[SuperAdmin] updateMany result:`, updateRes);
     } else {
-      await this.prisma.subscription.create({
+      const createRes = await this.prisma.subscription.create({
         data: {
           organizationId: id,
-          plan: dto.plan,
-          customPlanName: dto.customPlanName,
+          plan: dto.plan as any,
+          customPlanName: dto.customPlanName !== undefined ? dto.customPlanName : null,
           status,
           currentPeriodEnd,
         },
       });
+      console.log(`[SuperAdmin] create result:`, createRes);
     }
 
     return {
