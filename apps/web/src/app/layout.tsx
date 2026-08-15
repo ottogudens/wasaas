@@ -4,7 +4,7 @@ import { Providers } from '../components/Providers';
 import { Inter } from "next/font/google";
 import { cn } from "@/lib/utils";
 
-const inter = Inter({subsets:['latin'],variable:'--font-sans'});
+const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 
 export const metadata: Metadata = {
   title: 'miBot - Plataforma de Agentes IA de WhatsApp',
@@ -42,8 +42,19 @@ export default function RootLayout({
             __html: `
               if ('serviceWorker' in navigator) {
                 window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js').catch(function(err) {
-                    console.log('SW registration failed: ', err);
+                  // Desregistrar SWs obsoletos primero para evitar caché corrupta
+                  navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                    registrations.forEach(function(registration) {
+                      registration.update().catch(function() {
+                        registration.unregister();
+                      });
+                    });
+                  }).catch(function(err) {
+                    console.warn('SW cleanup failed:', err);
+                  }).finally(function() {
+                    navigator.serviceWorker.register('/sw.js').catch(function(err) {
+                      console.warn('SW registration failed:', err);
+                    });
                   });
                 });
               }

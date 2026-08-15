@@ -25,20 +25,30 @@ class ApiClient {
       headers,
     });
 
+    const data = await res.json().catch(() => null);
+
     if (res.status === 401) {
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('wasaas_token');
-        localStorage.removeItem('wasaas_user');
-        localStorage.removeItem('wasaas_org');
-        window.location.href = '/login';
+        const hadToken = !!localStorage.getItem('wasaas_token');
+        const isPublicPage = ['/login', '/register', '/onboarding'].some(
+          (p) => window.location.pathname.startsWith(p)
+        );
+        const isAuthEndpoint = path.startsWith('/auth/');
+
+        // Solo limpiar y redirigir si había una sesión activa y falló un endpoint protegido
+        if (hadToken && !isPublicPage && !isAuthEndpoint) {
+          localStorage.removeItem('wasaas_token');
+          localStorage.removeItem('wasaas_user');
+          localStorage.removeItem('wasaas_org');
+          window.location.href = '/login';
+          throw new Error('Sesión expirada. Por favor inicia sesión nuevamente.');
+        }
       }
-      throw new Error('Sesión expirada. Por favor inicia sesión nuevamente.');
+      throw new Error(data?.message || 'Credenciales inválidas o no autorizado.');
     }
 
-    const data = await res.json();
-
     if (!res.ok) {
-      throw new Error(data.message || `Error HTTP ${res.status}`);
+      throw new Error(data?.message || `Error HTTP ${res.status}`);
     }
 
     return data;
