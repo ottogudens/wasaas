@@ -8,7 +8,7 @@ import mimeTypes from 'mime-types'
  * @returns Un objeto con el tipo y la extensión del archivo
  */
 const fileTypeFromFile = async (response: AxiosResponse): Promise<{ type: string | null; ext: string | false }> => {
-    const type = response.headers['content-type'] ?? ''
+    const type = String(response.headers['content-type'] ?? '')
     const ext = mimeTypes.extension(type)
     return {
         type,

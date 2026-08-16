@@ -503,6 +503,13 @@ export class BotsService {
       return await res.json();
     } catch (err: any) {
       this.logger.error(`Error iniciando bot en engine: ${err.message}`);
+      // Revertir estado a DISCONNECTED si falló la conexión con el motor
+      if (bot.status !== 'CONNECTED') {
+        await this.prisma.botInstance.update({
+          where: { id: bot.id },
+          data: { status: 'DISCONNECTED' as any },
+        });
+      }
       throw new Error(`Engine error: ${err.message}`);
     }
   }

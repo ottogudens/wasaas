@@ -327,7 +327,7 @@ class MetaProvider extends ProviderClass<MetaInterface> implements MetaInterface
         if (!mediaInput) throw new Error(`MEDIA_INPUT_NULL_: ${mediaInput}`)
 
         const formData = new FormData()
-        const mimeType = mime.lookup(mediaInput)
+        const mimeType = mime.lookup(mediaInput) || 'application/octet-stream'
         formData.append('file', createReadStream(mediaInput), {
             contentType: mimeType,
         })
@@ -401,7 +401,7 @@ class MetaProvider extends ProviderClass<MetaInterface> implements MetaInterface
         if (!pathVideo) throw new Error(`MEDIA_INPUT_NULL_: ${pathVideo}`)
 
         const formData = new FormData()
-        const mimeType = mime.lookup(pathVideo)
+        const mimeType = mime.lookup(pathVideo) || 'application/octet-stream'
         formData.append('file', createReadStream(pathVideo), {
             contentType: mimeType,
         })
@@ -472,7 +472,7 @@ class MetaProvider extends ProviderClass<MetaInterface> implements MetaInterface
     sendMedia = async (to: string, text = '', mediaInput: string, context = null) => {
         to = parseMetaNumber(to)
         const fileDownloaded = await utils.generalDownload(mediaInput)
-        const mimeType = mime.lookup(fileDownloaded)
+        const mimeType = String(mime.lookup(fileDownloaded) || 'application/octet-stream')
         mediaInput = fileDownloaded
         if (mimeType.includes('image')) return this.sendImage(to, mediaInput, text, context)
         if (mimeType.includes('video')) return this.sendVideo(to, fileDownloaded, text, context)
@@ -890,7 +890,7 @@ class MetaProvider extends ProviderClass<MetaInterface> implements MetaInterface
         if (!mediaInput) throw new Error(`MEDIA_INPUT_NULL_: ${mediaInput}`)
 
         const formData = new FormData()
-        const mimeType = mime.lookup(mediaInput)
+        const mimeType = mime.lookup(mediaInput) || 'application/octet-stream'
         formData.append('file', createReadStream(mediaInput), {
             contentType: mimeType,
         })
@@ -940,11 +940,16 @@ class MetaProvider extends ProviderClass<MetaInterface> implements MetaInterface
         if (!pathVideo) throw new Error(`MEDIA_INPUT_NULL_: ${pathVideo}`)
 
         let audioPath = pathVideo
-        const mimeType = mime.lookup(pathVideo)
+        const mimeType = mime.lookup(pathVideo) || 'application/octet-stream'
 
         // Auto-convert to OGG/Opus if not already in that format (required for voice notes)
-        if (!mimeType?.includes('ogg') && !mimeType?.includes('opus')) {
-            audioPath = await utils.convertAudio(pathVideo, 'ogg')
+        if (!String(mimeType).includes('ogg') && !String(mimeType).includes('opus')) {
+            try {
+                audioPath = await utils.convertAudio(pathVideo, 'ogg')
+            } catch (err) {
+                console.error('Error converting audio to ogg/opus:', err)
+                throw err
+            }
         }
 
         const formData = new FormData()
