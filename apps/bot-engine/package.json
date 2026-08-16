@@ -5,15 +5,16 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
+    "prebuild": "cd builderbot/packages/bot && (npm run build || node -e \"process.exit(0)\") && cd ../manager && (npm run build || node -e \"process.exit(0)\") && cd ../provider-voice && (npm run build || node -e \"process.exit(0)\") && cd ../provider-meta && (npm run build || node -e \"process.exit(0)\") && cd ../provider-baileys && (npm run build || node -e \"process.exit(0)\")",
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "test": "vitest run"
   },
   "dependencies": {
-    "@builderbot/bot": "^1.4.3-y.6",
-    "@builderbot/manager": "^1.4.3-y.6",
-    "@builderbot/provider-baileys": "^1.4.3-y.6",
-    "@builderbot/provider-meta": "^1.4.3-y.6",
+    "@builderbot/bot": "*",
+    "@builderbot/manager": "*",
+    "@builderbot/provider-baileys": "*",
+    "@builderbot/provider-meta": "*",
     "@sentry/node": "^10.70.0",
     "@types/qrcode": "^1.5.6",
     "@types/ws": "^8.18.1",

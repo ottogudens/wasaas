@@ -1,3 +1,0 @@
-# Solo validar el mensaje del commit, no modificar archivos
-# Los archivos ya fueron formateados y linted en pre-commit
-npx --no -- commitlint --edit 

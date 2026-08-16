@@ -5,7 +5,8 @@
   "description": "SaaS Multi-tenant platform for AI WhatsApp Agents",
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "packages/*",
+    "apps/bot-engine/builderbot/packages/*"
   ],
   "scripts": {
     "dev:api": "npm run dev --workspace=apps/api",

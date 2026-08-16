@@ -1,7 +1,0 @@
-{
-    "IMPORT": "import { MemoryDB as Database } from '@builderbot/bot'\n",
-    "IMPLEMENTATION": "const adapterDB = new Database()\n",
-    "DEPENDENCIES":{
-    },
-    "DEV_DEPENDENCIES":{}
-}

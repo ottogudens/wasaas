@@ -1,8 +1,0 @@
-{
-    "IMPORT": "import { JsonFileDB as Database } from '@builderbot/database-json'\n",
-    "IMPLEMENTATION": "\n    const adapterDB = new Database({ filename: 'db.json' })\n",
-    "DEPENDENCIES":{
-        "@builderbot/database-json": "latest"
-    },
-    "DEV_DEPENDENCIES":{}
-}
