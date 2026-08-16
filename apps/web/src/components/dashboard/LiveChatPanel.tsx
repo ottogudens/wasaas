@@ -18,6 +18,7 @@ import {
   Database,
   ArrowRight,
   Zap,
+  X,
 } from 'lucide-react';
 import { useBotContext } from '../../lib/bot-context';
 import { useConversations } from '../../hooks/useConversations';
