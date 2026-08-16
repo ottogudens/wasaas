@@ -25,6 +25,10 @@ class ProcessTextDto {
   @IsString()
   @MinLength(10)
   content: string;
+
+  @IsOptional()
+  @IsString()
+  botId?: string;
 }
 
 class ProcessUrlDto {
@@ -35,6 +39,10 @@ class ProcessUrlDto {
   @IsString()
   @MaxLength(150)
   title?: string;
+
+  @IsOptional()
+  @IsString()
+  botId?: string;
 }
 
 class SearchDto {
@@ -68,7 +76,7 @@ export class InternalRagController {
   @Post('process-whatsapp-file')
   async processWhatsAppFile(
     @Headers('x-api-key') apiKey: string,
-    @Body() body: { tenantId: string; title: string; content?: string; contentBase64?: string },
+    @Body() body: { tenantId: string; title: string; content?: string; contentBase64?: string; botId?: string },
   ) {
     this.validateApiKey(apiKey);
 
@@ -103,6 +111,8 @@ export class InternalRagController {
       body.title,
       finalContent,
       'FILE',
+      undefined,
+      body.botId || bot.id // Por defecto lo asociamos a este bot si viene por WA
     );
 
     return {
@@ -131,6 +141,8 @@ export class RagController {
       body.title,
       body.content,
       'TEXT',
+      undefined,
+      body.botId,
     );
 
     return {
@@ -156,6 +168,7 @@ export class RagController {
         req.user.organizationId,
         body.url,
         body.title,
+        body.botId,
       );
 
       return {

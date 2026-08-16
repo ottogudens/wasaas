@@ -173,18 +173,18 @@ class ApiClient {
   }
 
   // ── RAG ───────────────────────────────────────────
-  async processDocument(body: { title: string; content: string }) {
-    return this.request<{ documentId: string; totalChunksProcessed: number }>(
-      '/rag/process-text',
-      { method: 'POST', body: JSON.stringify(body) },
-    );
+  async processDocument(body: { title: string; content: string; botId?: string }) {
+    return this.request<any>('/rag/process-text', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
   }
 
-  async processUrlDocument(body: { url: string; title?: string }) {
-    return this.request<{ documentId: string; documentTitle: string; sourceUrl: string; totalChunksProcessed: number }>(
-      '/rag/process-url',
-      { method: 'POST', body: JSON.stringify(body) },
-    );
+  async processUrlDocument(body: { url: string; title?: string; botId?: string }) {
+    return this.request<any>('/rag/process-url', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
   }
 
   async resyncUrlDocument(documentId: string) {

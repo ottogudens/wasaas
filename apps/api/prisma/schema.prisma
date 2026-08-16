@@ -1,7 +1,7 @@
 // Prisma Schema para SaaS Multi-tenant de Agentes IA de WhatsApp
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
   extensions = [pgvector(map: "vector")]
 }
 
@@ -46,23 +46,23 @@ enum SenderType {
 }
 
 model Organization {
-  id                String         @id @default(uuid())
-  name              String
-  slug              String         @unique
-  isActive          Boolean        @default(true)
-  mpAccessToken     String?        @db.Text // Credencial MercadoPago para cobros directos de la organización
-  mpPublicKey       String?
-  mpWebhookSecret   String?
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  id              String   @id @default(uuid())
+  name            String
+  slug            String   @unique
+  isActive        Boolean  @default(true)
+  mpAccessToken   String?  @db.Text // Credencial MercadoPago para cobros directos de la organización
+  mpPublicKey     String?
+  mpWebhookSecret String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  users             User[]
-  bots              BotInstance[]
-  subscriptions     Subscription[]
-  documents         KnowledgeDocument[]
-  semanticCaches    SemanticMemoryCache[]
-  invoices          Invoice[]
-  featureFlags      OrganizationFeatureFlag[]
+  users          User[]
+  bots           BotInstance[]
+  subscriptions  Subscription[]
+  documents      KnowledgeDocument[]
+  semanticCaches SemanticMemoryCache[]
+  invoices       Invoice[]
+  featureFlags   OrganizationFeatureFlag[]
 }
 
 model PlatformSetting {
@@ -85,16 +85,16 @@ model User {
 }
 
 model Plan {
-  id           String   @id @default(uuid())
-  name         String   @unique
-  description  String?
-  price        Float
-  maxBots      Int      @default(1)
-  maxDocs      Int      @default(50)
-  features     String[] @default([])
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  price       Float
+  maxBots     Int      @default(1)
+  maxDocs     Int      @default(50)
+  features    String[] @default([])
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model Invoice {
@@ -125,36 +125,38 @@ model Subscription {
 }
 
 model BotInstance {
-  id              String        @id @default(uuid())
-  tenantId        String        @unique // Identificador único de instancia para BuilderBot Manager
+  id              String                @id @default(uuid())
+  tenantId        String                @unique // Identificador único de instancia para BuilderBot Manager
   name            String
   phoneNumber     String?
-  provider        String        @default("baileys") // "baileys" | "meta"
-  metaJwtToken    String?       @db.Text
+  provider        String                @default("baileys") // "baileys" | "meta"
+  metaJwtToken    String?               @db.Text
   metaNumberId    String?
   metaVerifyToken String?
-  status          BotStatus     @default(DISCONNECTED)
-  qrCode          String?       @db.Text
+  status          BotStatus             @default(DISCONNECTED)
+  qrCode          String?               @db.Text
   pairingCode     String?
-  systemPrompt    String?       @db.Text
-  aiModel         String        @default("gpt-4o-mini")
+  systemPrompt    String?               @db.Text
+  aiModel         String                @default("gpt-4o-mini")
   organizationId  String
-  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization    Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   conversations   Conversation[]
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  documents       KnowledgeDocument[]
+  semanticCaches  SemanticMemoryCache[]
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
 }
 
 model Conversation {
-  id            String       @id @default(uuid())
+  id            String      @id @default(uuid())
   botId         String
-  bot           BotInstance  @relation(fields: [botId], references: [id], onDelete: Cascade)
+  bot           BotInstance @relation(fields: [botId], references: [id], onDelete: Cascade)
   customerPhone String
   customerName  String?
-  isHumanMode   Boolean      @default(false) // Handoff a humano
+  isHumanMode   Boolean     @default(false) // Handoff a humano
   messages      Message[]
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 
   @@index([botId, customerPhone])
 }
@@ -169,40 +171,44 @@ model Message {
 }
 
 model KnowledgeDocument {
-  id             String                 @id @default(uuid())
+  id             String                @id @default(uuid())
   organizationId String
-  organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  botId          String?
+  bot            BotInstance?          @relation(fields: [botId], references: [id], onDelete: Cascade)
   title          String
   fileUrl        String?
-  sourceType     String                 @default("TEXT") // "TEXT" | "FILE" | "URL"
+  sourceType     String                @default("TEXT") // "TEXT" | "FILE" | "URL"
   sourceUrl      String?
   lastSyncedAt   DateTime?
   chunks         DocumentVectorChunk[]
-  createdAt      DateTime               @default(now())
-  updatedAt      DateTime               @updatedAt
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
 }
 
 model DocumentVectorChunk {
-  id         String            @id @default(uuid())
+  id         String                       @id @default(uuid())
   documentId String
-  document   KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  content    String            @db.Text
+  document   KnowledgeDocument            @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  content    String                       @db.Text
   embedding  Unsupported("vector(1536)")?
-  createdAt  DateTime          @default(now())
+  createdAt  DateTime                     @default(now())
 
   @@index([documentId])
 }
 
 model SemanticMemoryCache {
-  id             String       @id @default(uuid())
+  id             String                       @id @default(uuid())
   organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  queryText      String       @db.Text
+  organization   Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  botId          String?
+  bot            BotInstance?                 @relation(fields: [botId], references: [id], onDelete: Cascade)
+  queryText      String                       @db.Text
   queryEmbedding Unsupported("vector(1536)")?
-  replyText      String       @db.Text
-  hitCount       Int          @default(0)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  replyText      String                       @db.Text
+  hitCount       Int                          @default(0)
+  createdAt      DateTime                     @default(now())
+  updatedAt      DateTime                     @updatedAt
 
   @@index([organizationId])
 }
@@ -222,7 +228,7 @@ model OrganizationFeatureFlag {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   featureName    String
-  isEnabled      Boolean      
+  isEnabled      Boolean
   createdAt      DateTime     @default(now())
 
   @@unique([organizationId, featureName])

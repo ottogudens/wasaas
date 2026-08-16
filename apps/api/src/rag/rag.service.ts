@@ -30,11 +30,13 @@ export class RagService {
     content: string,
     sourceType: string = 'TEXT',
     sourceUrl?: string,
+    botId?: string,
   ): Promise<{ documentId: string; chunksProcessed: number }> {
     // 1. Crear el registro del documento
     const document = await this.prisma.knowledgeDocument.create({
       data: {
         organizationId,
+        botId,
         title,
         sourceType,
         sourceUrl,
@@ -72,7 +74,7 @@ export class RagService {
     this.logger.log(`📚 Documento "${title}" procesado: ${chunksProcessed}/${chunks.length} chunks almacenados.`);
 
     // Invalida la caché semántica de la organización porque hay un nuevo documento
-    await this.invalidateSemanticCache(organizationId);
+    await this.invalidateSemanticCache(organizationId, botId);
 
     return {
       documentId: document.id,
@@ -185,6 +187,7 @@ export class RagService {
     organizationId: string,
     url: string,
     customTitle?: string,
+    botId?: string,
   ): Promise<{ documentId: string; title: string; chunksProcessed: number; sourceUrl: string }> {
     const { title: scrapedTitle, content } = await this.scrapeWebsite(url);
     const finalTitle = customTitle?.trim() || scrapedTitle || url;
@@ -195,6 +198,7 @@ export class RagService {
       content,
       'URL',
       url,
+      botId,
     );
 
     return {
@@ -291,6 +295,7 @@ export class RagService {
     organizationId: string,
     topK: number = 5,
     minSimilarity: number = 0.30,
+    botId?: string,
   ): Promise<Array<{ id: string; content: string; similarity: number }>> {
     try {
       const queryEmbedding = await this.generateEmbedding(query);
@@ -305,6 +310,7 @@ export class RagService {
         FROM "DocumentVectorChunk" dvc
         INNER JOIN "KnowledgeDocument" kd ON kd.id = dvc."documentId"
         WHERE kd."organizationId" = ${organizationId}
+          ${botId ? Prisma.sql`AND (kd."botId" = ${botId} OR kd."botId" IS NULL)` : Prisma.sql`AND kd."botId" IS NULL`}
           AND dvc.embedding IS NOT NULL
           AND 1 - (dvc.embedding <=> ${JSON.stringify(queryEmbedding)}::vector) >= ${minSimilarity}
         ORDER BY dvc.embedding <=> ${JSON.stringify(queryEmbedding)}::vector
@@ -327,6 +333,7 @@ export class RagService {
       orderBy: { createdAt: 'desc' },
       include: {
         _count: { select: { chunks: true } },
+        bot: { select: { id: true, name: true } },
       },
     });
   }
@@ -356,27 +363,28 @@ export class RagService {
    * Buscar en la memoria semántica aprendida (Semantic Caching)
    */
   async findCachedMemory(
-    query: string,
+    queryText: string,
     organizationId: string,
+    botId?: string,
     minSimilarity: number = 0.85,
   ): Promise<{ replyText: string; similarity: number } | null> {
     try {
-      const queryEmbedding = await this.generateEmbedding(query);
-      const ttlDays = 7;
+      const queryEmbedding = await this.generateEmbedding(queryText);
 
       const results = await this.prisma.$queryRaw<
         Array<{ id: string; replyText: string; similarity: number }>
       >`
         SELECT
-          smc.id,
-          smc."replyText",
-          1 - (smc."queryEmbedding" <=> ${JSON.stringify(queryEmbedding)}::vector) AS similarity
-        FROM "SemanticMemoryCache" smc
-        WHERE smc."organizationId" = ${organizationId}
-          AND smc."queryEmbedding" IS NOT NULL
-          AND 1 - (smc."queryEmbedding" <=> ${JSON.stringify(queryEmbedding)}::vector) >= ${minSimilarity}
-          AND smc."updatedAt" >= NOW() - INTERVAL '7 days'
-        ORDER BY smc."queryEmbedding" <=> ${JSON.stringify(queryEmbedding)}::vector
+          id,
+          "replyText",
+          1 - (embedding <=> ${JSON.stringify(queryEmbedding)}::vector) AS similarity
+        FROM "SemanticMemoryCache"
+        WHERE "organizationId" = ${organizationId}
+          ${botId ? Prisma.sql`AND ("botId" = ${botId} OR "botId" IS NULL)` : Prisma.sql`AND "botId" IS NULL`}
+          AND embedding IS NOT NULL
+          AND 1 - (embedding <=> ${JSON.stringify(queryEmbedding)}::vector) >= ${minSimilarity}
+          AND "updatedAt" >= NOW() - INTERVAL '7 days'
+        ORDER BY embedding <=> ${JSON.stringify(queryEmbedding)}::vector
         LIMIT 1
       `;
 
@@ -404,19 +412,21 @@ export class RagService {
     organizationId: string,
     queryText: string,
     replyText: string,
+    botId?: string,
   ): Promise<void> {
     try {
       if (!queryText || !replyText || queryText.length < 5 || replyText.length < 5) return;
       const embedding = await this.generateEmbedding(queryText);
 
       await this.prisma.$executeRaw`
-        INSERT INTO "SemanticMemoryCache" (id, "organizationId", "queryText", "queryEmbedding", "replyText", "hitCount", "createdAt", "updatedAt")
+        INSERT INTO "SemanticMemoryCache" (id, "organizationId", "botId", "queryText", "replyText", embedding, "hitCount", "createdAt", "updatedAt")
         VALUES (
           gen_random_uuid(),
           ${organizationId},
+          ${botId || null},
           ${queryText},
-          ${JSON.stringify(embedding)}::vector,
           ${replyText},
+          ${JSON.stringify(embedding)}::vector,
           1,
           NOW(),
           NOW()
@@ -499,14 +509,18 @@ export class RagService {
   /**
    * Invalidar caché semántica de una organización (borrar todas sus entradas)
    */
-  async invalidateSemanticCache(organizationId: string) {
+  async invalidateSemanticCache(organizationId: string, botId?: string): Promise<void> {
     try {
-      const { count } = await this.prisma.semanticMemoryCache.deleteMany({
-        where: { organizationId },
-      });
-      if (count > 0) {
-        this.logger.log(`🧹 Caché semántica invalidada para org ${organizationId}: ${count} entradas borradas.`);
+      if (botId) {
+        await this.prisma.semanticMemoryCache.deleteMany({
+          where: { organizationId, botId },
+        });
+      } else {
+        await this.prisma.semanticMemoryCache.deleteMany({
+          where: { organizationId },
+        });
       }
+      this.logger.log(`🧹 Caché semántica invalidada para organización ${organizationId}${botId ? ` y bot ${botId}` : ''}`);
     } catch (err) {
       this.logger.error('Error al invalidar caché semántica:', err);
     }

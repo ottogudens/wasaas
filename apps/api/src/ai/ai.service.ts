@@ -206,7 +206,7 @@ export class AiService {
     const orderedHistory = history.reverse();
 
     // 4.5. Buscar en la memoria semántica aprendida (Semantic Caching)
-    const cachedMemory = await this.ragService.findCachedMemory(userMessage, bot.organizationId);
+    const cachedMemory = await this.ragService.findCachedMemory(userMessage, bot.organizationId, bot.id);
     if (cachedMemory) {
       const reply = cachedMemory.replyText;
 
@@ -236,6 +236,7 @@ export class AiService {
         bot.organizationId,
         3,
         0.25,
+        bot.id,
       );
       if (similarChunks.length > 0) {
         foundRelevantChunks = true;
@@ -286,12 +287,16 @@ ${ragContext}`;
         max_tokens: 800,
       });
 
-      reply = response.choices[0]?.message?.content || 'No se pudo generar una respuesta.';
+      const assistantReply = response.choices[0]?.message?.content || 'No se pudo generar una respuesta.';
+      reply = assistantReply;
 
       // 8.5. Memorizar en caché semántico si se encontró información relevante y no fue un error
       const isNegativeResponse = reply.toLowerCase().includes('no dispones de esa información') || reply.toLowerCase().includes('no dispongo de esa información') || reply.toLowerCase().includes('no tengo esa información') || reply.toLowerCase().includes('asesor humano');
-      if (foundRelevantChunks && reply && !isNegativeResponse) {
-        await this.ragService.storeMemory(bot.organizationId, userMessage, reply);
+      if (isNegativeResponse || !foundRelevantChunks) {
+        this.logger.log('🛑 Respuesta negativa o sin contexto relevante. No se almacenará en la caché semántica.');
+      } else {
+        // Almacenar el contexto de la respuesta exitosa en memoria semántica
+        await this.ragService.storeMemory(bot.organizationId, userMessage, assistantReply, bot.id);
       }
     } catch (error) {
       this.logger.error('Error generando respuesta con IA:', error);

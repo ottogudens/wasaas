@@ -15,7 +15,7 @@ export function useDocuments(token: string | null) {
   });
 
   const processDocumentMutation = useMutation({
-    mutationFn: async (body: { title: string; content: string }) => {
+    mutationFn: async (body: { title: string; content: string; botId?: string }) => {
       const data = await api.processDocument(body);
       return data;
     },
@@ -25,7 +25,7 @@ export function useDocuments(token: string | null) {
   });
 
   const processUrlMutation = useMutation({
-    mutationFn: async (body: { url: string; title?: string }) => {
+    mutationFn: async (body: { url: string; title?: string; botId?: string }) => {
       const data = await api.processUrlDocument(body);
       return data;
     },

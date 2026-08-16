@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useDocuments } from '../../hooks/useDocuments';
 import { useAuth } from '../../lib/auth-context';
+import { useBots } from '../../hooks/useBots';
 
 export function KnowledgeBasePanel() {
   const { token } = useAuth();
@@ -33,9 +34,13 @@ export function KnowledgeBasePanel() {
     deleteDocument,
     isDeleting,
   } = useDocuments(token);
+  const { bots } = useBots(token);
 
   // Tab for ingestion method: 'url' | 'file' | 'text'
   const [ingestionTab, setIngestionTab] = useState<'url' | 'file' | 'text'>('url');
+
+  // Bot target state
+  const [targetBotId, setTargetBotId] = useState<string>('');
 
   // URL state
   const [websiteUrl, setWebsiteUrl] = useState('');
@@ -80,7 +85,7 @@ export function KnowledgeBasePanel() {
     if (!documentTitle || !documentContent) return;
     setRagStatus(null);
     try {
-      const res = await processDocument({ title: documentTitle, content: documentContent });
+      const res = await processDocument({ title: documentTitle, content: documentContent, botId: targetBotId || undefined });
       setRagStatus({
         success: true,
         message: `✅ Documento "${documentTitle}" procesado: ${res.totalChunksProcessed} vectores almacenados con éxito.`,
@@ -103,6 +108,7 @@ export function KnowledgeBasePanel() {
       const res = await processUrl({
         url: websiteUrl.trim(),
         title: urlTitle.trim() || undefined,
+        botId: targetBotId || undefined,
       });
 
       setRagStatus({
@@ -223,6 +229,23 @@ export function KnowledgeBasePanel() {
               Texto / FAQ
             </button>
           </div>
+        </div>
+
+        {/* Bot selector */}
+        <div className="pt-2">
+          <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">
+            Asignar Conocimiento a un Agente (Opcional)
+          </label>
+          <select
+            value={targetBotId}
+            onChange={(e) => setTargetBotId(e.target.value)}
+            className="w-full sm:w-1/2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500"
+          >
+            <option value="">Global (Todos los agentes acceden a esto)</option>
+            {bots.map((b) => (
+              <option key={b.id} value={b.id}>{b.name}</option>
+            ))}
+          </select>
         </div>
 
         {/* ── 1. URL INGESTION FORM ── */}
@@ -419,6 +442,16 @@ export function KnowledgeBasePanel() {
                         >
                           {isUrl ? '🌐 SITIO WEB' : '📄 DOCUMENTO'}
                         </span>
+
+                        {doc.botId ? (
+                          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full border bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-500/30 flex items-center gap-1">
+                            🤖 Solo: {doc.bot?.name || 'Agente'}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full border bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700 flex items-center gap-1">
+                            🌎 Global (Todos)
+                          </span>
+                        )}
                       </div>
 
                       {isUrl && doc.sourceUrl && (
