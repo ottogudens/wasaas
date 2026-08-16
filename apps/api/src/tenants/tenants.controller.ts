@@ -190,8 +190,8 @@ export class TenantsController {
     }
 
     if (existingSub) {
-      const updateRes = await this.prisma.subscription.updateMany({
-        where: { organizationId: id },
+      const updateRes = await this.prisma.subscription.update({
+        where: { id: existingSub.id },
         data: {
           plan: dto.plan as any,
           customPlanName: dto.customPlanName !== undefined ? dto.customPlanName : null,
