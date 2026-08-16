@@ -10,7 +10,7 @@
         "moduleResolution": "node",
         "importHelpers": true,
         "target": "es2021",
-        "module": "esnext",
+        "module": "ES2020",
         "skipLibCheck": true,
         "noEmitOnError": false,
         "types": ["node"],
