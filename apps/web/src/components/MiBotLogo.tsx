@@ -31,7 +31,7 @@ export function MiBotLogo({ className = "w-8 h-8", iconOnly = false, textClassNa
         <span className={`tracking-tight font-black ${textClassName}`}>
           <span className="text-emerald-400 font-extrabold">mi</span>
           <span className="bg-gradient-to-r from-white via-slate-100 to-slate-300 bg-clip-text text-transparent">Bot</span>
-          <span className="text-[10px] ml-1 font-semibold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-widest">
+          <span className="text-[11px] ml-1 font-semibold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-widest">
             AI
           </span>
         </span>

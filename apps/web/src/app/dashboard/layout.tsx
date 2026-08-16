@@ -58,7 +58,7 @@ function UserMenu({ onOpenHelp }: { onOpenHelp: () => void }) {
           <span className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate w-full">
             {user?.name || user?.email || 'Usuario'}
           </span>
-          <span className="text-[10px] text-slate-500 truncate w-full">
+          <span className="text-[11px] text-slate-500 truncate w-full">
             {org?.name || user?.email}
           </span>
         </div>
@@ -76,7 +76,7 @@ function UserMenu({ onOpenHelp }: { onOpenHelp: () => void }) {
             {org && (
               <div className="flex items-center gap-1 mt-1">
                 <Building2 className="w-3 h-3 text-slate-400" />
-                <p className="text-[10px] text-slate-500 truncate">{org.name}</p>
+                <p className="text-[11px] text-slate-500 truncate">{org.name}</p>
               </div>
             )}
           </div>
@@ -171,7 +171,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform animate-pulse" />
             <span className="font-bold text-xs">Guía Interactiva</span>
           </div>
-          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-200 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-400">
+          <span className="text-[11px] font-bold px-1.5 py-0.5 rounded bg-emerald-200 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-400">
             5 Pasos
           </span>
         </button>
@@ -269,19 +269,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </main>
 
       {/* Mobile Bottom Navigation (TabBar) */}
-      <nav className="md:hidden fixed bottom-0 w-full bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center justify-around pb-safe z-20 transition-colors duration-200">
-        {navItems.map((item) => {
+      <nav className="md:hidden fixed bottom-0 w-full bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center justify-around pb-safe z-20 transition-colors duration-200 overflow-x-auto">
+        {navItems.slice(0, 5).map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`flex flex-col items-center gap-1 p-3 transition-colors ${
+              className={`flex flex-col items-center gap-0.5 min-w-[3rem] p-3 transition-colors ${
                 isActive ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400'
               }`}
             >
               {item.icon}
-              <span className="text-[10px] font-medium">{item.label}</span>
+              <span className="text-[11px] font-medium hidden xs:block sm:block">{item.label}</span>
             </Link>
           );
         })}
@@ -318,7 +318,7 @@ function MobileUserMenu({
         <div>
           <p className="text-sm font-semibold text-slate-900 dark:text-slate-200">{user?.name || 'Usuario'}</p>
           <p className="text-xs text-slate-500">{user?.email}</p>
-          {org && <p className="text-[10px] text-slate-500 mt-0.5">{org.name}</p>}
+          {org && <p className="text-[11px] text-slate-500 mt-0.5">{org.name}</p>}
         </div>
       </div>
       <button

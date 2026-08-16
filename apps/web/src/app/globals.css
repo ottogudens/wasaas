@@ -69,6 +69,56 @@
     @apply bg-background text-foreground;
   }
   html {
-    @apply font-sans;
+    @apply font-sans overflow-x-hidden;
   }
+
+  /* A1: Focus-visible ring for keyboard accessibility */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-emerald-500/50 ring-offset-2 ring-offset-background;
+  }
+  /* Override for inputs that already handle focus styling */
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    @apply ring-0 ring-offset-0;
+  }
+}
+
+/* C5: Safe area padding for iOS notch / home indicator */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* A2: Active press feedback for buttons */
+@layer components {
+  button:not(:disabled):active,
+  a[role="button"]:not(:disabled):active {
+    transform: scale(0.98);
+  }
+}
+
+/* M1: Disabled cursor */
+@layer utilities {
+  button:disabled,
+  [disabled] {
+    cursor: not-allowed;
+  }
+}
+
+/* Scrollbar styling */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.3);
+  border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.5);
 }

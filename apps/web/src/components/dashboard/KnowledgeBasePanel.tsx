@@ -434,7 +434,7 @@ export function KnowledgeBasePanel() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <h4 className="font-bold text-sm text-slate-900 dark:text-white truncate">{doc.title}</h4>
                         <span
-                          className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
+                          className={`text-[11px] font-extrabold px-2 py-0.5 rounded-full border ${
                             isUrl
                               ? 'bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-500/30'
                               : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700'
@@ -444,11 +444,11 @@ export function KnowledgeBasePanel() {
                         </span>
 
                         {doc.botId ? (
-                          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full border bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-500/30 flex items-center gap-1">
+                          <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full border bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-500/30 flex items-center gap-1">
                             🤖 Solo: {doc.bot?.name || 'Agente'}
                           </span>
                         ) : (
-                          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full border bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700 flex items-center gap-1">
+                          <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full border bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700 flex items-center gap-1">
                             🌎 Global (Todos)
                           </span>
                         )}

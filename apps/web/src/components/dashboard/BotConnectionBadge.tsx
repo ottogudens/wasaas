@@ -49,7 +49,7 @@ export function BotConnectionBadge() {
         {activeBot.name}
       </span>
       <div className="w-px h-3 bg-current opacity-20 mx-1" />
-      <span className="text-[10px] font-medium uppercase tracking-wider">{badge.label}</span>
+      <span className="text-[11px] font-medium uppercase tracking-wider">{badge.label}</span>
     </div>
   );
 }

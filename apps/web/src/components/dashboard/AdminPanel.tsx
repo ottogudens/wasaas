@@ -413,7 +413,7 @@ function PlansTab() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-bold text-sm text-slate-900 dark:text-white">{plan.name}</span>
                   <span
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                    className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${
                       plan.isActive
                         ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border-emerald-300 dark:border-emerald-500/30'
                         : 'text-slate-500 bg-slate-200 dark:bg-slate-700/30 border-slate-300 dark:border-slate-700'
@@ -543,11 +543,11 @@ function TenantsTab() {
   const tenants = tenantsQuery.data ?? [];
 
   const planBadge = (sub: any) => {
-    if (!sub) return <span className="text-[10px] text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">Sin plan</span>;
+    if (!sub) return <span className="text-[11px] text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">Sin plan</span>;
 
     if (sub.plan === 'CORTESIA') {
       return (
-        <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border text-emerald-800 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-500/20 border-emerald-300 dark:border-emerald-500/40 flex items-center gap-1">
+        <span className="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full border text-emerald-800 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-500/20 border-emerald-300 dark:border-emerald-500/40 flex items-center gap-1">
           <Gift className="w-3 h-3" /> CORTESÍA (VITALICIO)
         </span>
       );
@@ -562,7 +562,7 @@ function TenantsTab() {
     };
     const color = statusColor[sub.status] ?? statusColor['PENDING'];
     return (
-      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${color}`}>
+      <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${color}`}>
         {sub.customPlanName || sub.plan} · {sub.status}
       </span>
     );

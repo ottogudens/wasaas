@@ -57,30 +57,30 @@ export default function OnboardingPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-4">
       
       {/* Stepper Header */}
       <div className="w-full max-w-2xl mb-8 flex items-center justify-between relative">
-        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-slate-800 -z-10" />
+        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-slate-200 dark:bg-slate-800 -z-10" />
         <div className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-emerald-500 -z-10 transition-all duration-500" style={{ width: `${((step - 1) / 2) * 100}%` }} />
         
         {steps.map(s => (
-          <div key={s.id} className="flex flex-col items-center gap-2 bg-slate-950 px-2">
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors duration-300 ${step >= s.id ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-500'}`}>
+          <div key={s.id} className="flex flex-col items-center gap-2 bg-slate-50 dark:bg-slate-950 px-2">
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors duration-300 ${step >= s.id ? 'bg-emerald-500 text-slate-950' : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500'}`}>
               {s.icon}
             </div>
-            <span className={`text-xs font-medium ${step >= s.id ? 'text-emerald-400' : 'text-slate-500'}`}>{s.title}</span>
+            <span className={`text-xs font-medium ${step >= s.id ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'}`}>{s.title}</span>
           </div>
         ))}
       </div>
 
       {/* Main Card */}
-      <div className="w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl">
+      <div className="w-full max-w-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 shadow-2xl">
         
         {step === 1 && (
           <div className="text-center space-y-6">
-            <h1 className="text-3xl font-bold text-white">¡Bienvenido a miBot! 🚀</h1>
-            <p className="text-slate-400">Estás a solo 3 pasos de tener tu asistente de WhatsApp con Inteligencia Artificial atendiendo a tus clientes 24/7.</p>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">¡Bienvenido a miBot! 🚀</h1>
+            <p className="text-slate-500 dark:text-slate-400">Estás a solo 3 pasos de tener tu asistente de WhatsApp con Inteligencia Artificial atendiendo a tus clientes 24/7.</p>
             <button 
               onClick={() => setStep(2)}
               className="mt-6 px-8 py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-xl transition-all"
@@ -93,16 +93,16 @@ export default function OnboardingPage() {
         {step === 2 && (
           <div className="space-y-6">
             <div className="text-center mb-6">
-              <h2 className="text-2xl font-bold text-white">Nombre de tu Asistente</h2>
-              <p className="text-sm text-slate-400">Dale una identidad a tu nuevo bot.</p>
+              <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Nombre de tu Asistente</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Dale una identidad a tu nuevo bot.</p>
             </div>
             
             <div className="space-y-4">
-              <label className="block text-sm font-medium text-slate-300">Nombre del Bot</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">Nombre del Bot</label>
               <input 
                 value={botName}
                 onChange={e => setBotName(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition-colors"
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 transition-colors"
                 placeholder="Ej. Asistente Ventas"
               />
             </div>
@@ -121,14 +121,14 @@ export default function OnboardingPage() {
         {step === 3 && (
           <div className="space-y-6">
             <div className="text-center mb-6">
-              <h2 className="text-2xl font-bold text-white">Entrena a tu Bot 🧠</h2>
-              <p className="text-sm text-slate-400">Escribe información básica sobre tu negocio (horarios, precios, dirección).</p>
+              <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Entrena a tu Bot 🧠</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Escribe información básica sobre tu negocio (horarios, precios, dirección).</p>
             </div>
             
             <textarea 
               value={documentContent}
               onChange={e => setDocumentContent(e.target.value)}
-              className="w-full h-48 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition-colors resize-none"
+              className="w-full h-48 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-4 py-3 text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 transition-colors resize-none"
               placeholder="Ej. Nuestro horario de atención es de Lunes a Viernes de 9am a 6pm..."
             />
 

@@ -38,7 +38,7 @@ function CourtesyBanner({ billing }: { billing: any }) {
             <h4 className="font-extrabold text-slate-900 dark:text-white text-base">
               {billing?.customPlanName || 'Cuenta de Cortesía (Plan Gratuito VIP)'}
             </h4>
-            <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-500 text-slate-950 uppercase tracking-wide">
+            <span className="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-500 text-slate-950 uppercase tracking-wide">
               Vitalicio / Activo
             </span>
           </div>
@@ -176,12 +176,12 @@ function PlanCard({
       }`}
     >
       {isCurrentPlan && (
-        <div className="absolute top-0 right-0 bg-emerald-500 text-slate-950 text-[10px] font-extrabold px-3 py-1 rounded-bl-xl uppercase tracking-wide">
+        <div className="absolute top-0 right-0 bg-emerald-500 text-slate-950 text-[11px] font-extrabold px-3 py-1 rounded-bl-xl uppercase tracking-wide">
           Plan Activo
         </div>
       )}
       {isRecommended && !isCurrentPlan && (
-        <div className="absolute top-0 right-0 bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 text-[10px] font-extrabold px-3 py-1 rounded-bl-xl uppercase tracking-wide">
+        <div className="absolute top-0 right-0 bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 text-[11px] font-extrabold px-3 py-1 rounded-bl-xl uppercase tracking-wide">
           Recomendado
         </div>
       )}
@@ -300,7 +300,7 @@ function ClientMercadoPagoIntegration() {
             <h3 className="font-extrabold text-base text-slate-900 dark:text-white flex items-center gap-2">
               Cobros por WhatsApp con tu Mercado Pago
               {config?.isConfigured && (
-                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
                   ● CONECTADO
                 </span>
               )}
@@ -539,7 +539,7 @@ export function BillingPanel() {
       {/* MercadoPago note */}
       <div className="flex items-start gap-3 p-4 rounded-xl bg-slate-100 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400">
         <div className="w-6 h-6 rounded-full bg-sky-500/20 flex items-center justify-center shrink-0 mt-0.5">
-          <span className="text-sky-600 dark:text-sky-400 text-[10px] font-bold">MP</span>
+          <span className="text-sky-600 dark:text-sky-400 text-[11px] font-bold">MP</span>
         </div>
         <div>
           <p>

@@ -228,7 +228,7 @@ export function LiveChatPanel() {
   // ── 1. LOADING STATE ────────────────────────────────────────────────────
   if (isLoadingBots) {
     return (
-      <div className="bg-white dark:bg-slate-900/60 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-3xl p-12 shadow-2xl h-[650px] flex flex-col items-center justify-center gap-3">
+      <div className="bg-white dark:bg-slate-900/60 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-3xl p-12 shadow-2xl h-[calc(100vh-12rem)] min-h-[500px] flex flex-col items-center justify-center gap-3">
         <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
         <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Cargando tus agentes...</p>
       </div>
@@ -238,7 +238,7 @@ export function LiveChatPanel() {
   // ── 2. NO BOTS CREATED STATE ────────────────────────────────────────────
   if (!bots || bots.length === 0) {
     return (
-      <div className="bg-white dark:bg-slate-900/60 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-3xl p-8 sm:p-12 shadow-2xl h-[650px] flex flex-col items-center justify-center text-center">
+      <div className="bg-white dark:bg-slate-900/60 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-3xl p-8 sm:p-12 shadow-2xl h-[calc(100vh-12rem)] min-h-[500px] flex flex-col items-center justify-center text-center">
         <div className="w-16 h-16 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 mb-4">
           <Bot className="w-8 h-8" />
         </div>
@@ -260,7 +260,7 @@ export function LiveChatPanel() {
   // ── 3. BOT SELECTION SCREEN (When user has multiple bots and none is selected) ──
   if (!selectedBotId) {
     return (
-      <div className="bg-white dark:bg-slate-900/60 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-10 shadow-2xl h-[650px] flex flex-col overflow-y-auto">
+      <div className="bg-white dark:bg-slate-900/60 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-10 shadow-2xl h-[calc(100vh-12rem)] min-h-[500px] flex flex-col overflow-y-auto">
         <div className="mb-6 text-center max-w-xl mx-auto">
           <h2 className="text-2xl font-extrabold text-slate-900 dark:text-white mb-2">Selecciona un Agente</h2>
           <p className="text-sm text-slate-600 dark:text-slate-400">
@@ -283,7 +283,7 @@ export function LiveChatPanel() {
                       <Bot className="w-5 h-5 group-hover:scale-110 transition-transform" />
                     </div>
                     <span
-                      className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
+                      className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
                         isConnected
                           ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
                           : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700'
@@ -337,7 +337,7 @@ export function LiveChatPanel() {
           </div>
 
           <span
-            className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border hidden md:inline-block ${
+            className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border hidden md:inline-block ${
               botStatusData?.status === 'CONNECTED'
                 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
                 : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30'
@@ -360,7 +360,7 @@ export function LiveChatPanel() {
             <MessageSquare className="w-3.5 h-3.5" />
             WhatsApp en Vivo
             {conversations.length > 0 && (
-              <span className="ml-1 text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-mono">
+              <span className="ml-1 text-[11px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-mono">
                 {conversations.length}
               </span>
             )}
@@ -382,7 +382,7 @@ export function LiveChatPanel() {
 
       {/* ── TAB 1: WHATSAPP EN VIVO ────────────────────────────────────────── */}
       {activeTab === 'live' && (
-        <div className="bg-white dark:bg-slate-900/60 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-6 shadow-2xl h-[620px] flex flex-col md:flex-row gap-6 overflow-hidden transition-colors">
+        <div className="bg-white dark:bg-slate-900/60 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-6 shadow-2xl h-[calc(100vh-12rem)] min-h-[500px] flex flex-col md:flex-row gap-6 overflow-hidden transition-colors">
           {/* Lista de Conversaciones */}
           <div className="w-full md:w-1/3 flex flex-col gap-4 border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-800 pb-4 md:pb-0 md:pr-6 h-full overflow-hidden">
             <div className="flex items-center justify-between">
@@ -399,20 +399,20 @@ export function LiveChatPanel() {
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => refetchConversations()}
-                  className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-colors"
+                  className="p-2.5 sm:p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-colors"
                   title="Actualizar lista de chats"
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isRefetching ? 'animate-spin text-emerald-500' : ''}`} />
+                  <RefreshCw className={`w-4 h-4 sm:w-3.5 sm:h-3.5 ${isRefetching ? 'animate-spin text-emerald-500' : ''}`} />
                 </button>
 
                 {conversations.length > 0 && (
                   <button
                     onClick={handleClearAllConversations}
                     disabled={isClearingAll}
-                    className="p-1.5 rounded-lg bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/30 transition-colors disabled:opacity-50"
+                    className="p-2.5 sm:p-1.5 rounded-lg bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/30 transition-colors disabled:opacity-50"
                     title="Vaciar todos los chats"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Trash2 className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                   </button>
                 )}
               </div>
@@ -569,7 +569,7 @@ export function LiveChatPanel() {
                           }`}
                         >
                           <p className="whitespace-pre-wrap">{msg.content}</p>
-                          <span className="text-[10px] opacity-75 mt-1.5 block text-right font-mono font-medium">
+                          <span className="text-[11px] opacity-75 mt-1.5 block text-right font-mono font-medium">
                             {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             {isAgent ? ' • Agente Humano' : !isUser ? ' • miBot IA' : ''}
                           </span>
@@ -606,7 +606,7 @@ export function LiveChatPanel() {
 
       {/* ── TAB 2: SIMULADOR DE PRUEBAS / WEB SANDBOX ─────────────────────── */}
       {activeTab === 'simulator' && (
-        <div className="bg-white dark:bg-slate-900/60 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-6 shadow-2xl h-[620px] flex flex-col overflow-hidden transition-colors">
+        <div className="bg-white dark:bg-slate-900/60 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-6 shadow-2xl h-[calc(100vh-12rem)] min-h-[500px] flex flex-col overflow-hidden transition-colors">
           {/* Simulator Header */}
           <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3 mb-3">
             <div className="flex items-center gap-3">
@@ -616,7 +616,7 @@ export function LiveChatPanel() {
               <div>
                 <h3 className="font-extrabold text-sm text-slate-900 dark:text-white flex items-center gap-2">
                   Simulador de IA: {activeBot?.name}
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
                     {activeBot?.aiModel || 'gpt-4o-mini'}
                   </span>
                 </h3>
@@ -628,10 +628,10 @@ export function LiveChatPanel() {
 
             <button
               onClick={handleClearSimulator}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-xs font-semibold border border-slate-200 dark:border-slate-700 transition-colors"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-xs font-semibold border border-slate-200 dark:border-slate-700 transition-colors"
               title="Reiniciar chat de pruebas"
             >
-              <Trash2 className="w-3.5 h-3.5" />
+              <Trash2 className="w-4 h-4" />
               Limpiar Chat
             </button>
           </div>
@@ -681,13 +681,13 @@ export function LiveChatPanel() {
 
                     {/* Sources badge if RAG was used */}
                     {msg.sources && msg.sources.length > 0 && (
-                      <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center gap-1 text-[10px] text-slate-500">
+                      <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center gap-1 text-[11px] text-slate-500">
                         <Database className="w-3 h-3 text-cyan-500" />
                         <span>RAG: {msg.sources.length} fragmento(s) documental(es) consultado(s)</span>
                       </div>
                     )}
 
-                    <span className="text-[10px] opacity-70 mt-1 block text-right font-mono">
+                    <span className="text-[11px] opacity-70 mt-1 block text-right font-mono">
                       {msg.time}
                     </span>
                   </div>
