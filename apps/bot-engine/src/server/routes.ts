@@ -266,15 +266,17 @@ export const setupRoutes = (app: any, manager: any) => {
         logger.info(`📱 [BotEngine] Creando instancia con pairing code para ${cleanNumber} (Tenant: ${tenantId})...`);
 
         // Promesa reactiva que captura el evento bot:code emitido por Baileys
-        const codePromise = new Promise<string>((resolve, reject) => {
+        let codeReceived: string | null = null;
+        const codePromise = new Promise<string | null>((resolve) => {
           const timeout = setTimeout(() => {
             manager.removeListener('bot:code', onCode);
             manager.removeListener('bot:error', onError);
-            reject(new Error('Tiempo de espera agotado al solicitar código a WhatsApp. Verifica que el número esté registrado en WhatsApp e incluye código de país.'));
-          }, 35000);
+            resolve(null); // No rechazar, continuar en segundo plano
+          }, 12000);
 
           const onCode = (tId: string, data: any) => {
             if (tId === tenantId && data?.code) {
+              codeReceived = data.code;
               clearTimeout(timeout);
               manager.removeListener('bot:code', onCode);
               manager.removeListener('bot:error', onError);
@@ -287,7 +289,7 @@ export const setupRoutes = (app: any, manager: any) => {
               clearTimeout(timeout);
               manager.removeListener('bot:code', onCode);
               manager.removeListener('bot:error', onError);
-              reject(new Error(errData?.error || 'Error al inicializar sesión en WhatsApp'));
+              resolve(null);
             }
           };
 
@@ -303,12 +305,18 @@ export const setupRoutes = (app: any, manager: any) => {
         });
         setupProviderListeners(manager, botInstance, tenantId);
 
-        // Si el socket ya tiene el código disponible o lo emite
+        // Esperar hasta 12s para responder rápido en HTTP, si toma más se completa vía Webhook/WebSocket
         const code = await codePromise;
 
-        logger.info(`✅ [BotEngine] Pairing code generado para ${tenantId}: ${code}`);
-        res.statusCode = 200;
-        return res.end(JSON.stringify({ success: true, code }));
+        if (code) {
+          logger.info(`✅ [BotEngine] Pairing code generado para ${tenantId}: ${code}`);
+          res.statusCode = 200;
+          return res.end(JSON.stringify({ success: true, code }));
+        } else {
+          logger.info(`⏳ [BotEngine] Pairing code en proceso para ${tenantId} (se sincronizará vía Webhook/WS)`);
+          res.statusCode = 200;
+          return res.end(JSON.stringify({ success: true, pending: true, message: 'Iniciando conexión con WhatsApp, el código aparecerá en breve...' }));
+        }
 
       } catch (err: any) {
         logger.error('❌ [BotEngine] Error generando pairing code:', err);
