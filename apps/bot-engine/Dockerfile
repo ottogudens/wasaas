@@ -2,12 +2,14 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Copiar paquetes y .npmrc con legacy-peer-deps
-COPY package.json .npmrc ./
-RUN npm install --legacy-peer-deps
+# Instalar git necesario para dependencias de NPM
+RUN apk add --no-cache git
 
-# Copiar el resto del código
+# Copiar todo el código (incluyendo dependencias locales)
 COPY . .
+
+# Instalar dependencias
+RUN npm install --legacy-peer-deps
 
 # Compilar TypeScript a JavaScript
 RUN npm run build || npx tsc

@@ -11,10 +11,10 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@builderbot/bot": "*",
-    "@builderbot/manager": "*",
-    "@builderbot/provider-baileys": "*",
-    "@builderbot/provider-meta": "*",
+    "@builderbot/bot": "file:./builderbot/packages/bot",
+    "@builderbot/manager": "file:./builderbot/packages/manager",
+    "@builderbot/provider-baileys": "file:./builderbot/packages/provider-baileys",
+    "@builderbot/provider-meta": "file:./builderbot/packages/provider-meta",
     "@sentry/node": "^10.70.0",
     "@types/qrcode": "^1.5.6",
     "@types/ws": "^8.18.1",
