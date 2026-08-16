@@ -333,17 +333,26 @@ class BaileysProvider extends ProviderClass<WASocket> {
             if (this.globalVendorArgs.usePairingCode && !sock.authState.creds.registered) {
                 if (this.globalVendorArgs.phoneNumber) {
                     const phoneNumberClean = utils.removePlus(this.globalVendorArgs.phoneNumber)
-                    const code = await sock.requestPairingCode(this.globalVendorArgs.phoneNumber)
-                    await utils.delay(2000)
-                    this.emit('require_action', {
-                        title: '⚡⚡ ACTION REQUIRED ⚡⚡',
-                        instructions: [
-                            `Accept the WhatsApp notification from ${this.globalVendorArgs.phoneNumber} on your phone 👌`,
-                            `The pairing code is: ${code}`,
-                            `Need help: https://link.codigoencasa.com/DISCORD`,
-                        ],
-                        payload: { code },
-                    })
+                    
+                    // Esperar a que el socket se conecte antes de pedir el código
+                    setTimeout(async () => {
+                        try {
+                            this.logger.log(`[${new Date().toISOString()}] Solicitando Pairing Code para ${phoneNumberClean}...`)
+                            const code = await sock.requestPairingCode(phoneNumberClean)
+                            this.logger.log(`[${new Date().toISOString()}] Pairing Code recibido: ${code}`)
+                            this.emit('require_action', {
+                                title: '⚡⚡ ACTION REQUIRED ⚡⚡',
+                                instructions: [
+                                    `Accept the WhatsApp notification from ${phoneNumberClean} on your phone 👌`,
+                                    `The pairing code is: ${code}`,
+                                    `Need help: https://link.codigoencasa.com/DISCORD`,
+                                ],
+                                payload: { code },
+                            })
+                        } catch (error) {
+                            this.logger.log(`[${new Date().toISOString()}] Error al solicitar pairing code:`, error)
+                        }
+                    }, 4000)
                 } else {
                     this.emit('auth_failure', [
                         `The phone number has not been defined, please add it`,
