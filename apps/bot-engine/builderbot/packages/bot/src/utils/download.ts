@@ -1,5 +1,6 @@
 import { randomBytes } from 'crypto'
-import { http, https } from 'follow-redirects'
+import pkg from 'follow-redirects'
+const { http, https } = pkg
 import { rename, createWriteStream, existsSync, mkdirSync } from 'fs'
 import type { IncomingMessage } from 'http'
 import mimeTypes from 'mime-types'
