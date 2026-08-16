@@ -527,6 +527,17 @@ function TenantsTab() {
     },
   });
 
+  const deleteTenantMutation = useMutation({
+    mutationFn: (id: string) => api.deleteTenant(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['tenants'] });
+      await queryClient.refetchQueries({ queryKey: ['tenants', 'all'] });
+    },
+    onError: (err: any) => {
+      alert(`Error al eliminar cliente: ${err.message || 'Error desconocido'}`);
+    },
+  });
+
   const updateSubMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) =>
       api.updateTenantSubscription(id, data),
@@ -666,12 +677,26 @@ function TenantsTab() {
                         disabled={toggleStatusMutation.isPending}
                         className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-colors ${
                           tenant.isActive
-                            ? 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 hover:bg-red-100'
+                            ? 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20 text-amber-600 dark:text-amber-400 hover:bg-amber-100'
                             : 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100'
                         }`}
                       >
                         {toggleStatusMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                         {tenant.isActive ? 'Suspender Acceso' : 'Activar Acceso'}
+                      </button>
+
+                      {/* Botón de eliminar cliente */}
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`¿Estás seguro de eliminar el cliente "${tenant.name}"? Esto eliminará todos sus bots, documentos y datos. Esta acción no se puede deshacer.`)) {
+                            deleteTenantMutation.mutate(tenant.id);
+                          }
+                        }}
+                        disabled={deleteTenantMutation.isPending}
+                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-colors bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20"
+                      >
+                        {deleteTenantMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                        Eliminar Cliente
                       </button>
                     </div>
                   </div>
