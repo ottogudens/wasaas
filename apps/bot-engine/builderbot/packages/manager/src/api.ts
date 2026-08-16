@@ -15,7 +15,7 @@ import {
     type RestartBotInput,
     type CreateFlowInput,
     type UpdateFlowInput,
-} from './schemas'
+} from './schemas.js'
 import { openApiSpec, generateSwaggerHtml } from './swagger.js'
 import type { Flow } from './types.js'
 

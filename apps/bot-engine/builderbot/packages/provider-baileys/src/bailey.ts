@@ -34,7 +34,7 @@ import {
     PollMessageOptions,
     WAVersion,
     WABrowserDescription,
-} from './baileyWrapper'
+} from './baileyWrapper.js'
 import {
     createLidCache,
     extractAndCacheLidFromMessage,
@@ -44,7 +44,7 @@ import {
     type LidCache,
     type MessageContext,
     type LidJid,
-} from './lidCache'
+} from './lidCache.js'
 import { releaseTmp } from './releaseTmp.js'
 import type { BaileyGlobalVendorArgs } from './type.js'
 import { baileyGenerateImage, baileyCleanNumber, baileyIsValidNumber, emptyDirSessions } from './utils.js'

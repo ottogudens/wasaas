@@ -19,7 +19,7 @@ export {
     createFlowSchema,
     updateFlowSchema,
     validate,
-} from './schemas'
+} from './schemas.js'
 
 // Types from types.ts
 export type {
@@ -35,7 +35,7 @@ export type {
     ProviderFactory,
     DatabaseFactory,
     ReconnectState,
-} from './types'
+} from './types.js'
 
 // Types from schemas.ts
 export type {
@@ -47,7 +47,7 @@ export type {
     UpdateFlowInput,
     FlowStep,
     ValidationResult,
-} from './schemas'
+} from './schemas.js'
 
 // Types from persistence.ts
 export type { SerializableBotConfig, PersistenceConfig } from './persistence.js'

@@ -37,4 +37,4 @@ export type {
     WhatsAppCallWebhookPayload,
     CallActionBody,
     WhatsAppVoicePayload,
-} from './calls/types'
+} from './calls/types.js'

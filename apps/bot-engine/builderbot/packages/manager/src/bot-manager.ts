@@ -11,7 +11,7 @@ import type {
     ProviderClass,
     DatabaseClass,
     ReconnectState,
-} from './types'
+} from './types.js'
 
 /**
  * Multi-tenant Bot Manager

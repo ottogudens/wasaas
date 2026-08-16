@@ -36,7 +36,7 @@ function processDir(dir) {
             }
 
             // Regex for: import { x } from './y' OR export { x } from './y'
-            content = content.replace(/(import|export)\s+(.*?\s+from\s+)['"](\.[^'"]+)['"]/g, replacer);
+            content = content.replace(/(import|export)\s+([\s\S]*?\s+from\s+)['"](\.[^'"]+)['"]/g, replacer);
             
             // Regex for: import './y'
             content = content.replace(/import\s+['"](\.[^'"]+)['"]/g, (match, importPath) => {

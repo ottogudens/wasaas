@@ -22,7 +22,7 @@ import type {
     ITtsAdapter,
     WhatsAppCallEntryEvent,
     WhatsAppVoicePayload,
-} from './types'
+} from './types.js'
 import { createAudioSink, createAudioSource, createPeerConnection, waitForIceGathering } from './webrtc.js'
 import type { RTCAudioSinkInstance, RTCAudioSourceInstance } from './webrtc.js'
 

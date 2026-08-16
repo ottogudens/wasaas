@@ -10,7 +10,7 @@ import type {
     FlagsRuntime,
     ProviderEventTypes,
     TContext,
-} from './../types'
+} from './../types.js'
 import type { HostEventTypes } from './eventEmitterClass.js'
 import { EventEmitterClass } from './eventEmitterClass.js'
 import { GlobalState, IdleState, SingleState } from '../context/index.js'

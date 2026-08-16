@@ -7,7 +7,7 @@ import type {
     CallbackFunction,
     Callbacks,
     ActionPropertiesKeyword,
-} from '../../types'
+} from '../../types.js'
 import flatObject from '../../utils/flattener.js'
 import { generateRef } from '../../utils/hash.js'
 
