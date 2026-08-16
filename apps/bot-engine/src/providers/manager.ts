@@ -307,17 +307,6 @@ export const overrideManagerCreateBot = async (manager: any) => {
 
       // Hook B: Nivel Raw Baileys Socket
       attachRawBaileysSocketListener(tenantConfig.tenantId, provider, manager);
-
-      // Forzar inicio del proveedor vendor de Baileys
-      if (typeof provider.initVendor === 'function') {
-        try {
-          logger.info(`🔄 [BotEngine] Invocando initVendor() explícitamente para Tenant: ${tenantConfig.tenantId}...`);
-          await provider.initVendor();
-          attachRawBaileysSocketListener(tenantConfig.tenantId, provider, manager);
-        } catch (err) {
-          logger.warn(`⚠️ [BotEngine] Advertencia durante initVendor() para Tenant ${tenantConfig.tenantId}:`, err);
-        }
-      }
     }
 
     return botInstance;

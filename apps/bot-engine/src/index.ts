@@ -1,3 +1,11 @@
+// Capturar excepciones globales y evitar caídas del contenedor por errores de Baileys / WebSocket
+process.on('unhandledRejection', (reason) => {
+  console.error('⚠️ [BotEngine Guard] Unhandled Promise Rejection interceptada:', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('⚠️ [BotEngine Guard] Uncaught Exception interceptada:', err);
+});
+
 import './check-env.js'; // Validar vars de entorno antes de cualquier otra importación
 import 'dotenv/config';
 import * as Sentry from '@sentry/node';
