@@ -38,6 +38,8 @@ export function LiveChatPanel() {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [chatInput, setChatInput] = useState('');
   const [pairingPhone, setPairingPhone] = useState('');
+  const [localPairingCode, setLocalPairingCode] = useState<string | null>(null);
+  const [pairingError, setPairingError] = useState<string | null>(null);
   const [isClearingAll, setIsClearingAll] = useState(false);
   const [showConnectionModal, setShowConnectionModal] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -173,10 +175,15 @@ export function LiveChatPanel() {
   const handleRequestPairingCode = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pairingPhone || !selectedBotId) return;
+    setPairingError(null);
     try {
-      await requestPairingCode({ id: selectedBotId, phoneNumber: pairingPhone });
-    } catch (err) {
+      const res = await requestPairingCode({ id: selectedBotId, phoneNumber: pairingPhone });
+      if (res?.code) {
+        setLocalPairingCode(res.code);
+      }
+    } catch (err: any) {
       console.error('Error requesting pairing code:', err);
+      setPairingError(err?.message || 'Error solicitando código de vinculación');
     }
   };
 
@@ -817,12 +824,24 @@ export function LiveChatPanel() {
 
                   <div className="w-full text-left">
                     <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-2">Opción 2: Código de 8 Dígitos (Pairing Code)</h4>
-                    {botStatusData.pairingCode ? (
+                    {pairingError && (
+                      <div className="p-2.5 mb-3 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 text-xs flex items-center gap-1.5">
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        <span>{pairingError}</span>
+                      </div>
+                    )}
+                    {(localPairingCode || botStatusData.pairingCode) ? (
                       <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 text-center">
-                        <span className="text-3xl font-mono font-bold tracking-[0.2em] text-slate-900 dark:text-white">
-                          {botStatusData.pairingCode}
+                        <span className="text-3xl font-mono font-bold tracking-[0.2em] text-emerald-600 dark:text-emerald-400">
+                          {localPairingCode || botStatusData.pairingCode}
                         </span>
                         <p className="text-xs text-slate-500 mt-2">Ingresa este código en la notificación de WhatsApp de tu celular.</p>
+                        <button
+                          onClick={() => { setLocalPairingCode(null); setPairingPhone(''); }}
+                          className="mt-3 text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 underline"
+                        >
+                          Usar otro número
+                        </button>
                       </div>
                     ) : (
                       <form onSubmit={handleRequestPairingCode} className="flex gap-2">

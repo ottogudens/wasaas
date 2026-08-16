@@ -541,6 +541,17 @@ export class BotsService {
         throw new Error(data.error || `Error del motor de WhatsApp (HTTP ${res.status})`);
       }
 
+      if (data.code) {
+        await this.prisma.botInstance.update({
+          where: { id: bot.id },
+          data: {
+            pairingCode: data.code,
+            status: 'QR_READY' as any,
+          },
+        });
+        this.logger.log(`✅ [requestPairingCode] Código guardado en BD para ${bot.name}: ${data.code}`);
+      }
+
       return data;
     } catch (err: any) {
       this.logger.error(`Error requesting pairing code: ${err.message}`);
