@@ -1,3 +1,3 @@
-export * from './globalstateClass'
-export * from './stateClass'
-export * from './idlestateClass'
+export * from './globalstateClass.js'
+export * from './stateClass.js'
+export * from './idlestateClass.js'

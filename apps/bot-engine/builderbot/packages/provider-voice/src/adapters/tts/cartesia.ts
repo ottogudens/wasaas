@@ -1,4 +1,4 @@
-import type { ITtsAdapter } from '../index'
+import type { ITtsAdapter } from '../index.js'
 
 export enum CartesiaModel {
     Sonic3 = 'sonic-3',

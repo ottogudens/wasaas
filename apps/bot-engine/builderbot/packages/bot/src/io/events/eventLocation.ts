@@ -1,4 +1,4 @@
-import { generateRef, generateRegex } from '../../utils/hash'
+import { generateRef, generateRegex } from '../../utils/hash.js'
 
 const eventLocation = (): string => {
     return generateRef('_event_location_')

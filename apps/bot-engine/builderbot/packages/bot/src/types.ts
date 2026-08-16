@@ -2,9 +2,9 @@
  * @fileoverview Este archivo contiene las definiciones de tipos utilizadas en el proyecto.
  */
 
-import type { IdleState } from './context'
-import type { ProviderClass } from './provider/interface/provider'
-import type { Queue } from './utils'
+import type { IdleState } from './context/index.js'
+import type { ProviderClass } from './provider/interface/provider.js'
+import type { Queue } from './utils/index.js'
 
 export type CustomNameEvent = string
 

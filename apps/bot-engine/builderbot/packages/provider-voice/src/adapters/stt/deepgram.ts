@@ -1,5 +1,5 @@
-import { pcmToWav } from '../../audio'
-import type { ISttAdapter } from '../index'
+import { pcmToWav } from '../../audio.js'
+import type { ISttAdapter } from '../index.js'
 
 export enum DeepgramSTTModel {
     /** Nova 3 — latest, best accuracy (recommended) */

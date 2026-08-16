@@ -1,7 +1,7 @@
 import { utils } from '@builderbot/bot'
 
-import { getMediaUrl } from './mediaUrl'
-import type { Message, ParamsIncomingMessage as ParamsIncomingMessage } from '../types'
+import { getMediaUrl } from './mediaUrl.js'
+import type { Message, ParamsIncomingMessage as ParamsIncomingMessage } from '../types.js'
 
 export const processIncomingMessage = async ({
     messageId,

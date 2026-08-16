@@ -1,4 +1,4 @@
-import type { TFlow } from '../types'
+import type { TFlow } from '../types.js'
 
 /**
  * Convierte una lista de objetos anidados en un objeto plano,

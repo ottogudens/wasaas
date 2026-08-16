@@ -1,13 +1,13 @@
-import { eventAction } from './eventAction'
-import { eventCall, REGEX_EVENT_CALL } from './eventCall'
-import { REGEX_EVENT_CUSTOM } from './eventCustom'
-import { eventDocument, REGEX_EVENT_DOCUMENT } from './eventDocument'
-import { eventLocation, REGEX_EVENT_LOCATION } from './eventLocation'
-import { eventMedia, REGEX_EVENT_MEDIA } from './eventMedia'
-import { eventOrder, REGEX_EVENT_ORDER } from './eventOrder'
-import { eventTemplate, REGEX_EVENT_TEMPLATE } from './eventTemplate'
-import { eventVoiceNote, REGEX_EVENT_VOICE_NOTE } from './eventVoiceNote'
-import { eventWelcome } from './eventWelcome'
+import { eventAction } from './eventAction.js'
+import { eventCall, REGEX_EVENT_CALL } from './eventCall.js'
+import { REGEX_EVENT_CUSTOM } from './eventCustom.js'
+import { eventDocument, REGEX_EVENT_DOCUMENT } from './eventDocument.js'
+import { eventLocation, REGEX_EVENT_LOCATION } from './eventLocation.js'
+import { eventMedia, REGEX_EVENT_MEDIA } from './eventMedia.js'
+import { eventOrder, REGEX_EVENT_ORDER } from './eventOrder.js'
+import { eventTemplate, REGEX_EVENT_TEMPLATE } from './eventTemplate.js'
+import { eventVoiceNote, REGEX_EVENT_VOICE_NOTE } from './eventVoiceNote.js'
+import { eventWelcome } from './eventWelcome.js'
 
 type EventFunctionRegex = {
     [key: string]: RegExp

@@ -1,4 +1,4 @@
-import type { ITtsAdapter } from '../index'
+import type { ITtsAdapter } from '../index.js'
 
 export enum ElevenLabsModel {
     TurboV2_5 = 'eleven_turbo_v2_5',

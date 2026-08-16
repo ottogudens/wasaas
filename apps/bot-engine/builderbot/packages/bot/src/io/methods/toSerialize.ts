@@ -1,5 +1,5 @@
-import type { TContext } from '../../types'
-import { generateRefSerialize } from '../../utils/hash'
+import type { TContext } from '../../types.js'
+import { generateRefSerialize } from '../../utils/hash.js'
 
 /**
  * Crear referencia serializada

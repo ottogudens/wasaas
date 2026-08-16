@@ -1,7 +1,7 @@
-import { addAnswer } from './addAnswer'
-import { toJson } from './toJson'
-import type { ActionPropertiesKeyword, CallbackFunction, TContext, TFlow } from '../../types'
-import { generateRef } from '../../utils/hash'
+import { addAnswer } from './addAnswer.js'
+import { toJson } from './toJson.js'
+import type { ActionPropertiesKeyword, CallbackFunction, TContext, TFlow } from '../../types.js'
+import { generateRef } from '../../utils/hash.js'
 
 /**
  * @public

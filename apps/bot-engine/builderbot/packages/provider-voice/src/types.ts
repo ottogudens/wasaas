@@ -1,6 +1,6 @@
 import type { GlobalVendorArgs } from '@builderbot/bot/dist/types'
 
-import type { ISttAdapter, ITtsAdapter } from './adapters/index'
+import type { ISttAdapter, ITtsAdapter } from './adapters/index.js'
 
 export { ISttAdapter, ITtsAdapter }
 

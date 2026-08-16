@@ -1,4 +1,4 @@
-import { generateRef, generateRegex } from '../../utils/hash'
+import { generateRef, generateRegex } from '../../utils/hash.js'
 
 const eventTemplate = (): string => {
     return generateRef('_event_template_')

@@ -1,4 +1,4 @@
-import type { ISttAdapter, ITtsAdapter } from '../adapters/index'
+import type { ISttAdapter, ITtsAdapter } from '../adapters/index.js'
 
 export type { ISttAdapter, ITtsAdapter }
 

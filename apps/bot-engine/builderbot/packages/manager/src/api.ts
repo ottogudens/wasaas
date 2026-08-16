@@ -1,9 +1,9 @@
 import type { IncomingMessage, ServerResponse } from 'http'
 import polka from 'polka'
 
-import type { BotManager } from './bot-manager'
-import { FlowRegistry, type FlowDefinition } from './flow-registry'
-import { RateLimiter, type RateLimiterConfig } from './rate-limiter'
+import type { BotManager } from './bot-manager.js'
+import { FlowRegistry, type FlowDefinition } from './flow-registry.js'
+import { RateLimiter, type RateLimiterConfig } from './rate-limiter.js'
 import {
     createBotSchema,
     updateBotSchema,
@@ -16,8 +16,8 @@ import {
     type CreateFlowInput,
     type UpdateFlowInput,
 } from './schemas'
-import { openApiSpec, generateSwaggerHtml } from './swagger'
-import type { Flow } from './types'
+import { openApiSpec, generateSwaggerHtml } from './swagger.js'
+import type { Flow } from './types.js'
 
 interface ApiConfig {
     port: number

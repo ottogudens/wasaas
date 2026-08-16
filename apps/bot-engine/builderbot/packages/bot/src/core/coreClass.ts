@@ -11,18 +11,18 @@ import type {
     ProviderEventTypes,
     TContext,
 } from './../types'
-import type { HostEventTypes } from './eventEmitterClass'
-import { EventEmitterClass } from './eventEmitterClass'
-import { GlobalState, IdleState, SingleState } from '../context'
-import type { MemoryDB } from '../db'
-import { LIST_REGEX } from '../io/events'
-import type FlowClass from '../io/flowClass'
-import { toCtx } from '../io/methods'
-import type { ProviderClass } from '../provider/interface/provider'
-import type { FlowDynamicMessage, GeneralArgs, MessageContextIncoming } from '../types'
-import { BlackList, Queue } from '../utils'
-import { delay } from '../utils/delay'
-import { printer } from '../utils/interactive'
+import type { HostEventTypes } from './eventEmitterClass.js'
+import { EventEmitterClass } from './eventEmitterClass.js'
+import { GlobalState, IdleState, SingleState } from '../context/index.js'
+import type { MemoryDB } from '../db/index.js'
+import { LIST_REGEX } from '../io/events/index.js'
+import type FlowClass from '../io/flowClass.js'
+import { toCtx } from '../io/methods/index.js'
+import type { ProviderClass } from '../provider/interface/provider.js'
+import type { FlowDynamicMessage, GeneralArgs, MessageContextIncoming } from '../types.js'
+import { BlackList, Queue } from '../utils/index.js'
+import { delay } from '../utils/delay.js'
+import { printer } from '../utils/interactive.js'
 
 const logger = new Console({
     stdout: createWriteStream(`${process.cwd()}/core.class.log`),

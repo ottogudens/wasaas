@@ -1,3 +1,3 @@
-export { MetaProvider } from './meta/provider'
-export * from './utils/processIncomingMsg'
-export * from './types'
+export { MetaProvider } from './meta/provider.js'
+export * from './utils/processIncomingMsg.js'
+export * from './types.js'

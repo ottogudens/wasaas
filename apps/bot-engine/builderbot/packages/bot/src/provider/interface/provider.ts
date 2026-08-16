@@ -3,10 +3,10 @@ import cors from 'cors'
 import type { IncomingMessage } from 'node:http'
 import polka, { type Polka } from 'polka'
 
-import type { PolkaRes, ProviderHttpServer } from './server'
-import { EventEmitterClass } from '../../core/eventEmitterClass'
-import type { GlobalVendorArgs, BotCtxMiddlewareOptions, BotCtxMiddleware, ProviderEventTypes } from '../../types'
-import { removePlus, setEvent } from '../../utils/event'
+import type { PolkaRes, ProviderHttpServer } from './server.js'
+import { EventEmitterClass } from '../../core/eventEmitterClass.js'
+import type { GlobalVendorArgs, BotCtxMiddlewareOptions, BotCtxMiddleware, ProviderEventTypes } from '../../types.js'
+import { removePlus, setEvent } from '../../utils/event.js'
 
 export type Vendor<T = {}> = {} & T
 

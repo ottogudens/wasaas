@@ -1,5 +1,5 @@
-import { toSerialize } from './toSerialize'
-import type { TContext, TFlow } from '../../types'
+import { toSerialize } from './toSerialize.js'
+import type { TContext, TFlow } from '../../types.js'
 
 /**
  * @private

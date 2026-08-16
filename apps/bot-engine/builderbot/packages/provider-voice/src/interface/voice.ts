@@ -1,6 +1,6 @@
 import type { BotContext, SendOptions } from '@builderbot/bot/dist/types'
 
-import type { VoicePayload } from '../types'
+import type { VoicePayload } from '../types.js'
 
 /**
  * Public contract implemented by VoiceProvider.

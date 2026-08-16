@@ -15,11 +15,11 @@ import {
 import { AccessToken } from 'livekit-server-sdk'
 import { EventEmitter } from 'node:events'
 
-import type { ISttAdapter, ITtsAdapter } from '../adapters/index'
-import { OpenAISTTAdapter } from '../adapters/stt/openai'
-import { OpenAITTSAdapter } from '../adapters/tts/openai'
-import { bufferToInt16, chunkPcm, SilenceSegmenter } from '../audio'
-import type { IVoiceProviderArgs, VoicePayload } from '../types'
+import type { ISttAdapter, ITtsAdapter } from '../adapters/index.js'
+import { OpenAISTTAdapter } from '../adapters/stt/openai.js'
+import { OpenAITTSAdapter } from '../adapters/tts/openai.js'
+import { bufferToInt16, chunkPcm, SilenceSegmenter } from '../audio.js'
+import type { IVoiceProviderArgs, VoicePayload } from '../types.js'
 
 /** 10 ms frames for publishing into LiveKit. */
 const PUBLISH_FRAME_MS = 10

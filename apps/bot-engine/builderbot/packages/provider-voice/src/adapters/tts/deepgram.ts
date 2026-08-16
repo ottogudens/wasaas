@@ -1,4 +1,4 @@
-import type { ITtsAdapter } from '../index'
+import type { ITtsAdapter } from '../index.js'
 
 export enum DeepgramTTSModel {
     /** Aura 2 — latest generation, highest quality */

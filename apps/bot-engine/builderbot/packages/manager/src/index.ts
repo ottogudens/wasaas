@@ -4,11 +4,11 @@
  */
 
 // Main classes
-export { BotManager } from './bot-manager'
-export { BotManagerApi } from './api'
-export { FlowRegistry, type FlowDefinition } from './flow-registry'
-export { RateLimiter, type RateLimiterConfig } from './rate-limiter'
-export { PersistenceManager, getDefaultPersistence, resetDefaultPersistence } from './persistence'
+export { BotManager } from './bot-manager.js'
+export { BotManagerApi } from './api.js'
+export { FlowRegistry, type FlowDefinition } from './flow-registry.js'
+export { RateLimiter, type RateLimiterConfig } from './rate-limiter.js'
+export { PersistenceManager, getDefaultPersistence, resetDefaultPersistence } from './persistence.js'
 
 // Schemas and validation
 export {
@@ -50,4 +50,4 @@ export type {
 } from './schemas'
 
 // Types from persistence.ts
-export type { SerializableBotConfig, PersistenceConfig } from './persistence'
+export type { SerializableBotConfig, PersistenceConfig } from './persistence.js'

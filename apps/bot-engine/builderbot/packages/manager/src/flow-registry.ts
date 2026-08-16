@@ -1,7 +1,7 @@
 import { addKeyword } from '@builderbot/bot'
 
-import type { CreateFlowInput, UpdateFlowInput, FlowStep } from './schemas'
-import type { Flow } from './types'
+import type { CreateFlowInput, UpdateFlowInput, FlowStep } from './schemas.js'
+import type { Flow } from './types.js'
 
 /**
  * Flow definition stored in registry

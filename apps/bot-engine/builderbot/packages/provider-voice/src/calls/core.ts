@@ -12,10 +12,10 @@
 
 import { EventEmitter } from 'node:events'
 
-import { bufferToInt16, chunkPcm, SilenceSegmenter } from '../audio'
-import { MetaCallClient } from './meta-call-client'
-import { assertOpus, transformAnswer } from './sdp'
-import { CallState } from './types'
+import { bufferToInt16, chunkPcm, SilenceSegmenter } from '../audio.js'
+import { MetaCallClient } from './meta-call-client.js'
+import { assertOpus, transformAnswer } from './sdp.js'
+import { CallState } from './types.js'
 import type {
     IMetaCallCoreConfig,
     ISttAdapter,
@@ -23,8 +23,8 @@ import type {
     WhatsAppCallEntryEvent,
     WhatsAppVoicePayload,
 } from './types'
-import { createAudioSink, createAudioSource, createPeerConnection, waitForIceGathering } from './webrtc'
-import type { RTCAudioSinkInstance, RTCAudioSourceInstance } from './webrtc'
+import { createAudioSink, createAudioSource, createPeerConnection, waitForIceGathering } from './webrtc.js'
+import type { RTCAudioSinkInstance, RTCAudioSourceInstance } from './webrtc.js'
 
 /** Duration of each TTS publish frame in milliseconds. */
 const PUBLISH_FRAME_MS = 10

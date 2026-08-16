@@ -45,9 +45,9 @@ import {
     type MessageContext,
     type LidJid,
 } from './lidCache'
-import { releaseTmp } from './releaseTmp'
-import type { BaileyGlobalVendorArgs } from './type'
-import { baileyGenerateImage, baileyCleanNumber, baileyIsValidNumber, emptyDirSessions } from './utils'
+import { releaseTmp } from './releaseTmp.js'
+import type { BaileyGlobalVendorArgs } from './type.js'
+import { baileyGenerateImage, baileyCleanNumber, baileyIsValidNumber, emptyDirSessions } from './utils.js'
 
 class BaileysProvider extends ProviderClass<WASocket> {
     public globalVendorArgs: BaileyGlobalVendorArgs = {

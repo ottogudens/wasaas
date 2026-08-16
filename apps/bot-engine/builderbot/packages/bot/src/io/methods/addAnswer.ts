@@ -1,5 +1,5 @@
-import { addChild } from './addChild'
-import { toJson } from './toJson'
+import { addChild } from './addChild.js'
+import { toJson } from './toJson.js'
 import type {
     TCTXoptions as TCTOptions,
     TContext,
@@ -8,8 +8,8 @@ import type {
     Callbacks,
     ActionPropertiesKeyword,
 } from '../../types'
-import flatObject from '../../utils/flattener'
-import { generateRef } from '../../utils/hash'
+import flatObject from '../../utils/flattener.js'
+import { generateRef } from '../../utils/hash.js'
 
 /**
  * @public

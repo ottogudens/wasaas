@@ -1,4 +1,4 @@
-import { generateRef, generateRegex } from '../../utils/hash'
+import { generateRef, generateRegex } from '../../utils/hash.js'
 
 const eventVoiceNote = (): string => {
     return generateRef('_event_voice_note_')

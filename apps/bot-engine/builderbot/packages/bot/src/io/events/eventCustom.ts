@@ -1,4 +1,4 @@
-import { generateRef } from '../../utils/hash'
+import { generateRef } from '../../utils/hash.js'
 
 const REGEX_EVENT_CUSTOM = /^_event_custom__[\w\d]{8}-(?:[\w\d]{4}-){3}[\w\d]{12}$/
 

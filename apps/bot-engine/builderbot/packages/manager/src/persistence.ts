@@ -1,7 +1,7 @@
 import { writeFileSync, readFileSync, existsSync, mkdirSync, unlinkSync } from 'fs'
 import { join, dirname } from 'path'
 
-import type { TenantConfig, Flow } from './types'
+import type { TenantConfig, Flow } from './types.js'
 
 /**
  * Serializable bot configuration (without Flow objects)

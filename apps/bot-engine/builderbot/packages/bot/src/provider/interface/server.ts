@@ -1,6 +1,6 @@
 import type { Polka } from 'polka'
 
-import type { BotCtxMiddleware } from '../../types'
+import type { BotCtxMiddleware } from '../../types.js'
 
 /**
  * Interface representing a Provider HTTP Server.

@@ -1,4 +1,4 @@
-import { decryptData, encryptData } from './hash'
+import { decryptData, encryptData } from './hash.js'
 /**
  *
  * @param fullHash

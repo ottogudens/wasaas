@@ -1,7 +1,7 @@
 import type { GlobalVendorArgs } from '@builderbot/bot/dist/types'
 import { proto, WABrowserDescription, WAVersion } from 'baileys'
 
-import type { LidCache } from './lidCache'
+import type { LidCache } from './lidCache.js'
 
 export interface BaileyGlobalVendorArgs extends GlobalVendorArgs {
     gifPlayback: boolean

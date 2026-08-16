@@ -10,8 +10,8 @@
 
 import axios, { type AxiosError } from 'axios'
 
-import { CallAction } from './types'
-import type { CallActionBody } from './types'
+import { CallAction } from './types.js'
+import type { CallActionBody } from './types.js'
 
 const GRAPH_API_BASE = 'https://graph.facebook.com'
 const RETRY_DELAY_MS = 250

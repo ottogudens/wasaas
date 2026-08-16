@@ -3,8 +3,8 @@ import EventEmitter from 'node:events'
 import type polka from 'polka'
 import type Queue from 'queue-promise'
 
-import { processIncomingMessage } from '../utils/processIncomingMsg'
-import { extractMetaSignature, verifyMetaSignature } from '../utils/webhookSignature'
+import { processIncomingMessage } from '../utils/processIncomingMsg.js'
+import { extractMetaSignature, verifyMetaSignature } from '../utils/webhookSignature.js'
 
 import type {
     ContactMeta,

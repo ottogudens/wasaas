@@ -1,7 +1,7 @@
 import OpenAI from 'openai'
 
-import { synthesize, TTS_SAMPLE_RATE } from '../../tts'
-import type { ITtsAdapter } from '../index'
+import { synthesize, TTS_SAMPLE_RATE } from '../../tts.js'
+import type { ITtsAdapter } from '../index.js'
 
 export interface OpenAITTSAdapterOptions {
     /** OpenAI API key. Get it at platform.openai.com/api-keys */

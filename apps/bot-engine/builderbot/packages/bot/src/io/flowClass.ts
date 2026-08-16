@@ -1,6 +1,6 @@
-import type { TContext, TFlow } from '../types'
-import { toSerialize } from './methods/toSerialize'
-import flatObject from '../utils/flattener'
+import type { TContext, TFlow } from '../types.js'
+import { toSerialize } from './methods/toSerialize.js'
+import flatObject from '../utils/flattener.js'
 
 /**
  * Esta clase se encarga de manejar la manipulación de los flows

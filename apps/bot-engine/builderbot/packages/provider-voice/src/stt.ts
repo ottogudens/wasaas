@@ -1,6 +1,6 @@
 import OpenAI, { toFile } from 'openai'
 
-import { pcmToWav } from './audio'
+import { pcmToWav } from './audio.js'
 
 export interface TranscribeOptions {
     /** Whisper model. Default 'whisper-1'. */

@@ -1,7 +1,7 @@
 import OpenAI from 'openai'
 
-import { transcribe } from '../../stt'
-import type { ISttAdapter } from '../index'
+import { transcribe } from '../../stt.js'
+import type { ISttAdapter } from '../index.js'
 
 export interface OpenAISTTAdapterOptions {
     /** OpenAI API key. Get it at platform.openai.com/api-keys */

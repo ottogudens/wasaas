@@ -11,9 +11,9 @@ import { tmpdir } from 'os'
 import { join, basename, resolve } from 'path'
 import Queue from 'queue-promise'
 
-import { MetaCoreVendor } from './core'
-import { downloadFile, getOrderDetails, getProfile } from '../utils'
-import { isBSUID, parseMetaNumber } from '../utils/number'
+import { MetaCoreVendor } from './core.js'
+import { downloadFile, getOrderDetails, getProfile } from '../utils/index.js'
+import { isBSUID, parseMetaNumber } from '../utils/number.js'
 
 import type { MetaInterface } from '~/interface/meta'
 import type {

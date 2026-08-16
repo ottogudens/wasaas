@@ -1,5 +1,5 @@
-import { baileyCleanNumber } from './utils'
+import { baileyCleanNumber } from './utils.js'
 
-export * from './bailey'
-export * from './lidCache'
+export * from './bailey.js'
+export * from './lidCache.js'
 export { baileyCleanNumber }

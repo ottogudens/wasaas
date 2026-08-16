@@ -5,12 +5,12 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import type polka from 'polka'
 
-import { pcmToWav } from '../audio'
-import type { VoiceInterface } from '../interface/voice'
-import { SttModel, TtsModel, TtsVoice } from '../types'
-import type { IVoiceProviderArgs, VoicePayload } from '../types'
-import { generateAudioFileName } from '../utils'
-import { LiveKitCoreVendor } from './core'
+import { pcmToWav } from '../audio.js'
+import type { VoiceInterface } from '../interface/voice.js'
+import { SttModel, TtsModel, TtsVoice } from '../types.js'
+import type { IVoiceProviderArgs, VoicePayload } from '../types.js'
+import { generateAudioFileName } from '../utils.js'
+import { LiveKitCoreVendor } from './core.js'
 
 /**
  * Realtime voice provider for BuilderBot built on LiveKit (WebRTC) + OpenAI.
