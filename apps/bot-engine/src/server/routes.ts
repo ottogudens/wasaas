@@ -236,10 +236,11 @@ export const setupRoutes = (app: any, manager: any) => {
   });
 
   // Endpoint de pairing code (vincular por teléfono)
-  app.post('/internal/pair-phone', async (req: any, res: any) => {
+  const handlePairPhoneRequest = async (req: any, res: any) => {
     const processRequest = async (bodyStr: string) => {
       try {
-        const apiKey = req.headers['x-api-key'];
+        const authHeader = req.headers['authorization'] || '';
+        const apiKey = authHeader.replace('Bearer ', '').trim() || req.headers['x-api-key'];
         if (apiKey !== API_KEY) {
           res.statusCode = 401;
           return res.end(JSON.stringify({ error: 'Unauthorized' }));
@@ -323,7 +324,10 @@ export const setupRoutes = (app: any, manager: any) => {
       req.on('data', (chunk: any) => body += chunk.toString());
       req.on('end', () => processRequest(body));
     }
-  });
+  };
+
+  app.post('/internal/pair-phone', handlePairPhoneRequest);
+  app.post('/internal/request-code', handlePairPhoneRequest);
 
   // Endpoint para desconectar un bot y notificar a la API
   app.post('/internal/disconnect', async (req: any, res: any) => {

@@ -516,11 +516,12 @@ export class BotsService {
     const apiKey = process.env.INTERNAL_API_KEY;
 
     try {
-      const res = await fetch(`${botEngineUrl}/internal/request-code`, {
+      this.logger.log(`📱 [requestPairingCode] Solicitando código para bot "${bot.name}" (${bot.tenantId}) a ${botEngineUrl}/internal/pair-phone...`);
+      const res = await fetch(`${botEngineUrl}/internal/pair-phone`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': apiKey,
+          'x-api-key': apiKey || '',
         },
         body: JSON.stringify({
           tenantId: bot.tenantId,
@@ -528,12 +529,19 @@ export class BotsService {
         }),
       });
 
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to request pairing code');
+      const rawText = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        data = { error: rawText || `HTTP ${res.status}` };
       }
 
-      return res.json();
+      if (!res.ok) {
+        throw new Error(data.error || `Error del motor de WhatsApp (HTTP ${res.status})`);
+      }
+
+      return data;
     } catch (err: any) {
       this.logger.error(`Error requesting pairing code: ${err.message}`);
       throw new Error(`Engine error: ${err.message}`);
