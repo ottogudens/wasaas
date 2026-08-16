@@ -40,6 +40,7 @@ export function LiveChatPanel() {
   const [pairingPhone, setPairingPhone] = useState('');
   const [localPairingCode, setLocalPairingCode] = useState<string | null>(null);
   const [pairingError, setPairingError] = useState<string | null>(null);
+  const [pairingPending, setPairingPending] = useState(false);
   const [isClearingAll, setIsClearingAll] = useState(false);
   const [showConnectionModal, setShowConnectionModal] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -176,10 +177,14 @@ export function LiveChatPanel() {
     e.preventDefault();
     if (!pairingPhone || !selectedBotId) return;
     setPairingError(null);
+    setPairingPending(false);
     try {
       const res = await requestPairingCode({ id: selectedBotId, phoneNumber: pairingPhone });
       if (res?.code) {
         setLocalPairingCode(res.code);
+      } else if (res?.pending) {
+        // Código llegará vía WebSocket — mostrar estado "Conectando..."
+        setPairingPending(true);
       }
     } catch (err: any) {
       console.error('Error requesting pairing code:', err);
@@ -837,11 +842,21 @@ export function LiveChatPanel() {
                         </span>
                         <p className="text-xs text-slate-500 mt-2">Ingresa este código en la notificación de WhatsApp de tu celular.</p>
                         <button
-                          onClick={() => { setLocalPairingCode(null); setPairingPhone(''); }}
+                          onClick={() => { setLocalPairingCode(null); setPairingPhone(''); setPairingPending(false); }}
                           className="mt-3 text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 underline"
                         >
                           Usar otro número
                         </button>
+                      </div>
+                    ) : pairingPending || isRequestingPairing ? (
+                      <div className="text-center py-6">
+                        <Loader2 className="w-8 h-8 animate-spin mx-auto text-emerald-500" />
+                        <p className="text-sm text-slate-600 dark:text-slate-300 mt-3 font-medium">
+                          Conectando con WhatsApp...
+                        </p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          El código de 8 dígitos aparecerá aquí automáticamente.
+                        </p>
                       </div>
                     ) : (
                       <form onSubmit={handleRequestPairingCode} className="flex gap-2">
@@ -854,10 +869,9 @@ export function LiveChatPanel() {
                         />
                         <button
                           type="submit"
-                          disabled={!pairingPhone || isRequestingPairing}
+                          disabled={!pairingPhone}
                           className="px-4 py-2 bg-emerald-500 text-slate-950 text-sm font-bold rounded-lg hover:bg-emerald-400 transition-colors disabled:opacity-50 flex items-center gap-2"
                         >
-                          {isRequestingPairing ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                           Solicitar
                         </button>
                       </form>

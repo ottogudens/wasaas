@@ -1,5 +1,7 @@
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
+import { randomUUID } from 'crypto';
 import QRCode from 'qrcode';
 import { addKeyword, EVENTS } from '@builderbot/bot';
 import { fetchLatestBaileysVersion, downloadMediaMessage } from 'baileys';
@@ -11,16 +13,26 @@ import { extractMessageText, cleanPhoneNumber } from '../utils/format.js';
 import { transcribeVoice, processWhatsappFile, chatWithContext } from '../services/api.js';
 import { notifyWebhook } from '../services/webhook.js';
 
-// Cache LRU en memoria para deduplicar mensajes (evitar procesar el mismo mensaje 2 veces si Baileys o Flow emiten simultáneamente)
-const processedMessageIds = new Set<string>();
+// Deduplicación robusta de mensajes con TTL (Fase 4.1)
+const processedMessageIds = new Map<string, number>();
+const MESSAGE_DEDUP_TTL_MS = 60_000;  // IDs expiran tras 60s
+const MESSAGE_DEDUP_MAX = 10_000;
+
+// Limpieza periódica cada 30s para evitar memory leaks
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, ts] of processedMessageIds) {
+    if (now - ts > MESSAGE_DEDUP_TTL_MS) processedMessageIds.delete(id);
+  }
+}, 30_000);
 
 const isMessageDuplicate = (id?: string): boolean => {
   if (!id) return false;
   if (processedMessageIds.has(id)) return true;
-  processedMessageIds.add(id);
-  if (processedMessageIds.size > 5000) {
-    const first = processedMessageIds.values().next().value;
-    if (first) processedMessageIds.delete(first);
+  processedMessageIds.set(id, Date.now());
+  if (processedMessageIds.size > MESSAGE_DEDUP_MAX) {
+    const oldest = processedMessageIds.keys().next().value;
+    if (oldest) processedMessageIds.delete(oldest);
   }
   return false;
 };
@@ -57,15 +69,18 @@ export const processIncomingMessage = async (
 
     logger.info(`📩 [${source} Incoming] Tenant: ${tenantId}, From: ${cleanFrom}, Audio: ${isAudio}, Doc: ${isDocument}, Body: "${bodyText}"`);
 
-    // 🎙️ A. Procesar Nota de Voz vía OpenAI Whisper
+    // 🎤️ A. Procesar Nota de Voz vía OpenAI Whisper
     if (isAudio) {
-      logger.info(`🎙️ [Baileys Audio] Recibida nota de voz de ${cleanFrom}...`);
+      logger.info(`🎤️ [Baileys Audio] Recibida nota de voz de ${cleanFrom}...`);
+      const tmpAudioPath = path.join(os.tmpdir(), `wa-audio-${randomUUID()}.ogg`);
       try {
         const audioBuffer = (await downloadMediaMessage(payload, 'buffer', {})) as Buffer;
 
         if (audioBuffer && audioBuffer.length > 0) {
-          logger.info(`🎙️ [Baileys Audio] Descargados ${audioBuffer.length} bytes de audio.`);
+          // Guardar a archivo temporal para evitar mantener buffers grandes en RAM
+          fs.writeFileSync(tmpAudioPath, audioBuffer);
           const audioBase64 = audioBuffer.toString('base64');
+          logger.info(`🎤️ [Baileys Audio] Descargados ${audioBuffer.length} bytes de audio.`);
 
           const voiceRes = await transcribeVoice(tenantId, cleanFrom, audioBase64);
 
@@ -76,7 +91,7 @@ export const processIncomingMessage = async (
             if (voiceData.transcribedText) {
               manager.emit('bot:message', tenantId, {
                 from: cleanFrom,
-                body: `🎙️ ${voiceData.transcribedText}`,
+                body: `🎤️ ${voiceData.transcribedText}`,
                 name: payload?.pushName || payload?.name || cleanFrom,
                 timestamp: Date.now(),
               });
@@ -94,6 +109,9 @@ export const processIncomingMessage = async (
         }
       } catch (audioErr) {
         logger.error('❌ Error procesando mensaje de voz:', audioErr);
+      } finally {
+        // Limpiar archivo temporal siempre
+        fs.unlink(tmpAudioPath, () => {});
       }
     }
 
@@ -102,12 +120,15 @@ export const processIncomingMessage = async (
       const docMsg = msgContent.documentMessage || msgContent.documentWithCaptionMessage?.message?.documentMessage;
       const docTitle = docMsg?.fileName || 'Documento_WhatsApp.txt';
       logger.info(`📄 [Baileys Document] Recibido archivo "${docTitle}" de ${cleanFrom}...`);
+      const tmpDocPath = path.join(os.tmpdir(), `wa-doc-${randomUUID()}`);
       try {
         const docBuffer = (await downloadMediaMessage(payload, 'buffer', {})) as Buffer;
 
         if (docBuffer && docBuffer.length > 0) {
-          logger.info(`📄 [Baileys Document] Descargados ${docBuffer.length} bytes del documento.`);
+          // Guardar a archivo temporal para evitar mantener buffers grandes en RAM
+          fs.writeFileSync(tmpDocPath, docBuffer);
           const docContentBase64 = docBuffer.toString('base64');
+          logger.info(`📄 [Baileys Document] Descargados ${docBuffer.length} bytes del documento.`);
 
           const docRes = await processWhatsappFile(tenantId, docTitle, docContentBase64);
 
@@ -131,6 +152,9 @@ export const processIncomingMessage = async (
         }
       } catch (docErr) {
         logger.error('❌ Error procesando documento de WhatsApp:', docErr);
+      } finally {
+        // Limpiar archivo temporal siempre
+        fs.unlink(tmpDocPath, () => {});
       }
     }
 
@@ -222,9 +246,16 @@ export const setupProviderListeners = (manager: any, botInstance: any, tenantId:
   });
 };
 
+// Cache global de versión de Baileys (se obtiene 1x por arranque del motor, no por cada bot)
+let cachedBaileysVersion: [number, number, number] | null = null;
+
 export const overrideManagerCreateBot = async (manager: any) => {
-  const { version } = await fetchLatestBaileysVersion();
-  logger.info(`🌐 [Baileys] Versión de WhatsApp Web obtenida de servidores oficiales: ${version.join('.')}`);
+  if (!cachedBaileysVersion) {
+    const { version: fetchedVersion } = await fetchLatestBaileysVersion();
+    cachedBaileysVersion = fetchedVersion;
+    logger.info(`🌐 [Baileys] Versión de WhatsApp Web obtenida: ${fetchedVersion.join('.')} (cacheada para todas las instancias)`);
+  }
+  const version = cachedBaileysVersion;
 
   const originalCreateBot = manager.createBot.bind(manager);
 
@@ -285,27 +316,29 @@ export const overrideManagerCreateBot = async (manager: any) => {
         }
       });
 
+      // Evento 'ready': conexión establecida — registrar listener de mensajes canónico
+      let readyFired = false;
       provider.on('ready', (data: any) => {
-        logger.info(`🎉 [Baileys Native Event] 'ready' recibido para Tenant ${tenantConfig.tenantId}:`, data);
+        if (readyFired) return; // Prevenir duplicación
+        readyFired = true;
+        logger.info(`🎉 [Baileys] 'ready' para Tenant ${tenantConfig.tenantId}`);
         manager.emit('bot:connected', tenantConfig.tenantId);
-
-        // Hook directo a socket nativo de Baileys cuando esté listo
+        // Registrar listener único de mensajes vía socket nativo de Baileys
         attachRawBaileysSocketListener(tenantConfig.tenantId, provider, manager);
       });
 
+      // Evento 'host': complementario a 'ready' (Meta Provider lo usa)
       provider.on('host', (data: any) => {
-        logger.info(`🎉 [Baileys Native Event] 'host' recibido para Tenant ${tenantConfig.tenantId}:`, data);
-        manager.emit('bot:connected', tenantConfig.tenantId);
-
-        attachRawBaileysSocketListener(tenantConfig.tenantId, provider, manager);
+        if (!readyFired) {
+          readyFired = true;
+          logger.info(`🎉 [Baileys] 'host' para Tenant ${tenantConfig.tenantId}`);
+          manager.emit('bot:connected', tenantConfig.tenantId);
+          attachRawBaileysSocketListener(tenantConfig.tenantId, provider, manager);
+        }
       });
 
-      // Hook A: Nivel ProviderClass
-      provider.on('message', async (payload: any) => {
-        await processIncomingMessage(tenantConfig.tenantId, provider, payload, manager, 'ProviderClass');
-      });
-
-      // Hook B: Nivel Raw Baileys Socket
+      // Canal ÚNICO de mensajes: Raw Baileys Socket (messages.upsert)
+      // NO se usa provider.on('message') para evitar doble procesamiento
       attachRawBaileysSocketListener(tenantConfig.tenantId, provider, manager);
     }
 

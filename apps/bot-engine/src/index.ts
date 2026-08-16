@@ -1,10 +1,23 @@
-// Capturar excepciones globales y evitar caídas del contenedor por errores de Baileys / WebSocket
-process.on('unhandledRejection', (reason) => {
-  console.error('⚠️ [BotEngine Guard] Unhandled Promise Rejection interceptada:', reason);
-});
-process.on('uncaughtException', (err) => {
+// Blindar handlers para que no sean eliminados por librerías downstream (BaileysProvider)
+const guardUnhandled = (reason: any) => {
+  console.error('⚠️ [BotEngine Guard] Unhandled Rejection interceptada:', reason);
+};
+const guardUncaught = (err: any) => {
   console.error('⚠️ [BotEngine Guard] Uncaught Exception interceptada:', err);
-});
+  // NO llamar process.exit() — mantener el contenedor vivo en Railway
+};
+
+// Re-registrar periódicamente (defensa contra removeAllListeners de dependencias)
+const ensureGuards = () => {
+  if (!process.listeners('unhandledRejection').includes(guardUnhandled)) {
+    process.on('unhandledRejection', guardUnhandled);
+  }
+  if (!process.listeners('uncaughtException').includes(guardUncaught)) {
+    process.on('uncaughtException', guardUncaught);
+  }
+};
+ensureGuards();
+setInterval(ensureGuards, 5000); // Re-blindar cada 5s
 
 import './check-env.js'; // Validar vars de entorno antes de cualquier otra importación
 import 'dotenv/config';

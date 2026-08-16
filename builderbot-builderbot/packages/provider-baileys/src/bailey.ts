@@ -155,28 +155,13 @@ class BaileysProvider extends ProviderClass<WASocket> {
             this.cleanup()
         }
 
-        // Remove existing listeners to prevent duplicates
-        process.removeAllListeners('SIGINT')
-        process.removeAllListeners('SIGTERM')
-        process.removeAllListeners('SIGUSR1')
-        process.removeAllListeners('SIGUSR2')
-        process.removeAllListeners('uncaughtException')
-        process.removeAllListeners('unhandledRejection')
+        // Registrar handlers de señal de forma ADITIVA, SIN borrar los existentes
+        // El host (bot-engine/index.ts) registra sus propios guards que NO deben ser eliminados
+        process.once('SIGINT', cleanup)
+        process.once('SIGTERM', cleanup)
 
-        process.on('SIGINT', cleanup)
-        process.on('SIGTERM', cleanup)
-        process.on('SIGUSR1', cleanup)
-        process.on('SIGUSR2', cleanup)
-
-        process.on('uncaughtException', (error) => {
-            this.logger.log(`[${new Date().toISOString()}] Uncaught Exception:`, error)
-            this.cleanup()
-            process.exit(1)
-        })
-
-        process.on('unhandledRejection', (reason, promise) => {
-            this.logger.log(`[${new Date().toISOString()}] Unhandled Rejection at:`, promise, 'reason:', reason)
-        })
+        // NO registrar uncaughtException ni unhandledRejection aquí
+        // El host (index.ts) maneja estos eventos globalmente para mantener el contenedor vivo
     }
 
     private setupPeriodicCleanup() {

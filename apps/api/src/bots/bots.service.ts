@@ -509,6 +509,7 @@ export class BotsService {
 
   /**
    * Request pairing code from bot engine
+   * El motor responde 202 Accepted inmediatamente y el código llega vía WebSocket/Webhook
    */
   async requestPairingCode(botId: string, organizationId: string, phoneNumber: string) {
     const bot = await this.getBot(botId, organizationId);
@@ -537,10 +538,18 @@ export class BotsService {
         data = { error: rawText || `HTTP ${res.status}` };
       }
 
-      if (!res.ok) {
+      // Aceptar 200 (código inmediato) y 202 (pending, código llegará vía WS/Webhook)
+      if (!res.ok && res.status !== 202) {
         throw new Error(data.error || `Error del motor de WhatsApp (HTTP ${res.status})`);
       }
 
+      // Actualizar estado del bot a CONNECTING mientras el motor negocia con WhatsApp
+      await this.prisma.botInstance.update({
+        where: { id: bot.id },
+        data: { status: 'CONNECTING' as any },
+      });
+
+      // Si el código llegó inmediatamente (raro pero posible con 200)
       if (data.code) {
         await this.prisma.botInstance.update({
           where: { id: bot.id },
@@ -550,9 +559,11 @@ export class BotsService {
           },
         });
         this.logger.log(`✅ [requestPairingCode] Código guardado en BD para ${bot.name}: ${data.code}`);
+      } else {
+        this.logger.log(`⏳ [requestPairingCode] Vinculación iniciada para ${bot.name}. Código llegará vía WebSocket.`);
       }
 
-      return data;
+      return { success: true, pending: !data.code, code: data.code || null };
     } catch (err: any) {
       this.logger.error(`Error requesting pairing code: ${err.message}`);
       throw new Error(`Engine error: ${err.message}`);

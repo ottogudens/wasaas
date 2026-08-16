@@ -254,8 +254,16 @@ export const setupRoutes = (app: any, manager: any) => {
           return res.end(JSON.stringify({ error: 'Missing tenantId or phoneNumber' }));
         }
 
-        const cleanNumber = phoneNumber.replace(/[\s\-\+]/g, '');
+        // Sanitización estricta: solo dígitos, validación E.164
+        const cleanNumber = phoneNumber.replace(/\D/g, '');
+        if (cleanNumber.length < 10 || cleanNumber.length > 15) {
+          res.statusCode = 400;
+          return res.end(JSON.stringify({
+            error: `Número inválido: "${phoneNumber}". Debe ser formato E.164 sin '+' (ej: 56912345678, mínimo 10 dígitos)`,
+          }));
+        }
 
+        // Limpiar instancia previa si existe
         let botInstance = manager.getBot(tenantId);
         if (botInstance) {
           logger.info(`📱 [BotEngine] Removiendo bot anterior para pairing code...`);
@@ -263,65 +271,40 @@ export const setupRoutes = (app: any, manager: any) => {
         }
         cleanSessionFiles(tenantId);
 
-        logger.info(`📱 [BotEngine] Creando instancia con pairing code para ${cleanNumber} (Tenant: ${tenantId})...`);
+        logger.info(`📱 [BotEngine] Iniciando vinculación con pairing code para ${cleanNumber} (Tenant: ${tenantId})...`);
 
-        // Promesa reactiva que captura el evento bot:code emitido por Baileys
-        let codeReceived: string | null = null;
-        const codePromise = new Promise<string | null>((resolve) => {
-          const timeout = setTimeout(() => {
-            manager.removeListener('bot:code', onCode);
-            manager.removeListener('bot:error', onError);
-            resolve(null); // No rechazar, continuar en segundo plano
-          }, 12000);
+        // Responder inmediatamente con 202 Accepted — NO bloquear la petición HTTP
+        // El código llegará al frontend vía WebSocket (bot:code) y Webhook
+        res.statusCode = 202;
+        res.end(JSON.stringify({
+          success: true,
+          pending: true,
+          message: 'Solicitud de vinculación iniciada. El código llegará vía WebSocket.',
+        }));
 
-          const onCode = (tId: string, data: any) => {
-            if (tId === tenantId && data?.code) {
-              codeReceived = data.code;
-              clearTimeout(timeout);
-              manager.removeListener('bot:code', onCode);
-              manager.removeListener('bot:error', onError);
-              resolve(data.code);
-            }
-          };
-
-          const onError = (tId: string, errData: any) => {
-            if (tId === tenantId) {
-              clearTimeout(timeout);
-              manager.removeListener('bot:code', onCode);
-              manager.removeListener('bot:error', onError);
-              resolve(null);
-            }
-          };
-
-          manager.on('bot:code', onCode);
-          manager.on('bot:error', onError);
+        // Continuar en background: crear bot y esperar código
+        setImmediate(async () => {
+          try {
+            botInstance = await manager.createBot({
+              tenantId,
+              usePairingCode: true,
+              phoneNumber: cleanNumber,
+              flows: [createAiFlow(tenantId)],
+            });
+            setupProviderListeners(manager, botInstance, tenantId);
+            logger.info(`✅ [BotEngine] Instancia con pairing code creada para ${tenantId}. Esperando código de WhatsApp...`);
+          } catch (err: any) {
+            logger.error(`❌ [BotEngine] Error en background pair-phone para ${tenantId}:`, err);
+            manager.emit('bot:error', tenantId, { error: err?.message || String(err) });
+          }
         });
-
-        botInstance = await manager.createBot({
-          tenantId,
-          usePairingCode: true,
-          phoneNumber: cleanNumber,
-          flows: [createAiFlow(tenantId)],
-        });
-        setupProviderListeners(manager, botInstance, tenantId);
-
-        // Esperar hasta 12s para responder rápido en HTTP, si toma más se completa vía Webhook/WebSocket
-        const code = await codePromise;
-
-        if (code) {
-          logger.info(`✅ [BotEngine] Pairing code generado para ${tenantId}: ${code}`);
-          res.statusCode = 200;
-          return res.end(JSON.stringify({ success: true, code }));
-        } else {
-          logger.info(`⏳ [BotEngine] Pairing code en proceso para ${tenantId} (se sincronizará vía Webhook/WS)`);
-          res.statusCode = 200;
-          return res.end(JSON.stringify({ success: true, pending: true, message: 'Iniciando conexión con WhatsApp, el código aparecerá en breve...' }));
-        }
 
       } catch (err: any) {
         logger.error('❌ [BotEngine] Error generando pairing code:', err);
-        res.statusCode = 500;
-        return res.end(JSON.stringify({ error: err?.message || String(err) }));
+        if (!res.headersSent && !res.writableEnded) {
+          res.statusCode = 500;
+          return res.end(JSON.stringify({ error: err?.message || String(err) }));
+        }
       }
     };
 
