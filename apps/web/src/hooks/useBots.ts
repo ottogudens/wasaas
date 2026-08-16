@@ -60,6 +60,17 @@ export function useBots(token: string | null) {
     },
   });
 
+  // Start / Wake up Bot (generate QR)
+  const startBotMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return api.startBot(id);
+    },
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ['bots'] });
+      queryClient.invalidateQueries({ queryKey: ['botStatus', id] });
+    },
+  });
+
   // Request Pairing Code
   const requestPairingCodeMutation = useMutation({
     mutationFn: async ({ id, phoneNumber }: { id: string, phoneNumber: string }) => {
@@ -81,6 +92,8 @@ export function useBots(token: string | null) {
     isDeleting: deleteBotMutation.isPending,
     updateBot: updateBotMutation.mutateAsync,
     isUpdating: updateBotMutation.isPending,
+    startBot: startBotMutation.mutateAsync,
+    isStartingBot: startBotMutation.isPending,
     requestPairingCode: requestPairingCodeMutation.mutateAsync,
     isRequestingPairing: requestPairingCodeMutation.isPending,
   };

@@ -248,6 +248,12 @@ export const overrideManagerCreateBot = async (manager: any) => {
         tenantConfig.providerOptions = {};
       }
       tenantConfig.providerOptions.version = version;
+      if (tenantConfig.usePairingCode !== undefined) {
+        tenantConfig.providerOptions.usePairingCode = tenantConfig.usePairingCode;
+      }
+      if (tenantConfig.phoneNumber) {
+        tenantConfig.providerOptions.phoneNumber = tenantConfig.phoneNumber;
+      }
     }
 
     // Inyectar flujo dinámico con tenantId en closure si no trae flujos

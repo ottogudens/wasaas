@@ -165,6 +165,12 @@ class ApiClient {
     });
   }
 
+  async startBot(botId: string) {
+    return this.request<any>(`/bots/${botId}/start`, {
+      method: 'POST',
+    });
+  }
+
   async requestPairingCode(botId: string, phoneNumber: string) {
     return this.request<any>(`/bots/${botId}/pair-phone`, {
       method: 'POST',

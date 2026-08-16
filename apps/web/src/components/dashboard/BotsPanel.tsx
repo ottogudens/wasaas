@@ -9,7 +9,7 @@ import { useBots } from '../../hooks/useBots';
 
 export function BotsPanel() {
   const { token } = useAuth();
-  const { bots, isLoading, isCreating, createBot, updateBot, deleteBot, isUpdating } = useBots(token);
+  const { bots, isLoading, isCreating, createBot, updateBot, deleteBot, isUpdating, startBot } = useBots(token);
   const { setSelectedBotId, setSelectedBot } = useBotContext();
   const router = useRouter();
 
@@ -143,7 +143,13 @@ export function BotsPanel() {
                 <p className="text-xs text-slate-500 mb-3">Modelo: {b.aiModel || 'gpt-4o-mini'}</p>
                 <div className="flex items-center gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
                   <button
-                    onClick={() => { setSelectedBot(b); router.push('/dashboard/chat'); }}
+                    onClick={async () => {
+                      setSelectedBot(b);
+                      if (b.status !== 'CONNECTED') {
+                        startBot(b.id).catch(() => {});
+                      }
+                      router.push('/dashboard/chat');
+                    }}
                     className="text-xs px-3.5 py-2.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-all flex items-center gap-1.5"
                   >
                     <QrCode className="w-4 h-4" /> Vincular

@@ -466,6 +466,48 @@ export class BotsService {
   }
 
   /**
+   * Start / Wake up a bot in bot-engine for QR code generation
+   */
+  async startBot(botId: string, organizationId: string, isSuperAdmin: boolean = false) {
+    const bot = await this.getBot(botId, organizationId, isSuperAdmin);
+    const botEngineUrl = process.env.BOT_ENGINE_URL || 'https://whatsapp-service-production-e6f2.up.railway.app';
+    const apiKey = process.env.INTERNAL_API_KEY;
+
+    // Actualizar estado a CONNECTING mientras el engine levanta el socket
+    if (bot.status !== 'CONNECTED') {
+      await this.prisma.botInstance.update({
+        where: { id: bot.id },
+        data: { status: 'CONNECTING' as any },
+      });
+    }
+
+    try {
+      this.logger.log(`🚀 [startBot] Solicitando arranque de instancia en bot-engine para "${bot.name}" (${bot.tenantId})...`);
+      const res = await fetch(`${botEngineUrl}/internal/start`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey || '',
+        },
+        body: JSON.stringify({
+          tenantId: bot.tenantId,
+          name: bot.name,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Engine error (HTTP ${res.status})`);
+      }
+
+      return await res.json();
+    } catch (err: any) {
+      this.logger.error(`Error iniciando bot en engine: ${err.message}`);
+      throw new Error(`Engine error: ${err.message}`);
+    }
+  }
+
+  /**
    * Request pairing code from bot engine
    */
   async requestPairingCode(botId: string, organizationId: string, phoneNumber: string) {

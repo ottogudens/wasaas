@@ -156,6 +156,12 @@ export class BotsController {
     return this.botsService.toggleHumanMode(conversationId, req.user.organizationId, isHumanMode);
   }
 
+  @Post(':id/start')
+  async startBot(@Param('id') id: string, @Req() req: any) {
+    const isSuperAdmin = req.user.role === 'SUPER_ADMIN';
+    return this.botsService.startBot(id, req.user.organizationId, isSuperAdmin);
+  }
+
   @Post(':id/pair-phone')
   async requestPairingCode(
     @Param('id') id: string,

@@ -263,34 +263,47 @@ export const setupRoutes = (app: any, manager: any) => {
         cleanSessionFiles(tenantId);
 
         logger.info(`📱 [BotEngine] Creando instancia con pairing code para ${cleanNumber} (Tenant: ${tenantId})...`);
-        
+
+        // Promesa reactiva que captura el evento bot:code emitido por Baileys
+        const codePromise = new Promise<string>((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            manager.removeListener('bot:code', onCode);
+            manager.removeListener('bot:error', onError);
+            reject(new Error('Tiempo de espera agotado al solicitar código a WhatsApp. Verifica que el número esté registrado en WhatsApp e incluye código de país.'));
+          }, 35000);
+
+          const onCode = (tId: string, data: any) => {
+            if (tId === tenantId && data?.code) {
+              clearTimeout(timeout);
+              manager.removeListener('bot:code', onCode);
+              manager.removeListener('bot:error', onError);
+              resolve(data.code);
+            }
+          };
+
+          const onError = (tId: string, errData: any) => {
+            if (tId === tenantId) {
+              clearTimeout(timeout);
+              manager.removeListener('bot:code', onCode);
+              manager.removeListener('bot:error', onError);
+              reject(new Error(errData?.error || 'Error al inicializar sesión en WhatsApp'));
+            }
+          };
+
+          manager.on('bot:code', onCode);
+          manager.on('bot:error', onError);
+        });
+
         botInstance = await manager.createBot({
           tenantId,
+          usePairingCode: true,
+          phoneNumber: cleanNumber,
           flows: [createAiFlow(tenantId)],
         });
         setupProviderListeners(manager, botInstance, tenantId);
 
-        const provider = botInstance.provider as any;
-
-        const code = await new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => reject(new Error('Timeout esperando código de Baileys')), 25000);
-          
-          setTimeout(async () => {
-            try {
-               const sock = provider.vendor || provider.socket || provider.sock;
-               if (!sock || !sock.requestPairingCode) {
-                 clearTimeout(timeout);
-                 return reject(new Error('El proveedor de WhatsApp no soporta pairing code'));
-               }
-               const rawCode = await sock.requestPairingCode(cleanNumber);
-               clearTimeout(timeout);
-               resolve(rawCode);
-            } catch (err) {
-               clearTimeout(timeout);
-               reject(err);
-            }
-          }, 3000); // Wait for Baileys WS to connect
-        });
+        // Si el socket ya tiene el código disponible o lo emite
+        const code = await codePromise;
 
         logger.info(`✅ [BotEngine] Pairing code generado para ${tenantId}: ${code}`);
         res.statusCode = 200;
