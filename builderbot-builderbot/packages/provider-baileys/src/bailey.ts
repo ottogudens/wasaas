@@ -307,7 +307,7 @@ class BaileysProvider extends ProviderClass<WASocket> {
                     creds: state.creds,
                     keys: makeCacheableSignalKeyStore(state.keys, loggerBaileys),
                 },
-                browser: this.globalVendorArgs.browser as WABrowserDescription,
+                browser: ['Mac OS', 'Chrome', '121.0.0.0'] as WABrowserDescription,
                 syncFullHistory: false,
                 markOnlineOnConnect: false,
                 generateHighQualityLinkPreview: true,
@@ -331,29 +331,7 @@ class BaileysProvider extends ProviderClass<WASocket> {
 
             this.vendor = sock
             if (this.globalVendorArgs.usePairingCode && !sock.authState.creds.registered) {
-                if (this.globalVendorArgs.phoneNumber) {
-                    const phoneNumberClean = utils.removePlus(this.globalVendorArgs.phoneNumber)
-                    
-                    // Esperar a que el socket se conecte antes de pedir el código
-                    setTimeout(async () => {
-                        try {
-                            this.logger.log(`[${new Date().toISOString()}] Solicitando Pairing Code para ${phoneNumberClean}...`)
-                            const code = await sock.requestPairingCode(phoneNumberClean)
-                            this.logger.log(`[${new Date().toISOString()}] Pairing Code recibido: ${code}`)
-                            this.emit('require_action', {
-                                title: '⚡⚡ ACTION REQUIRED ⚡⚡',
-                                instructions: [
-                                    `Accept the WhatsApp notification from ${phoneNumberClean} on your phone 👌`,
-                                    `The pairing code is: ${code}`,
-                                    `Need help: https://link.codigoencasa.com/DISCORD`,
-                                ],
-                                payload: { code },
-                            })
-                        } catch (error) {
-                            this.logger.log(`[${new Date().toISOString()}] Error al solicitar pairing code:`, error)
-                        }
-                    }, 4000)
-                } else {
+                if (!this.globalVendorArgs.phoneNumber) {
                     this.emit('auth_failure', [
                         `The phone number has not been defined, please add it`,
                         `Restart the BOT`,
@@ -417,18 +395,42 @@ class BaileysProvider extends ProviderClass<WASocket> {
                 }
 
                 /** QR Code */
-                if (qr && !this.globalVendorArgs.usePairingCode) {
-                    this.logger.log(`[${new Date().toISOString()}] QR Code received`)
-                    this.emit('require_action', {
-                        title: '⚡⚡ ACTION REQUIRED ⚡⚡',
-                        instructions: [
-                            `You must scan the QR Code`,
-                            `Remember that the QR code updates every minute`,
-                            `Need help: https://link.codigoencasa.com/DISCORD`,
-                            `Official documentation: https://www.builderbot.app`,
-                        ],
-                        payload: { qr },
-                    })
+                if (qr) {
+                    if (this.globalVendorArgs.usePairingCode && !sock.authState.creds.registered) {
+                        // Flujo de Pairing Code: Solicitamos el código exacto cuando WhatsApp emite el QR (el socket ya está 100% conectado)
+                        if (this.globalVendorArgs.phoneNumber) {
+                            try {
+                                const phoneNumberClean = utils.removePlus(this.globalVendorArgs.phoneNumber)
+                                this.logger.log(`[${new Date().toISOString()}] QR recibido internamente. Solicitando Pairing Code seguro para ${phoneNumberClean}...`)
+                                const code = await sock.requestPairingCode(phoneNumberClean)
+                                this.logger.log(`[${new Date().toISOString()}] Pairing Code recibido: ${code}`)
+                                this.emit('require_action', {
+                                    title: '⚡⚡ ACTION REQUIRED ⚡⚡',
+                                    instructions: [
+                                        `Accept the WhatsApp notification from ${phoneNumberClean} on your phone 👌`,
+                                        `The pairing code is: ${code}`,
+                                        `Need help: https://link.codigoencasa.com/DISCORD`,
+                                    ],
+                                    payload: { code },
+                                })
+                            } catch (error) {
+                                this.logger.log(`[${new Date().toISOString()}] Error al solicitar pairing code internamente:`, error)
+                            }
+                        }
+                    } else if (!this.globalVendorArgs.usePairingCode) {
+                        // Flujo de Código QR tradicional
+                        this.logger.log(`[${new Date().toISOString()}] QR Code received`)
+                        this.emit('require_action', {
+                            title: '⚡⚡ ACTION REQUIRED ⚡⚡',
+                            instructions: [
+                                `You must scan the QR Code`,
+                                `Remember that the QR code updates every minute`,
+                                `Need help: https://link.codigoencasa.com/DISCORD`,
+                                `Official documentation: https://www.builderbot.app`,
+                            ],
+                            payload: { qr },
+                        })
+                    }
                     await baileyGenerateImage(qr, `${this.globalVendorArgs.name}.qr.png`)
                 }
             })
