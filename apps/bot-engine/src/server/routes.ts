@@ -75,6 +75,9 @@ export const setupRoutes = (app: any, manager: any) => {
           logger.info(`🔄 [BotEngine] Bot ${tenantId} ya existía. Removiendo previa para generar QR nuevo (evitando 409)...`);
           await manager.removeBot(tenantId).catch(() => {});
         }
+        
+        // Limpiar archivos de sesión para forzar la generación de un nuevo QR
+        cleanSessionFiles(tenantId);
 
         const botInstance = await manager.createBot({
           tenantId,

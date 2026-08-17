@@ -1,6 +1,7 @@
 import { randomBytes } from 'crypto'
-import pkg from 'follow-redirects'
-const { http, https } = pkg
+import { createRequire } from 'module'
+const require = createRequire(import.meta.url)
+const { http, https } = require('follow-redirects')
 import { rename, createWriteStream, existsSync, mkdirSync } from 'fs'
 import type { IncomingMessage } from 'http'
 import mimeTypes from 'mime-types'
