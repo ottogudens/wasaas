@@ -19,6 +19,7 @@ import {
   ArrowRight,
   Zap,
   X,
+  RotateCcw,
 } from 'lucide-react';
 import { useBotContext } from '../../lib/bot-context';
 import { useConversations } from '../../hooks/useConversations';
@@ -29,7 +30,17 @@ import { api } from '../../lib/api';
 export function LiveChatPanel() {
   const { selectedBotId, setSelectedBotId } = useBotContext();
   const { token } = useAuth();
-  const { bots, isLoading: isLoadingBots, useBotStatus, startBot, isStartingBot, requestPairingCode, isRequestingPairing } = useBots(token);
+  const { 
+    bots, 
+    isLoading: isLoadingBots, 
+    useBotStatus, 
+    startBot, 
+    isStartingBot, 
+    requestPairingCode, 
+    isRequestingPairing,
+    cancelPairing,
+    isCancelingPairing
+  } = useBots(token);
 
   // Active view: 'live' (WhatsApp real conversations) or 'simulator' (In-app sandbox test)
   const [activeTab, setActiveTab] = useState<'live' | 'simulator'>('live');
@@ -191,6 +202,20 @@ export function LiveChatPanel() {
     } catch (err: any) {
       console.error('Error requesting pairing code:', err);
       setPairingError(err?.message || 'Error solicitando código de vinculación');
+    }
+  };
+
+  const handleCancelPairing = async () => {
+    if (!selectedBotId) return;
+    setPairingError(null);
+    setPairingPending(false);
+    setLocalPairingCode(null);
+    setPairingPhone('');
+    try {
+      await cancelPairing(selectedBotId);
+    } catch (err: any) {
+      console.error('Error al cancelar vinculación:', err);
+      setPairingError(err?.message || 'Error al cancelar la vinculación');
     }
   };
 
@@ -880,7 +905,16 @@ export function LiveChatPanel() {
                 </>
               )}
             </div>
-            <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex justify-end">
+            <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex justify-between items-center">
+              <button
+                onClick={handleCancelPairing}
+                disabled={isCancelingPairing}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                title="Borrar archivos de sesión y reiniciar estado de vinculación por completo"
+              >
+                {isCancelingPairing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
+                Cancelar y reiniciar vinculación
+              </button>
               <button 
                 onClick={() => setShowConnectionModal(false)}
                 className="px-5 py-2 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"

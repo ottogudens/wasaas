@@ -178,6 +178,12 @@ class ApiClient {
     });
   }
 
+  async cancelPairing(botId: string) {
+    return this.request<any>(`/bots/${botId}/cancel-pairing`, {
+      method: 'POST',
+    });
+  }
+
   // ── RAG ───────────────────────────────────────────
   async processDocument(body: { title: string; content: string; botId?: string }) {
     return this.request<any>('/rag/process-text', {

@@ -587,4 +587,42 @@ export class BotsService {
       throw new Error(`Engine error: ${err.message}`);
     }
   }
+
+  /**
+   * Cancelar vinculación y limpiar por completo el estado del bot (BD, disco y memoria de bot-engine)
+   */
+  async cancelPairing(botId: string, organizationId: string, isSuperAdmin: boolean = false) {
+    const bot = await this.getBot(botId, organizationId, isSuperAdmin);
+
+    // 1. Limpiar base de datos Prisma de inmediato
+    await this.prisma.botInstance.update({
+      where: { id: bot.id },
+      data: {
+        status: 'DISCONNECTED' as any,
+        qrCode: null,
+        pairingCode: null,
+      },
+    });
+
+    // 2. Solicitar desvinculación y borrado de sesión a bot-engine
+    try {
+      const botEngineUrl = process.env.BOT_ENGINE_URL || 'https://whatsapp-service-production-e6f2.up.railway.app';
+      const apiKey = process.env.INTERNAL_API_KEY;
+
+      this.logger.log(`🚫 [cancelPairing] Notificando desvinculación total a bot-engine para ${bot.tenantId}...`);
+      await fetch(`${botEngineUrl}/internal/disconnect`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey || '',
+        },
+        body: JSON.stringify({ tenantId: bot.tenantId }),
+      });
+    } catch (err: any) {
+      this.logger.warn(`⚠️ [cancelPairing] No se pudo notificar a bot-engine: ${err.message}`);
+    }
+
+    this.logger.log(`🧹 [cancelPairing] Vinculación cancelada y limpiada exitosamente para ${bot.name} (${bot.tenantId})`);
+    return { success: true, message: 'Vinculación cancelada y datos limpios.' };
+  }
 }

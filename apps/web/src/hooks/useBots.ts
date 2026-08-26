@@ -81,6 +81,17 @@ export function useBots(token: string | null) {
     },
   });
 
+  // Cancel Pairing / Reset connection state
+  const cancelPairingMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return api.cancelPairing(id);
+    },
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ['bots'] });
+      queryClient.invalidateQueries({ queryKey: ['botStatus', id] });
+    },
+  });
+
   return {
     bots: botsQuery.data || [],
     isLoading: botsQuery.isLoading,
@@ -96,5 +107,7 @@ export function useBots(token: string | null) {
     isStartingBot: startBotMutation.isPending,
     requestPairingCode: requestPairingCodeMutation.mutateAsync,
     isRequestingPairing: requestPairingCodeMutation.isPending,
+    cancelPairing: cancelPairingMutation.mutateAsync,
+    isCancelingPairing: cancelPairingMutation.isPending,
   };
 }

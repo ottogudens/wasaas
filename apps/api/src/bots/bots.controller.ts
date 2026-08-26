@@ -170,4 +170,10 @@ export class BotsController {
   ) {
     return this.botsService.requestPairingCode(id, req.user.organizationId, phoneNumber);
   }
+
+  @Post(':id/cancel-pairing')
+  async cancelPairing(@Param('id') id: string, @Req() req: any) {
+    const isSuperAdmin = req.user.role === 'SUPER_ADMIN';
+    return this.botsService.cancelPairing(id, req.user.organizationId, isSuperAdmin);
+  }
 }
