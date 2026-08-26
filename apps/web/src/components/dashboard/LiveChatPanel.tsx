@@ -47,7 +47,9 @@ export function LiveChatPanel() {
 
   const handleOpenConnectionModal = async () => {
     setShowConnectionModal(true);
-    if (selectedBotId && botStatusData?.status !== 'CONNECTED') {
+    // Solo iniciar si está DISCONNECTED/ERROR/etc — nunca si ya está CONNECTING
+    // (evita el reset de la instancia Baileys antes de que genere el QR)
+    if (selectedBotId && botStatusData?.status !== 'CONNECTED' && botStatusData?.status !== 'CONNECTING') {
       try {
         await startBot(selectedBotId);
       } catch (err) {

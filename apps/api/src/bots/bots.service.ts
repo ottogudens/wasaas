@@ -473,13 +473,25 @@ export class BotsService {
     const botEngineUrl = process.env.BOT_ENGINE_URL || 'https://whatsapp-service-production-e6f2.up.railway.app';
     const apiKey = process.env.INTERNAL_API_KEY;
 
-    // Actualizar estado a CONNECTING mientras el engine levanta el socket
-    if (bot.status !== 'CONNECTED') {
-      await this.prisma.botInstance.update({
-        where: { id: bot.id },
-        data: { status: 'CONNECTING' as any },
-      });
+    // Guard: si ya está conectado, no hacer nada.
+    if (bot.status === 'CONNECTED') {
+      this.logger.warn(`⚠️ [startBot] Bot "${bot.name}" ya está CONNECTED — ignorando solicitud.`);
+      return { success: true, message: 'Already connected' };
     }
+
+    // Guard: si ya está iniciándose, no destruir la instancia Baileys en mitad
+    // de la negociación de QR. El frontend sigue polinando y mostrará el QR
+    // cuando llegue vía webhook (bot-engine → /bots/internal/webhook → BD).
+    if (bot.status === 'CONNECTING') {
+      this.logger.warn(`⚠️ [startBot] Bot "${bot.name}" ya está en CONNECTING — ignorando solicitud duplicada para evitar reinicio prematuro.`);
+      return { success: true, pending: true, message: 'Already connecting — QR incoming via webhook' };
+    }
+
+    // Marcar como CONNECTING antes de llamar al engine
+    await this.prisma.botInstance.update({
+      where: { id: bot.id },
+      data: { status: 'CONNECTING' as any },
+    });
 
     try {
       this.logger.log(`🚀 [startBot] Solicitando arranque de instancia en bot-engine para "${bot.name}" (${bot.tenantId})...`);
