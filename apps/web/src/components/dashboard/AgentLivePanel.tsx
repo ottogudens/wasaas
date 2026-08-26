@@ -42,7 +42,8 @@ interface Message {
 export function AgentLivePanel() {
   const { selectedBotId, setSelectedBotId } = useBotContext();
   const { token } = useAuth();
-  const { bots, activeBot } = useBots(token);
+  const { bots } = useBots(token);
+  const activeBot = bots?.find((b: any) => b.id === selectedBotId);
 
   const [messages, setMessages] = useState<Message[]>([
     {
