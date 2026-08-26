@@ -25,6 +25,7 @@ import {
   Info,
 } from 'lucide-react';
 import { useBotContext } from '../../lib/bot-context';
+import { useAuth } from '../../lib/auth-context';
 import { useBots } from '../../hooks/useBots';
 import { api } from '../../lib/api';
 
@@ -39,8 +40,9 @@ interface Message {
 }
 
 export function AgentLivePanel() {
-  const { token } = useBotContext();
-  const { bots, activeBot, selectedBotId, setSelectedBotId } = useBots(token);
+  const { selectedBotId, setSelectedBotId } = useBotContext();
+  const { token } = useAuth();
+  const { bots, activeBot } = useBots(token);
 
   const [messages, setMessages] = useState<Message[]>([
     {
