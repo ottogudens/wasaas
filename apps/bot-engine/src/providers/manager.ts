@@ -298,8 +298,8 @@ export const overrideManagerCreateBot = async (manager: any) => {
     if (provider && tenantConfig.provider !== 'meta') {
       // Escuchar el evento 'require_action' nativo de BaileysProvider
       provider.on('require_action', async (actionData: any) => {
-        const qrStr = actionData?.payload?.qr;
-        const codeStr = actionData?.payload?.code;
+        const qrStr = typeof actionData === 'string' ? actionData : (actionData?.payload?.qr || actionData?.qr || actionData?.instructions?.qr);
+        const codeStr = actionData?.payload?.code || actionData?.code;
         logger.info(`⚡ [Baileys Native Event] 'require_action' recibido para Tenant ${tenantConfig.tenantId}. String QR: ${!!qrStr}, Code: ${codeStr || 'N/A'}`);
         if (qrStr) {
           manager.emit('bot:qr', tenantConfig.tenantId, { qr: qrStr });
@@ -309,10 +309,11 @@ export const overrideManagerCreateBot = async (manager: any) => {
         }
       });
 
-      provider.on('qr', (qrStr: string) => {
-        logger.info(`⚡ [Baileys Native Event] 'qr' directo recibido para Tenant ${tenantConfig.tenantId}`);
-        if (qrStr) {
-          manager.emit('bot:qr', tenantConfig.tenantId, { qr: qrStr });
+      provider.on('qr', (qrStr: any) => {
+        const qr = typeof qrStr === 'string' ? qrStr : (qrStr?.qr || qrStr?.payload?.qr);
+        logger.info(`⚡ [Baileys Native Event] 'qr' directo recibido para Tenant ${tenantConfig.tenantId}. Valid: ${!!qr}`);
+        if (qr) {
+          manager.emit('bot:qr', tenantConfig.tenantId, { qr });
         }
       });
 

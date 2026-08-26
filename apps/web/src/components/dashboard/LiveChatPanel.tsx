@@ -777,12 +777,6 @@ export function LiveChatPanel() {
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">El agente ya está vinculado y listo para responder.</p>
                   </div>
                 </div>
-              ) : (botStatusData.status === 'CONNECTING' && !botStatusData.qrCode) || isStartingBot ? (
-                <div className="flex flex-col items-center gap-3 py-6">
-                  <Loader2 className="w-10 h-10 text-emerald-500 animate-spin" />
-                  <p className="text-sm font-medium text-slate-600 dark:text-slate-300">Iniciando motor de WhatsApp y generando código...</p>
-                  <p className="text-xs text-slate-500">Esto puede tomar unos segundos.</p>
-                </div>
               ) : (
                 <>
                   <div className="w-full">
@@ -806,12 +800,16 @@ export function LiveChatPanel() {
                       </div>
                     ) : (
                       <div className="w-48 h-48 mx-auto bg-slate-100 dark:bg-slate-800 rounded-xl flex flex-col items-center justify-center border border-dashed border-slate-300 dark:border-slate-700 p-4 gap-2">
-                        <Loader2 className="w-6 h-6 text-slate-400 animate-spin" />
+                        <Loader2 className="w-6 h-6 text-emerald-500 animate-spin" />
+                        <span className="text-xs text-slate-500 dark:text-slate-400">
+                          {botStatusData.status === 'CONNECTING' || isStartingBot ? 'Generando QR...' : 'Esperando código...'}
+                        </span>
                         <button
                           onClick={() => selectedBotId && startBot(selectedBotId)}
-                          className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline"
+                          disabled={isStartingBot || botStatusData.status === 'CONNECTING'}
+                          className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline disabled:opacity-50"
                         >
-                          Generar QR
+                          Regenerar
                         </button>
                       </div>
                     )}
