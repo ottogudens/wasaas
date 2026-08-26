@@ -377,6 +377,31 @@ class ApiClient {
     );
   }
 
+  // ── Direct Agent & Voice Transcription ─────────────
+  async transcribeDirectAudio(audioBase64: string, mimeType?: string) {
+    return this.request<{ status: string; transcribedText: string }>('/ai/transcribe-direct', {
+      method: 'POST',
+      body: JSON.stringify({ audioBase64, mimeType }),
+    });
+  }
+
+  async interactDirectAgent(
+    botId: string,
+    message: string,
+    documentAttachment?: { documentName: string; documentContent: string },
+    history?: Array<{ role: 'user' | 'assistant'; content: string }>
+  ) {
+    return this.request<{ reply: string; sources: string[]; model: string }>(`/ai/direct-agent/${botId}`, {
+      method: 'POST',
+      body: JSON.stringify({
+        message,
+        documentName: documentAttachment?.documentName,
+        documentContent: documentAttachment?.documentContent,
+        history,
+      }),
+    });
+  }
+
   // ── Bot Simulator / In-App Test Chat ────────────
   async simulateBot(
     botId: string,

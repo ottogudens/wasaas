@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   HelpCircle,
   Sparkles,
+  Zap,
 } from 'lucide-react';
 import { BotConnectionBadge } from '../../components/dashboard/BotConnectionBadge';
 import { ThemeToggle } from '../../components/ThemeToggle';
@@ -122,6 +123,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const navItems = [
     { label: 'Bots', href: '/dashboard/bots', icon: <Bot className="w-5 h-5" /> },
+    { label: 'Agente Directo', href: '/dashboard/agent-live', icon: <Zap className="w-5 h-5 text-emerald-500" /> },
     { label: 'Live Chat', href: '/dashboard/chat', icon: <MessageSquare className="w-5 h-5" /> },
     { label: 'Conocimiento', href: '/dashboard/knowledge', icon: <Database className="w-5 h-5" /> },
     { label: 'Facturación', href: '/dashboard/billing', icon: <CreditCard className="w-5 h-5" /> },

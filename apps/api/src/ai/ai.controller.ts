@@ -122,4 +122,54 @@ export class AiController {
       isHumanMode: (result as any).isHumanMode || false,
     };
   }
+
+  /**
+   * Endpoint de transcripción directa de notas de voz desde el agente web/móvil
+   */
+  @Post('transcribe-direct')
+  @UseGuards(JwtAuthGuard)
+  async transcribeDirect(
+    @Body() body: { audioBase64: string; mimeType?: string }
+  ) {
+    if (!body.audioBase64) {
+      return { status: 'error', message: 'Falta el audio en formato Base64.' };
+    }
+    const audioBuffer = Buffer.from(body.audioBase64, 'base64');
+    const ext = body.mimeType?.includes('webm') ? 'voice.webm' : body.mimeType?.includes('mp3') ? 'voice.mp3' : 'voice.ogg';
+    const transcribedText = await this.aiService.transcriptionService.transcribeAudioBuffer(audioBuffer, ext);
+    return {
+      status: 'success',
+      transcribedText,
+    };
+  }
+
+  /**
+   * Chat en Vivo Directo con el Agente (Procesa texto, documentos adjuntos y RAG)
+   */
+  @Post('direct-agent/:botId')
+  @UseGuards(JwtAuthGuard)
+  async directAgent(
+    @Param('botId') botId: string,
+    @Req() req: any,
+    @Body() body: {
+      message: string;
+      documentName?: string;
+      documentContent?: string;
+      history?: Array<{ role: 'user' | 'assistant'; content: string }>;
+    }
+  ) {
+    const isSuperAdmin = req.user?.role === 'SUPER_ADMIN';
+    let fullQuery = body.message || '';
+    if (body.documentName && body.documentContent) {
+      fullQuery = `[DOCUMENTO ADJUNTO: ${body.documentName}]\nContenido del documento:\n${body.documentContent}\n\nConsulta del usuario sobre el documento:\n${body.message || 'Analiza el documento adjunto y resume los puntos clave.'}`;
+    }
+
+    return this.aiService.simulateBotResponse(
+      botId,
+      req.user.organizationId,
+      fullQuery,
+      body.history || [],
+      isSuperAdmin,
+    );
+  }
 }
