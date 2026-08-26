@@ -40,12 +40,12 @@ const envSchema = z.object({
     .optional()
     .refine((v) => !v || !isNaN(parseInt(v, 10)), { message: 'PORT debe ser un número.' }),
 
-  // Super Admin (opcionales con defaults seguros documentados en .env.example)
-  SUPER_ADMIN_EMAIL: z.string().email('SUPER_ADMIN_EMAIL debe ser un email válido.').optional(),
+  // Super Admin — obligatorio, sin fallback. Sin estas vars, main.ts omite el
+  // seed en vez de crear una cuenta con credenciales predecibles.
+  SUPER_ADMIN_EMAIL: z.string().email('SUPER_ADMIN_EMAIL debe ser un email válido.'),
   SUPER_ADMIN_PASSWORD: z
     .string()
-    .min(12, 'SUPER_ADMIN_PASSWORD debe tener al menos 12 caracteres.')
-    .optional(),
+    .min(12, 'SUPER_ADMIN_PASSWORD debe tener al menos 12 caracteres.'),
 });
 
 export function checkEnv(): void {

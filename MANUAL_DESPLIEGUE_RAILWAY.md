@@ -61,8 +61,11 @@ REDIS_URL=${{Redis.REDIS_URL}}
 OPENAI_API_KEY=sk-proj-xxxxxxxxxxxxxxxxxxxxxxxx
 MERCADOPAGO_ACCESS_TOKEN=APP_USR-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 
-# Llave de comunicación interna con BotEngine
-INTERNAL_API_KEY=skale-saas-secret-key
+# Llave de comunicación interna con BotEngine — genera un valor aleatorio propio,
+# ej. con `openssl rand -hex 32`. NUNCA uses un valor de ejemplo de esta guía en
+# producción: debe coincidir exactamente con la del servicio bot-engine (Paso 3)
+# y también autentica ahora las conexiones al WebSocket interno del bot-engine.
+INTERNAL_API_KEY=
 
 # URL del Frontend Web
 FRONTEND_URL=https://tu-dominio-dashboard.up.railway.app
@@ -79,7 +82,7 @@ Este servicio orquesta las instancias de WhatsApp por cliente utilizando `@build
 * **Root Directory**: `apps/bot-engine`
 * **Build Command**: `npm run build`
 * **Start Command**: `node dist/index.js`
-* **Networking**: Exponer puerto HTTP `3005` y puerto WebSocket `3006`.
+* **Networking**: Exponer únicamente el puerto HTTP `3005`. El WebSocket se sirve sobre el **mismo** servidor y puerto (no requiere un puerto separado); Railway solo necesita el dominio/puerto HTTP habilitado y `wss://` funcionará automáticamente sobre él.
 
 ### ⚠️ IMPORTANTE: Añadir Volumen de Persistencia (Railway Volume)
 Para evitar que las sesiones de WhatsApp conectadas se desconecten cuando Railway reinicie el servicio:
@@ -93,9 +96,10 @@ Para evitar que las sesiones de WhatsApp conectadas se desconecten cuando Railwa
 ### Variables de Entorno (`apps/bot-engine`):
 ```env
 BOT_ENGINE_PORT=3005
-WS_PORT=3006
+# WS_PORT no se usa: el WebSocket se adjunta al mismo servidor HTTP de arriba.
 SESSIONS_DIR=/app/apps/bot-engine/sessions
-INTERNAL_API_KEY=skale-saas-secret-key
+# Debe ser idéntica, carácter por carácter, a la INTERNAL_API_KEY del Paso 2.
+INTERNAL_API_KEY=
 DATABASE_URL=${{Postgres.DATABASE_URL}}
 ```
 
@@ -116,8 +120,9 @@ El panel de control en Next.js para que los usuarios escaneen su QR, configuren 
 ```env
 PORT=3000
 NEXT_PUBLIC_API_URL=https://api-wasaas.up.railway.app
-NEXT_PUBLIC_WS_URL=wss://bot-engine-wasaas.up.railway.app
 ```
+
+> ⚠️ **No definas `NEXT_PUBLIC_WS_URL`.** El WebSocket de `bot-engine` es un canal interno protegido con `INTERNAL_API_KEY` (ver Paso 3); cualquier variable `NEXT_PUBLIC_*` viaja dentro del bundle JS y es visible en el navegador de cualquier persona, así que exponerla ahí anularía la autenticación del socket. El estado de conexión/QR y los mensajes del dashboard se obtienen hoy vía *polling* HTTP autenticado con JWT contra la API Central (`GET /bots/:id`, `GET /bots/:id/conversations`), no por WebSocket directo al bot-engine.
 
 ---
 

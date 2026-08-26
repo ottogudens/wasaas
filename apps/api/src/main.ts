@@ -18,9 +18,20 @@ import { json, urlencoded } from 'express';
 import * as bcrypt from 'bcryptjs';
 
 async function seedSuperAdmin(prisma: PrismaService) {
+  const email = process.env.SUPER_ADMIN_EMAIL;
+  const password = process.env.SUPER_ADMIN_PASSWORD;
+
+  // Sin fallback: si no están definidas, se omite el seed en lugar de crear
+  // o sincronizar una cuenta con una contraseña conocida/predecible.
+  if (!email || !password) {
+    console.warn(
+      '⚠️ [SEED-AUTO] SUPER_ADMIN_EMAIL/SUPER_ADMIN_PASSWORD no definidas — se omite el seed del Super Admin. ' +
+        'Configúralas en Railway → Variables si necesitas provisionar o rotar la cuenta.',
+    );
+    return;
+  }
+
   try {
-    const email = process.env.SUPER_ADMIN_EMAIL || 'mibot@skale.cl';
-    const password = process.env.SUPER_ADMIN_PASSWORD || 'GuD3Ns@#';
     const orgName = 'Skale Admin';
     const userName = 'Super Admin';
     const slug = 'skale-admin';
