@@ -19,12 +19,17 @@ export const setupRoutes = (app: any, manager: any) => {
   const cleanSessionFiles = (tenantId: string) => {
     try {
       if (!fs.existsSync(SESSIONS_DIR)) return;
+      const targetDir = path.join(SESSIONS_DIR, tenantId);
+      if (fs.existsSync(targetDir)) {
+        fs.rmSync(targetDir, { recursive: true, force: true });
+        logger.info(`🗑️ [SessionClean] Directorio de sesión borrado: ${targetDir}`);
+      }
       const files = fs.readdirSync(SESSIONS_DIR);
       for (const file of files) {
         if (file.includes(tenantId)) {
           const fullPath = path.join(SESSIONS_DIR, file);
           fs.rmSync(fullPath, { recursive: true, force: true });
-          logger.info(`🗑️ [SessionClean] Sesión borrada de disco: ${fullPath}`);
+          logger.info(`🗑️ [SessionClean] Archivo/Carpeta de sesión borrada: ${fullPath}`);
         }
       }
     } catch (err) {

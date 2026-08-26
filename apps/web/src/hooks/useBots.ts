@@ -24,7 +24,7 @@ export function useBots(token: string | null) {
       return data;
     },
     enabled: !!token && !!botId,
-    refetchInterval: 5000, // Poll every 5s to keep status updated
+    refetchInterval: 2000, // Poll every 2s for fast QR/Pairing updates
   });
 
   // Create Bot

@@ -5,7 +5,7 @@ export const PORT = process.env.PORT ? parseInt(process.env.PORT) : (process.env
 export const SESSIONS_DIR = process.env.SESSIONS_DIR || './sessions';
 export const API_KEY = process.env.INTERNAL_API_KEY as string;
 
-const rawApiUrl = process.env.API_URL || 'https://wasaas-production.up.railway.app';
+const rawApiUrl = process.env.API_URL || 'https://api-production-049a.up.railway.app';
 const formatUrl = (url: string) => {
   let cleaned = url.trim().replace(/\/+$/, '');
   if (!cleaned.startsWith('http://') && !cleaned.startsWith('https://')) {

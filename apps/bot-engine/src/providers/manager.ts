@@ -274,7 +274,6 @@ export const overrideManagerCreateBot = async (manager: any) => {
       };
     } else {
       // Proveedor por defecto: Baileys (Código QR / Pairing Code)
-      tenantConfig.providerClass = BaileysProvider as any;
       if (!tenantConfig.providerOptions) {
         tenantConfig.providerOptions = {};
       }
@@ -285,6 +284,35 @@ export const overrideManagerCreateBot = async (manager: any) => {
       if (tenantConfig.phoneNumber) {
         tenantConfig.providerOptions.phoneNumber = tenantConfig.phoneNumber;
       }
+
+      // Crear wrapper de BaileysProvider para registrar listeners tempranos en el constructor
+      const CustomBaileysProvider = class extends (BaileysProvider as any) {
+        constructor(args: any) {
+          super(args);
+          
+          this.on('require_action', async (actionData: any) => {
+            const qrStr = typeof actionData === 'string' ? actionData : (actionData?.payload?.qr || actionData?.qr || actionData?.instructions?.qr);
+            const codeStr = actionData?.payload?.code || actionData?.code || actionData?.instructions?.code;
+            logger.info(`⚡ [Baileys Native Early Event] 'require_action' recibido para Tenant ${tenantConfig.tenantId}. String QR: ${!!qrStr}, Code: ${codeStr || 'N/A'}`);
+            if (qrStr) {
+              manager.emit('bot:qr', tenantConfig.tenantId, { qr: qrStr });
+            }
+            if (codeStr) {
+              manager.emit('bot:code', tenantConfig.tenantId, { code: codeStr });
+            }
+          });
+
+          this.on('qr', (qrStr: any) => {
+            const qr = typeof qrStr === 'string' ? qrStr : (qrStr?.qr || qrStr?.payload?.qr);
+            logger.info(`⚡ [Baileys Native Early Event] 'qr' directo recibido para Tenant ${tenantConfig.tenantId}. Valid: ${!!qr}`);
+            if (qr) {
+              manager.emit('bot:qr', tenantConfig.tenantId, { qr });
+            }
+          });
+        }
+      };
+
+      tenantConfig.providerClass = CustomBaileysProvider as any;
     }
 
     // Inyectar flujo dinámico con tenantId en closure si no trae flujos
@@ -296,26 +324,12 @@ export const overrideManagerCreateBot = async (manager: any) => {
 
     const provider = botInstance.provider;
     if (provider && tenantConfig.provider !== 'meta') {
-      // Escuchar el evento 'require_action' nativo de BaileysProvider
-      provider.on('require_action', async (actionData: any) => {
-        const qrStr = typeof actionData === 'string' ? actionData : (actionData?.payload?.qr || actionData?.qr || actionData?.instructions?.qr);
-        const codeStr = actionData?.payload?.code || actionData?.code;
-        logger.info(`⚡ [Baileys Native Event] 'require_action' recibido para Tenant ${tenantConfig.tenantId}. String QR: ${!!qrStr}, Code: ${codeStr || 'N/A'}`);
-        if (qrStr) {
-          manager.emit('bot:qr', tenantConfig.tenantId, { qr: qrStr });
-        }
-        if (codeStr) {
-          manager.emit('bot:code', tenantConfig.tenantId, { code: codeStr });
-        }
-      });
-
-      provider.on('qr', (qrStr: any) => {
-        const qr = typeof qrStr === 'string' ? qrStr : (qrStr?.qr || qrStr?.payload?.qr);
-        logger.info(`⚡ [Baileys Native Event] 'qr' directo recibido para Tenant ${tenantConfig.tenantId}. Valid: ${!!qr}`);
-        if (qr) {
-          manager.emit('bot:qr', tenantConfig.tenantId, { qr });
-        }
-      });
+      // Verificar si el provider ya generó el QR o pairing code antes de colgar listeners tardíos
+      const existingQr = provider.qr || provider.vendor?.qr || provider.globalVendorArgs?.qr;
+      if (existingQr) {
+        logger.info(`⚡ [BotEngine] QR pre-existente detectado tras instanciar Tenant ${tenantConfig.tenantId}`);
+        manager.emit('bot:qr', tenantConfig.tenantId, { qr: existingQr });
+      }
 
       // Evento 'ready': conexión establecida — registrar listener de mensajes canónico
       let readyFired = false;
