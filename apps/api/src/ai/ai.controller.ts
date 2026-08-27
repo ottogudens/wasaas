@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Headers, UseGuards, UnauthorizedException, Param, Req } from '@nestjs/common';
+import { Controller, Post, Get, Body, Headers, UseGuards, UnauthorizedException, Param, Req } from '@nestjs/common';
 import { AiService } from './ai.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { SkipThrottle } from '@nestjs/throttler';
@@ -14,6 +14,12 @@ export class AiController {
     if (!apiKey || apiKey !== expectedKey) {
       throw new UnauthorizedException('Invalid API Key');
     }
+  }
+
+  @Get('config')
+  @UseGuards(JwtAuthGuard)
+  async getAiConfig() {
+    return this.aiService.getPublicAiConfig();
   }
 
   /**

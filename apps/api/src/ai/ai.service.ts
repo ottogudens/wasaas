@@ -33,6 +33,22 @@ export class AiService {
     return new OpenAI({ apiKey });
   }
 
+  async getPublicAiConfig(): Promise<{ defaultProvider: string; defaultModel: string }> {
+    const dbSettings = await this.prisma.platformSetting.findMany({
+      where: {
+        key: {
+          in: ['DEFAULT_AI_PROVIDER', 'DEFAULT_AI_MODEL'],
+        },
+      },
+    });
+
+    const settingsMap = new Map(dbSettings.map((s) => [s.key, s.value]));
+    return {
+      defaultProvider: settingsMap.get('DEFAULT_AI_PROVIDER') || 'openai',
+      defaultModel: settingsMap.get('DEFAULT_AI_MODEL') || 'gpt-4o-mini',
+    };
+  }
+
   /**
    * Generar respuesta simple (endpoint protegido por JWT)
    */
@@ -103,7 +119,7 @@ export class AiService {
       if (!geminiKey) {
         throw new Error('Google Gemini API Key no está configurada en la plataforma.');
       }
-      const modelName = params.model || 'gemini-1.5-flash';
+      const modelName = params.model || 'gemini-2.0-flash';
       const contents: any[] = [];
       for (const h of params.history) {
         contents.push({

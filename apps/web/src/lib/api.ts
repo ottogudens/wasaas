@@ -378,6 +378,10 @@ class ApiClient {
   }
 
   // ── Direct Agent & Voice Transcription ─────────────
+  async getAiPublicConfig() {
+    return this.request<{ defaultProvider: string; defaultModel: string }>('/ai/config');
+  }
+
   async transcribeDirectAudio(audioBase64: string, mimeType?: string) {
     return this.request<{ status: string; transcribedText: string }>('/ai/transcribe-direct', {
       method: 'POST',

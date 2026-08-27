@@ -53,6 +53,8 @@ const PROVIDER_MODELS: Record<string, { label: string; models: { id: string; nam
   gemini: {
     label: 'Google Gemini',
     models: [
+      { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash (Nuevo / Ultra Rápido)' },
+      { id: 'gemini-2.0-flash-lite', name: 'Gemini 2.0 Flash Lite' },
       { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
       { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
     ],
@@ -81,6 +83,30 @@ export function AgentLivePanel() {
 
   const [selectedProvider, setSelectedProvider] = useState<string>('openai');
   const [selectedModel, setSelectedModel] = useState<string>('gpt-4o-mini');
+
+  // Auto-seleccionar primer bot disponible si no hay bot activo elegido
+  useEffect(() => {
+    if (bots && bots.length > 0 && !selectedBotId) {
+      setSelectedBotId(bots[0].id);
+    }
+  }, [bots, selectedBotId, setSelectedBotId]);
+
+  // Cargar proveedor y modelo por defecto globales de la plataforma
+  useEffect(() => {
+    api.getAiPublicConfig()
+      .then((cfg) => {
+        if (cfg?.defaultProvider && PROVIDER_MODELS[cfg.defaultProvider]) {
+          setSelectedProvider(cfg.defaultProvider);
+          const availableModels = PROVIDER_MODELS[cfg.defaultProvider].models;
+          if (cfg.defaultModel && availableModels.some((m) => m.id === cfg.defaultModel)) {
+            setSelectedModel(cfg.defaultModel);
+          } else if (availableModels.length > 0) {
+            setSelectedModel(availableModels[0].id);
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -243,7 +269,8 @@ export function AgentLivePanel() {
   // Send Text Message
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if ((!inputText.trim() && !attachedDoc) || !selectedBotId || isProcessing) return;
+    const targetBotId = selectedBotId || (bots && bots.length > 0 ? bots[0].id : null);
+    if ((!inputText.trim() && !attachedDoc) || !targetBotId || isProcessing) return;
 
     const userText = inputText.trim();
     const currentDoc = attachedDoc;
@@ -264,7 +291,7 @@ export function AgentLivePanel() {
     try {
       const historyForAi = messages.slice(-8).map((m) => ({ role: m.role, content: m.content }));
       const aiRes = await api.interactDirectAgent(
-        selectedBotId,
+        targetBotId,
         userText,
         currentDoc ? { documentName: currentDoc.name, documentContent: currentDoc.content } : undefined,
         historyForAi,
