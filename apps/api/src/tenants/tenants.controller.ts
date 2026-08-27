@@ -420,4 +420,236 @@ _Generado por miBot SaaS_`,
       },
     });
   }
+
+  // ── AI KEYS MANAGEMENT (SUPER ADMIN) ─────────────────────────────
+  @Get('ai-keys')
+  async getAiKeys(@Req() req: any) {
+    this.checkSuperAdmin(req);
+
+    const keys = await this.prisma.platformSetting.findMany({
+      where: {
+        key: {
+          in: [
+            'OPENAI_API_KEY',
+            'GEMINI_API_KEY',
+            'ANTHROPIC_API_KEY',
+            'DEEPSEEK_API_KEY',
+            'DEFAULT_AI_PROVIDER',
+            'DEFAULT_AI_MODEL',
+          ],
+        },
+      },
+    });
+
+    const keyMap: Record<string, string> = {};
+    keys.forEach((k) => {
+      keyMap[k.key] = k.value;
+    });
+
+    const openaiKey = keyMap['OPENAI_API_KEY'] || process.env.OPENAI_API_KEY || '';
+    const geminiKey = keyMap['GEMINI_API_KEY'] || process.env.GEMINI_API_KEY || '';
+    const anthropicKey = keyMap['ANTHROPIC_API_KEY'] || process.env.ANTHROPIC_API_KEY || '';
+    const deepseekKey = keyMap['DEEPSEEK_API_KEY'] || process.env.DEEPSEEK_API_KEY || '';
+
+    const mask = (val: string) => (val ? `${val.slice(0, 7)}...${val.slice(-4)}` : '');
+
+    return {
+      openai: {
+        isConfigured: !!openaiKey,
+        maskedKey: mask(openaiKey),
+      },
+      gemini: {
+        isConfigured: !!geminiKey,
+        maskedKey: mask(geminiKey),
+      },
+      anthropic: {
+        isConfigured: !!anthropicKey,
+        maskedKey: mask(anthropicKey),
+      },
+      deepseek: {
+        isConfigured: !!deepseekKey,
+        maskedKey: mask(deepseekKey),
+      },
+      defaultProvider: keyMap['DEFAULT_AI_PROVIDER'] || 'openai',
+      defaultModel: keyMap['DEFAULT_AI_MODEL'] || 'gpt-4o-mini',
+    };
+  }
+
+  @Post('ai-keys')
+  async saveAiKeys(
+    @Req() req: any,
+    @Body() body: {
+      openaiKey?: string;
+      geminiKey?: string;
+      anthropicKey?: string;
+      deepseekKey?: string;
+      defaultProvider?: string;
+      defaultModel?: string;
+    },
+  ) {
+    this.checkSuperAdmin(req);
+
+    const upserts = [];
+
+    if (body.openaiKey !== undefined && body.openaiKey.trim() !== '') {
+      upserts.push(
+        this.prisma.platformSetting.upsert({
+          where: { key: 'OPENAI_API_KEY' },
+          create: { key: 'OPENAI_API_KEY', value: body.openaiKey.trim() },
+          update: { value: body.openaiKey.trim() },
+        }),
+      );
+    }
+
+    if (body.geminiKey !== undefined && body.geminiKey.trim() !== '') {
+      upserts.push(
+        this.prisma.platformSetting.upsert({
+          where: { key: 'GEMINI_API_KEY' },
+          create: { key: 'GEMINI_API_KEY', value: body.geminiKey.trim() },
+          update: { value: body.geminiKey.trim() },
+        }),
+      );
+    }
+
+    if (body.anthropicKey !== undefined && body.anthropicKey.trim() !== '') {
+      upserts.push(
+        this.prisma.platformSetting.upsert({
+          where: { key: 'ANTHROPIC_API_KEY' },
+          create: { key: 'ANTHROPIC_API_KEY', value: body.anthropicKey.trim() },
+          update: { value: body.anthropicKey.trim() },
+        }),
+      );
+    }
+
+    if (body.deepseekKey !== undefined && body.deepseekKey.trim() !== '') {
+      upserts.push(
+        this.prisma.platformSetting.upsert({
+          where: { key: 'DEEPSEEK_API_KEY' },
+          create: { key: 'DEEPSEEK_API_KEY', value: body.deepseekKey.trim() },
+          update: { value: body.deepseekKey.trim() },
+        }),
+      );
+    }
+
+    if (body.defaultProvider !== undefined) {
+      upserts.push(
+        this.prisma.platformSetting.upsert({
+          where: { key: 'DEFAULT_AI_PROVIDER' },
+          create: { key: 'DEFAULT_AI_PROVIDER', value: body.defaultProvider.trim() },
+          update: { value: body.defaultProvider.trim() },
+        }),
+      );
+    }
+
+    if (body.defaultModel !== undefined) {
+      upserts.push(
+        this.prisma.platformSetting.upsert({
+          where: { key: 'DEFAULT_AI_MODEL' },
+          create: { key: 'DEFAULT_AI_MODEL', value: body.defaultModel.trim() },
+          update: { value: body.defaultModel.trim() },
+        }),
+      );
+    }
+
+    await Promise.all(upserts);
+
+    return { success: true, message: 'Credenciales de IA guardadas correctamente' };
+  }
+
+  @Post('ai-keys/test')
+  async testAiKey(
+    @Req() req: any,
+    @Body() body: { provider: 'openai' | 'gemini' | 'anthropic' | 'deepseek'; apiKey?: string },
+  ) {
+    this.checkSuperAdmin(req);
+
+    let keyToTest = body.apiKey?.trim();
+
+    if (!keyToTest) {
+      const keyNameMap: Record<string, string> = {
+        openai: 'OPENAI_API_KEY',
+        gemini: 'GEMINI_API_KEY',
+        anthropic: 'ANTHROPIC_API_KEY',
+        deepseek: 'DEEPSEEK_API_KEY',
+      };
+      const dbKey = await this.prisma.platformSetting.findUnique({
+        where: { key: keyNameMap[body.provider] },
+      });
+      keyToTest = dbKey?.value || process.env[keyNameMap[body.provider]] || '';
+    }
+
+    if (!keyToTest) {
+      return { success: false, error: `No hay API Key ingresada ni guardada para ${body.provider.toUpperCase()}.` };
+    }
+
+    try {
+      if (body.provider === 'openai') {
+        const res = await fetch('https://api.openai.com/v1/models', {
+          headers: { Authorization: `Bearer ${keyToTest}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          return {
+            success: true,
+            message: `¡Conexión Exitosa con OpenAI! Modelos disponibles: ${data.data?.length || 0}`,
+          };
+        } else {
+          const err = await res.json();
+          return { success: false, error: err.error?.message || `Error HTTP ${res.status}` };
+        }
+      }
+
+      if (body.provider === 'gemini') {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${keyToTest}`);
+        if (res.ok) {
+          const data = await res.json();
+          return {
+            success: true,
+            message: `¡Conexión Exitosa con Google Gemini! Modelos disponibles: ${data.models?.length || 0}`,
+          };
+        } else {
+          const err = await res.json();
+          return { success: false, error: err.error?.message || `Error HTTP ${res.status}` };
+        }
+      }
+
+      if (body.provider === 'anthropic') {
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'x-api-key': keyToTest,
+            'anthropic-version': '2023-06-01',
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'claude-3-haiku-20240307',
+            max_tokens: 1,
+            messages: [{ role: 'user', content: 'hi' }],
+          }),
+        });
+        if (res.ok || res.status === 200) {
+          return { success: true, message: '¡Conexión Exitosa con Anthropic Claude!' };
+        } else {
+          const err = await res.json();
+          return { success: false, error: err.error?.message || `Error HTTP ${res.status}` };
+        }
+      }
+
+      if (body.provider === 'deepseek') {
+        const res = await fetch('https://api.deepseek.com/models', {
+          headers: { Authorization: `Bearer ${keyToTest}` },
+        });
+        if (res.ok) {
+          return { success: true, message: '¡Conexión Exitosa con DeepSeek AI!' };
+        } else {
+          const err = await res.json();
+          return { success: false, error: err.error?.message || `Error HTTP ${res.status}` };
+        }
+      }
+
+      return { success: false, error: 'Proveedor no soportado' };
+    } catch (err: any) {
+      return { success: false, error: `Error de red: ${err.message || 'No se pudo conectar con el proveedor'}` };
+    }
+  }
 }

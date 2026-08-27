@@ -22,6 +22,8 @@ import {
   ShieldCheck,
   Copy,
   RefreshCw,
+  Key,
+  Cpu,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth-context';
@@ -914,8 +916,411 @@ function MercadoPagoPlatformTab() {
   );
 }
 
-// ── 6. Admin Panel Main Component ────────────────────────────────────────────
-type Tab = 'plans' | 'tenants' | 'mercadopago';
+// ── 6. Tab de Configuración de API Keys de IA (Super Admin) ───────────────────
+function AiKeysTab() {
+  const queryClient = useQueryClient();
+  const [openaiKey, setOpenaiKey] = useState('');
+  const [geminiKey, setGeminiKey] = useState('');
+  const [anthropicKey, setAnthropicKey] = useState('');
+  const [deepseekKey, setDeepseekKey] = useState('');
+  const [defaultProvider, setDefaultProvider] = useState('openai');
+  const [defaultModel, setDefaultModel] = useState('gpt-4o-mini');
+  const [testResults, setTestResults] = useState<Record<string, { success: boolean; message: string }>>({});
+
+  const keysQuery = useQuery({
+    queryKey: ['ai-keys', 'platform-config'],
+    queryFn: () => api.getAiKeysConfig(),
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: (body: any) => api.saveAiKeysConfig(body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ai-keys', 'platform-config'] });
+      setOpenaiKey('');
+      setGeminiKey('');
+      setAnthropicKey('');
+      setDeepseekKey('');
+      alert('¡Configuración de API Keys de IA guardada exitosamente!');
+    },
+    onError: (err: any) => {
+      alert(`Error al guardar configuración: ${err.message || 'Error desconocido'}`);
+    },
+  });
+
+  const testMutation = useMutation({
+    mutationFn: ({ provider, apiKey }: { provider: 'openai' | 'gemini' | 'anthropic' | 'deepseek'; apiKey?: string }) =>
+      api.testAiKeyConnection(provider, apiKey),
+    onSuccess: (res, variables) => {
+      setTestResults((prev) => ({
+        ...prev,
+        [variables.provider]: {
+          success: res.success,
+          message: res.success ? (res.message || '¡Conexión Exitosa!') : (res.error || 'Fallo de autenticación'),
+        },
+      }));
+    },
+    onError: (err: any, variables) => {
+      setTestResults((prev) => ({
+        ...prev,
+        [variables.provider]: {
+          success: false,
+          message: err.message || 'Error probando conexión',
+        },
+      }));
+    },
+  });
+
+  const config = keysQuery.data;
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    saveMutation.mutate({
+      openaiKey: openaiKey.trim() || undefined,
+      geminiKey: geminiKey.trim() || undefined,
+      anthropicKey: anthropicKey.trim() || undefined,
+      deepseekKey: deepseekKey.trim() || undefined,
+      defaultProvider,
+      defaultModel,
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+          <Key className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+          Configuración de Proveedores & API Keys de IA
+        </h3>
+        <p className="text-xs text-slate-500 mt-0.5">
+          Ingresa y gestiona las llaves maestras de acceso a las APIs de OpenAI, Google Gemini, Anthropic Claude y DeepSeek.
+        </p>
+      </div>
+
+      <form onSubmit={handleSave} className="space-y-6">
+        {/* Proveedor por Defecto y Modelo Predeterminado */}
+        <div className="p-5 rounded-2xl bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+          <h4 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+            <Cpu className="w-4 h-4 text-cyan-500" /> Proveedor & Modelo por Defecto del Sistema
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">
+                Proveedor Principal *
+              </label>
+              <select
+                value={defaultProvider || config?.defaultProvider || 'openai'}
+                onChange={(e) => setDefaultProvider(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 font-medium"
+              >
+                <option value="openai">OpenAI (GPT-4o, GPT-4o-mini)</option>
+                <option value="gemini">Google Gemini (1.5 Flash, 1.5 Pro)</option>
+                <option value="anthropic">Anthropic Claude (3.5 Sonnet, Haiku)</option>
+                <option value="deepseek">DeepSeek AI (DeepSeek Chat)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">
+                Modelo por Defecto para Bots *
+              </label>
+              <select
+                value={defaultModel || config?.defaultModel || 'gpt-4o-mini'}
+                onChange={(e) => setDefaultModel(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 font-medium"
+              >
+                <option value="gpt-4o-mini">OpenAI: GPT-4o Mini (Recomendado Rápido)</option>
+                <option value="gpt-4o">OpenAI: GPT-4o (Alta Precisión)</option>
+                <option value="gemini-1.5-flash">Google: Gemini 1.5 Flash</option>
+                <option value="gemini-1.5-pro">Google: Gemini 1.5 Pro</option>
+                <option value="claude-3-5-sonnet-20241022">Anthropic: Claude 3.5 Sonnet</option>
+                <option value="claude-3-haiku-20240307">Anthropic: Claude 3 Haiku</option>
+                <option value="deepseek-chat">DeepSeek: DeepSeek Chat (V3)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Grid de Proveedores */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {/* OpenAI */}
+          <div className="p-5 rounded-2xl bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-xs">
+                  AI
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-slate-900 dark:text-white">OpenAI API Key</h4>
+                  <p className="text-[11px] text-slate-500">
+                    {config?.openai?.isConfigured ? `Configurado · ${config.openai.maskedKey}` : 'No configurado'}
+                  </p>
+                </div>
+              </div>
+              <span
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                  config?.openai?.isConfigured
+                    ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border-emerald-300 dark:border-emerald-500/30'
+                    : 'text-slate-500 bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700'
+                }`}
+              >
+                {config?.openai?.isConfigured ? 'ACTIVO' : 'PENDIENTE'}
+              </span>
+            </div>
+
+            <div>
+              <input
+                type="password"
+                value={openaiKey}
+                onChange={(e) => setOpenaiKey(e.target.value)}
+                placeholder={config?.openai?.maskedKey ? `Actual: ${config.openai.maskedKey}` : 'sk-proj-XXXXXXXXXXXXXXXX'}
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500 font-mono"
+              />
+            </div>
+
+            <div className="flex items-center justify-between pt-1">
+              <button
+                type="button"
+                onClick={() => testMutation.mutate({ provider: 'openai', apiKey: openaiKey || undefined })}
+                disabled={testMutation.isPending}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 transition-colors"
+              >
+                {testMutation.isPending && testMutation.variables?.provider === 'openai' ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-3.5 h-3.5" />
+                )}
+                Probar OpenAI
+              </button>
+            </div>
+
+            {testResults['openai'] && (
+              <div
+                className={`p-2.5 rounded-lg text-xs font-medium flex items-center gap-2 ${
+                  testResults['openai'].success
+                    ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/20'
+                    : 'bg-red-50 dark:bg-red-500/10 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-500/20'
+                }`}
+              >
+                {testResults['openai'].success ? <Check className="w-4 h-4 shrink-0 text-emerald-500" /> : <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />}
+                <span>{testResults['openai'].message}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Google Gemini */}
+          <div className="p-5 rounded-2xl bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-cyan-50 dark:bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 flex items-center justify-center font-bold text-xs">
+                  G
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-slate-900 dark:text-white">Google Gemini API Key</h4>
+                  <p className="text-[11px] text-slate-500">
+                    {config?.gemini?.isConfigured ? `Configurado · ${config.gemini.maskedKey}` : 'No configurado'}
+                  </p>
+                </div>
+              </div>
+              <span
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                  config?.gemini?.isConfigured
+                    ? 'text-cyan-700 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-500/10 border-cyan-300 dark:border-cyan-500/30'
+                    : 'text-slate-500 bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700'
+                }`}
+              >
+                {config?.gemini?.isConfigured ? 'ACTIVO' : 'PENDIENTE'}
+              </span>
+            </div>
+
+            <div>
+              <input
+                type="password"
+                value={geminiKey}
+                onChange={(e) => setGeminiKey(e.target.value)}
+                placeholder={config?.gemini?.maskedKey ? `Actual: ${config.gemini.maskedKey}` : 'AIzaSyXXXXXXXXXXXXXXXX'}
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-cyan-500 font-mono"
+              />
+            </div>
+
+            <div className="flex items-center justify-between pt-1">
+              <button
+                type="button"
+                onClick={() => testMutation.mutate({ provider: 'gemini', apiKey: geminiKey || undefined })}
+                disabled={testMutation.isPending}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 transition-colors"
+              >
+                {testMutation.isPending && testMutation.variables?.provider === 'gemini' ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-3.5 h-3.5" />
+                )}
+                Probar Gemini
+              </button>
+            </div>
+
+            {testResults['gemini'] && (
+              <div
+                className={`p-2.5 rounded-lg text-xs font-medium flex items-center gap-2 ${
+                  testResults['gemini'].success
+                    ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/20'
+                    : 'bg-red-50 dark:bg-red-500/10 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-500/20'
+                }`}
+              >
+                {testResults['gemini'].success ? <Check className="w-4 h-4 shrink-0 text-emerald-500" /> : <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />}
+                <span>{testResults['gemini'].message}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Anthropic Claude */}
+          <div className="p-5 rounded-2xl bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold text-xs">
+                  A
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-slate-900 dark:text-white">Anthropic Claude API Key</h4>
+                  <p className="text-[11px] text-slate-500">
+                    {config?.anthropic?.isConfigured ? `Configurado · ${config.anthropic.maskedKey}` : 'No configurado'}
+                  </p>
+                </div>
+              </div>
+              <span
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                  config?.anthropic?.isConfigured
+                    ? 'text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border-amber-300 dark:border-amber-500/30'
+                    : 'text-slate-500 bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700'
+                }`}
+              >
+                {config?.anthropic?.isConfigured ? 'ACTIVO' : 'PENDIENTE'}
+              </span>
+            </div>
+
+            <div>
+              <input
+                type="password"
+                value={anthropicKey}
+                onChange={(e) => setAnthropicKey(e.target.value)}
+                placeholder={config?.anthropic?.maskedKey ? `Actual: ${config.anthropic.maskedKey}` : 'sk-ant-api03-XXXXXXXXXXXXXXXX'}
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-amber-500 font-mono"
+              />
+            </div>
+
+            <div className="flex items-center justify-between pt-1">
+              <button
+                type="button"
+                onClick={() => testMutation.mutate({ provider: 'anthropic', apiKey: anthropicKey || undefined })}
+                disabled={testMutation.isPending}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 transition-colors"
+              >
+                {testMutation.isPending && testMutation.variables?.provider === 'anthropic' ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-3.5 h-3.5" />
+                )}
+                Probar Claude
+              </button>
+            </div>
+
+            {testResults['anthropic'] && (
+              <div
+                className={`p-2.5 rounded-lg text-xs font-medium flex items-center gap-2 ${
+                  testResults['anthropic'].success
+                    ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/20'
+                    : 'bg-red-50 dark:bg-red-500/10 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-500/20'
+                }`}
+              >
+                {testResults['anthropic'].success ? <Check className="w-4 h-4 shrink-0 text-emerald-500" /> : <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />}
+                <span>{testResults['anthropic'].message}</span>
+              </div>
+            )}
+          </div>
+
+          {/* DeepSeek AI */}
+          <div className="p-5 rounded-2xl bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs">
+                  DS
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-slate-900 dark:text-white">DeepSeek AI Key</h4>
+                  <p className="text-[11px] text-slate-500">
+                    {config?.deepseek?.isConfigured ? `Configurado · ${config.deepseek.maskedKey}` : 'No configurado'}
+                  </p>
+                </div>
+              </div>
+              <span
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                  config?.deepseek?.isConfigured
+                    ? 'text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 border-indigo-300 dark:border-indigo-500/30'
+                    : 'text-slate-500 bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700'
+                }`}
+              >
+                {config?.deepseek?.isConfigured ? 'ACTIVO' : 'PENDIENTE'}
+              </span>
+            </div>
+
+            <div>
+              <input
+                type="password"
+                value={deepseekKey}
+                onChange={(e) => setDeepseekKey(e.target.value)}
+                placeholder={config?.deepseek?.maskedKey ? `Actual: ${config.deepseek.maskedKey}` : 'sk-XXXXXXXXXXXXXXXX'}
+                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500 font-mono"
+              />
+            </div>
+
+            <div className="flex items-center justify-between pt-1">
+              <button
+                type="button"
+                onClick={() => testMutation.mutate({ provider: 'deepseek', apiKey: deepseekKey || undefined })}
+                disabled={testMutation.isPending}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 transition-colors"
+              >
+                {testMutation.isPending && testMutation.variables?.provider === 'deepseek' ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-3.5 h-3.5" />
+                )}
+                Probar DeepSeek
+              </button>
+            </div>
+
+            {testResults['deepseek'] && (
+              <div
+                className={`p-2.5 rounded-lg text-xs font-medium flex items-center gap-2 ${
+                  testResults['deepseek'].success
+                    ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/20'
+                    : 'bg-red-50 dark:bg-red-500/10 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-500/20'
+                }`}
+              >
+                {testResults['deepseek'].success ? <Check className="w-4 h-4 shrink-0 text-emerald-500" /> : <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />}
+                <span>{testResults['deepseek'].message}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Botón de Guardado Global */}
+        <div className="flex justify-end pt-4">
+          <button
+            type="submit"
+            disabled={saveMutation.isPending}
+            className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 font-bold text-sm shadow-md hover:opacity-90 disabled:opacity-50 transition-all"
+          >
+            {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+            Guardar Configuración de API Keys de IA
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+// ── 7. Admin Panel Main Component ────────────────────────────────────────────
+type Tab = 'tenants' | 'plans' | 'mercadopago' | 'ai-keys';
 
 export function AdminPanel() {
   const { user } = useAuth();
@@ -939,7 +1344,7 @@ export function AdminPanel() {
           Panel de Super Administración
         </h2>
         <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-          Gestión de planes de servicio, organizaciones, suscripciones y pasarelas de pago.
+          Gestión de planes de servicio, organizaciones, suscripciones, pasarelas de pago y proveedores de IA.
         </p>
       </div>
 
@@ -949,6 +1354,7 @@ export function AdminPanel() {
           { id: 'tenants' as Tab, label: 'Clientes & Cortesías', icon: <Users className="w-4 h-4" /> },
           { id: 'plans' as Tab, label: 'Planes de Servicio', icon: <Package className="w-4 h-4" /> },
           { id: 'mercadopago' as Tab, label: 'Mercado Pago Plataforma', icon: <CreditCard className="w-4 h-4" /> },
+          { id: 'ai-keys' as Tab, label: 'Proveedores de IA', icon: <Key className="w-4 h-4" /> },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -969,6 +1375,7 @@ export function AdminPanel() {
       {activeTab === 'tenants' && <TenantsTab />}
       {activeTab === 'plans' && <PlansTab />}
       {activeTab === 'mercadopago' && <MercadoPagoPlatformTab />}
+      {activeTab === 'ai-keys' && <AiKeysTab />}
     </div>
   );
 }

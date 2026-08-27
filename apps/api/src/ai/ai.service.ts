@@ -25,6 +25,14 @@ export class AiService {
     this.openai = new OpenAI({ apiKey: apiKey || '' });
   }
 
+  private async getOpenAiClient(): Promise<OpenAI> {
+    const dbKey = await this.prisma.platformSetting.findUnique({
+      where: { key: 'OPENAI_API_KEY' },
+    });
+    const apiKey = dbKey?.value || this.configService.get<string>('OPENAI_API_KEY') || '';
+    return new OpenAI({ apiKey });
+  }
+
   /**
    * Generar respuesta simple (endpoint protegido por JWT)
    */
@@ -40,7 +48,8 @@ export class AiService {
 
       const fullSystemPrompt = `${systemPrompt}${contextText}`;
 
-      const response = await this.openai.chat.completions.create({
+      const client = await this.getOpenAiClient();
+      const response = await client.chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: fullSystemPrompt },

@@ -413,6 +413,39 @@ class ApiClient {
       body: JSON.stringify({ message, history }),
     });
   }
+
+  // ── AI Keys Management (Super Admin) ─────────────
+  async getAiKeysConfig() {
+    return this.request<{
+      openai: { isConfigured: boolean; maskedKey: string };
+      gemini: { isConfigured: boolean; maskedKey: string };
+      anthropic: { isConfigured: boolean; maskedKey: string };
+      deepseek: { isConfigured: boolean; maskedKey: string };
+      defaultProvider: string;
+      defaultModel: string;
+    }>('/tenants/ai-keys');
+  }
+
+  async saveAiKeysConfig(body: {
+    openaiKey?: string;
+    geminiKey?: string;
+    anthropicKey?: string;
+    deepseekKey?: string;
+    defaultProvider?: string;
+    defaultModel?: string;
+  }) {
+    return this.request<{ success: boolean; message: string }>('/tenants/ai-keys', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  }
+
+  async testAiKeyConnection(provider: 'openai' | 'gemini' | 'anthropic' | 'deepseek', apiKey?: string) {
+    return this.request<{ success: boolean; message?: string; error?: string }>('/tenants/ai-keys/test', {
+      method: 'POST',
+      body: JSON.stringify({ provider, apiKey }),
+    });
+  }
 }
 
 export const api = new ApiClient();
