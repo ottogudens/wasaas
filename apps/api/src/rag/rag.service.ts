@@ -525,4 +525,22 @@ export class RagService {
       this.logger.error('Error al invalidar caché semántica:', err);
     }
   }
+
+  /**
+   * Obtener el texto completo agrupado de múltiples documentos
+   */
+  async getDocumentsFullText(documentIds: string[], organizationId: string): Promise<string> {
+    const documents = await this.prisma.knowledgeDocument.findMany({
+      where: {
+        id: { in: documentIds },
+        organizationId
+      },
+      include: { chunks: true }
+    });
+    
+    return documents.map(doc => {
+      const allText = doc.chunks.map(chunk => chunk.content).join('\n');
+      return `--- DOCUMENTO: ${doc.title} ---\n${allText}\n--- FIN DOCUMENTO ---`;
+    }).join('\n\n');
+  }
 }

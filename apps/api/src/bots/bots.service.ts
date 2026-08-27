@@ -124,6 +124,7 @@ export class BotsService {
         ...(data.systemPrompt !== undefined && { systemPrompt: data.systemPrompt }),
         ...(data.aiModel && { aiModel: data.aiModel }),
         ...(data.provider && { provider: data.provider }),
+        ...(data.timezone && { timezone: data.timezone }),
         ...(data.metaJwtToken !== undefined && { metaJwtToken: data.metaJwtToken }),
         ...(data.metaNumberId !== undefined && { metaNumberId: data.metaNumberId }),
         ...(data.metaVerifyToken !== undefined && { metaVerifyToken: data.metaVerifyToken }),

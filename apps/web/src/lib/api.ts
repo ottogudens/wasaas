@@ -392,7 +392,7 @@ class ApiClient {
   async interactDirectAgent(
     botId: string,
     message: string,
-    documentAttachment?: { documentName: string; documentContent: string },
+    documentAttachment?: { documentName?: string; documentContent?: string; mentionedDocumentIds?: string[] },
     history?: Array<{ role: 'user' | 'assistant'; content: string }>,
     options?: { provider?: string; model?: string }
   ) {
@@ -402,6 +402,7 @@ class ApiClient {
         message,
         documentName: documentAttachment?.documentName,
         documentContent: documentAttachment?.documentContent,
+        mentionedDocumentIds: documentAttachment?.mentionedDocumentIds,
         history,
         provider: options?.provider,
         model: options?.model,

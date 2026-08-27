@@ -137,6 +137,7 @@ model BotInstance {
   qrCode          String?               @db.Text
   pairingCode     String?
   systemPrompt    String?               @db.Text
+  timezone        String                @default("America/Santiago")
   aiModel         String                @default("gpt-4o-mini")
   organizationId  String
   organization    Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)

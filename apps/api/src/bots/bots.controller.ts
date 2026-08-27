@@ -17,6 +17,10 @@ class CreateBotDto {
   @IsOptional()
   @IsString()
   aiModel?: string;
+
+  @IsOptional()
+  @IsString()
+  timezone?: string;
 }
 
 class UpdateBotDto {
@@ -34,6 +38,10 @@ class UpdateBotDto {
   @IsOptional()
   @IsString()
   aiModel?: string;
+
+  @IsOptional()
+  @IsString()
+  timezone?: string;
 }
 
 class SendMessageDto {

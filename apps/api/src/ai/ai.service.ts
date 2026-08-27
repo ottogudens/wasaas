@@ -318,11 +318,16 @@ export class AiService {
       0.25,
     );
 
+    const now = new Date();
+    const localDate = now.toLocaleDateString('es-ES', { timeZone: (bot as any).timezone || 'America/Santiago' });
+    const localTime = now.toLocaleTimeString('es-ES', { timeZone: (bot as any).timezone || 'America/Santiago' });
+    const timeContext = `\n\n[CONTEXTO TEMPORAL]:\nLa fecha y hora actual del sistema es ${localDate} ${localTime}. Usa este dato si te preguntan "¿qué fecha/hora es hoy?".`;
+
     const contextText = ragChunks.length > 0
-      ? `\n\n[INFORMACIÓN DE CONTEXTO RAG - DOCUMENTOS DE LA EMPRESA]:\n${ragChunks.map(c => c.content).join('\n---\n')}\n\nInstrucción RAG: Utiliza la información de contexto anterior cuando sea relevante para responder con precisión comercial.`
+      ? `\n\n[INFORMACIÓN DE CONTEXTO RAG - BASE DE CONOCIMIENTO DE LA EMPRESA]:\n${ragChunks.map(c => c.content).join('\n---\n')}\n\nInstrucción RAG: TIENES ACCESO COMPLETO a los documentos de la organización incluidos en este bloque de BASE DE CONOCIMIENTOS. Si el cliente pregunta si tienes acceso a los documentos o fuentes, SIEMPRE indica que SÍ y extrae tu respuesta desde aquí.`
       : '';
 
-    const systemPrompt = `${bot.systemPrompt || 'Eres un asistente virtual profesional y amable para atención al cliente.'}${contextText}`;
+    const systemPrompt = `${bot.systemPrompt || 'Eres un asistente virtual profesional y amable para atención al cliente.'}${timeContext}${contextText}`;
 
     const formattedHistory = (history || []).slice(-10).map((h) => ({
       role: h.role as 'user' | 'assistant',
@@ -484,13 +489,19 @@ export class AiService {
 
     // 6. Construir system prompt dinámico
     const customPrompt = bot.systemPrompt || 'Eres un asistente virtual profesional especializado en atención al cliente.';
+    const now = new Date();
+    const localDate = now.toLocaleDateString('es-ES', { timeZone: (bot as any).timezone || 'America/Santiago' });
+    const localTime = now.toLocaleTimeString('es-ES', { timeZone: (bot as any).timezone || 'America/Santiago' });
+    const timeContext = `\n\n[CONTEXTO TEMPORAL]:\nLa fecha y hora actual del sistema es ${localDate} ${localTime}. Usa este dato si te preguntan "¿qué fecha/hora es hoy?".`;
+
     const systemInstruction = `
-${customPrompt}
+${customPrompt}${timeContext}
 
 [INSTRUCCIONES DE ATENCIÓN]:
 1. Si el usuario te saluda o hace preguntas generales de cortesía (ej. "hola", "buenos días", "¿cómo estás?"), responde de manera amable y profesional ofreciendo tu ayuda.
-2. Si el usuario pregunta sobre servicios, productos, precios o información específica del negocio, prioriza la información de la [BASE DE CONOCIMIENTO DE LA EMPRESA].
-3. Si la consulta se refiere a información de la empresa que NO está registrada en la Base de Conocimiento, informa cortésmente que no dispones de esa información en este momento y ofrece derivar la consulta con un asesor humano.
+2. Si el usuario pregunta sobre servicios, productos, precios o información específica del negocio, prioriza la información de la [BASE DE CONOCIMIENTO DE LA EMPRESA]. Considera que **SÍ TIENES ACCESO** a estos documentos.
+3. Si te preguntan si tienes acceso a cierta información o documentos, **SIEMPRE INDICA QUE SÍ** y menciona los datos extraídos de la [BASE DE CONOCIMIENTO DE LA EMPRESA].
+4. Si la consulta se refiere a información de la empresa que está totalmente ausente en tu base de conocimiento, informa cortésmente que no dispones de esa información y ofrece derivar con un asesor humano.
 ${ragContext}`;
 
     const fullSystemPrompt = systemInstruction;

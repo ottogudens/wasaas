@@ -172,6 +172,7 @@ export class AiController {
       message: string;
       documentName?: string;
       documentContent?: string;
+      mentionedDocumentIds?: string[];
       history?: Array<{ role: 'user' | 'assistant'; content: string }>;
       provider?: string;
       model?: string;
@@ -180,8 +181,21 @@ export class AiController {
     try {
       const isSuperAdmin = req.user?.role === 'SUPER_ADMIN';
       let fullQuery = body.message || '';
+      
+      // Inject mentioned documents immediately bypassing RAG semantic search limit
+      if (body.mentionedDocumentIds && body.mentionedDocumentIds.length > 0) {
+        try {
+          const mentionedKnowledge = await this.ragService.getDocumentsFullText(body.mentionedDocumentIds, req.user.organizationId);
+          if (mentionedKnowledge) {
+             fullQuery = `[DOCUMENTOS MENCIONADOS POR EL USUARIO]\nEl usuario ha referenciado explícitamente la siguiente información de la base de datos. Priorízala obligatoriamente:\n\n${mentionedKnowledge}\n\nConsulta del usuario:\n${fullQuery}`;
+          }
+        } catch(e) {
+           console.error("Error al inyectar documentos mencionados:", e);
+        }
+      }
+
       if (body.documentName && body.documentContent) {
-        fullQuery = `[DOCUMENTO ADJUNTO: ${body.documentName}]\nContenido del documento:\n${body.documentContent}\n\nConsulta del usuario sobre el documento:\n${body.message || 'Analiza el documento adjunto y resume los puntos clave.'}`;
+        fullQuery = `[DOCUMENTO ADJUNTO: ${body.documentName}]\nContenido del documento:\n${body.documentContent}\n\nConsulta del usuario sobre el documento:\n${fullQuery || 'Analiza el documento adjunto y resume los puntos clave.'}`;
         
         // Guardar el documento en la base de conocimientos RAG permanentemente
         try {

@@ -135,6 +135,60 @@ export function AgentLivePanel({ standaloneBotId, isStandalone }: { standaloneBo
 
   // Shortcut / PWA modal
   const [showShortcutModal, setShowShortcutModal] = useState(false);
+  
+  // PWA Native Prompt
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+    }
+  };
+
+  // Mentions logic
+  const [knowledgeDocs, setKnowledgeDocs] = useState<any[]>([]);
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [showMentionMenu, setShowMentionMenu] = useState(false);
+  const [mentionedDocIds, setMentionedDocIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    api.listDocuments().then(res => {
+      if (res?.documents) setKnowledgeDocs(res.documents);
+    }).catch(() => {});
+  }, []);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setInputText(val);
+    
+    const lastWord = val.split(' ').pop() || '';
+    if (lastWord.startsWith('@')) {
+      setMentionQuery(lastWord.substring(1).toLowerCase());
+      setShowMentionMenu(true);
+    } else {
+      setShowMentionMenu(false);
+    }
+  };
+
+  const handleMentionSelect = (doc: any) => {
+    const words = inputText.split(' ');
+    words.pop(); // remover "@query" incompleto
+    words.push(`@${doc.title} `);
+    setInputText(words.join(' '));
+    setMentionedDocIds(prev => Array.from(new Set([...prev, doc.id])));
+    setShowMentionMenu(false);
+  };
 
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
@@ -294,10 +348,12 @@ export function AgentLivePanel({ standaloneBotId, isStandalone }: { standaloneBo
       const aiRes = await api.interactDirectAgent(
         targetBotId,
         userText,
-        currentDoc ? { documentName: currentDoc.name, documentContent: currentDoc.content } : undefined,
+        currentDoc ? { documentName: currentDoc.name, documentContent: currentDoc.content, mentionedDocumentIds: mentionedDocIds } : { mentionedDocumentIds: mentionedDocIds } as any,
         historyForAi,
         { provider: selectedProvider, model: selectedModel }
       );
+      
+      setMentionedDocIds([]); // Clear mentions after sending
 
       const botMsg: Message = {
         id: (Date.now() + 1).toString(),
@@ -441,6 +497,15 @@ export function AgentLivePanel({ standaloneBotId, isStandalone }: { standaloneBo
             <Smartphone className="w-4 h-4" />
             Acceso Directo
           </button>
+          {deferredPrompt && (
+            <button
+              onClick={handleInstallClick}
+              className="hidden md:flex px-3 py-1.5 bg-emerald-500 text-white hover:bg-emerald-400 border border-emerald-600 rounded-xl text-xs font-bold transition-all items-center gap-1.5 shadow-sm shadow-emerald-500/20 animate-fade-in"
+            >
+              <Download className="w-4 h-4" />
+              Instalar App
+            </button>
+          )}
         </div>
       </div>
 
@@ -600,14 +665,42 @@ export function AgentLivePanel({ standaloneBotId, isStandalone }: { standaloneBo
                 <Mic className="w-5 h-5" />
               </button>
 
-              <input
-                type="text"
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                placeholder="Escribe tu mensaje o adjunta un documento..."
-                disabled={isProcessing}
-                className="flex-1 bg-slate-100 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-500"
-              />
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  value={inputText}
+                  onChange={handleInputChange}
+                  placeholder="Escribe tu mensaje o adjunta un documento..."
+                  disabled={isProcessing}
+                  className="w-full bg-slate-100 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:border-emerald-500"
+                />
+
+                {/* Floating Mention Autocomplete Menu */}
+                {showMentionMenu && (
+                  <div className="absolute bottom-full left-0 mb-2 w-full max-w-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg overflow-hidden animate-fade-in z-50">
+                    <div className="px-3 py-2 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 font-semibold text-[11px] text-emerald-600 dark:text-emerald-400">
+                      Mencionar documento (Enter o Click)
+                    </div>
+                    <ul className="max-h-48 overflow-y-auto">
+                      {knowledgeDocs
+                        .filter(d => d.title.toLowerCase().includes(mentionQuery))
+                        .map(doc => (
+                          <li
+                            key={doc.id}
+                            onClick={() => handleMentionSelect(doc)}
+                            className="px-4 py-2 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 cursor-pointer flex items-center gap-2 border-b border-slate-100 dark:border-slate-700/50 last:border-0"
+                          >
+                            <FileText className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                            <span className="text-xs text-slate-700 dark:text-slate-300 truncate">{doc.title}</span>
+                          </li>
+                        ))}
+                      {knowledgeDocs.filter(d => d.title.toLowerCase().includes(mentionQuery)).length === 0 && (
+                        <li className="px-4 py-3 text-xs text-slate-500 dark:text-slate-400 italic">No se encontraron documentos...</li>
+                      )}
+                    </ul>
+                  </div>
+                )}
+              </div>
 
               <button
                 type="submit"

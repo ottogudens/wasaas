@@ -20,6 +20,7 @@ export function BotsPanel() {
   const [editBotName, setEditBotName] = useState('');
   const [editSystemPrompt, setEditSystemPrompt] = useState('');
   const [editAiModel, setEditAiModel] = useState('gpt-4o-mini');
+  const [editTimezone, setEditTimezone] = useState('America/Santiago');
   
   const [deletingBotId, setDeletingBotId] = useState<string | null>(null);
 
@@ -52,7 +53,8 @@ export function BotsPanel() {
         data: { 
           name: editBotName,
           systemPrompt: editSystemPrompt,
-          aiModel: editAiModel
+          aiModel: editAiModel,
+          timezone: editTimezone
         } 
       });
       setConfigBot(null);
@@ -160,7 +162,7 @@ export function BotsPanel() {
                     }
                   </button>
                     <button
-                      onClick={() => { setConfigBot(b); setEditBotName(b.name); setEditSystemPrompt(b.systemPrompt || ''); setEditAiModel(b.aiModel || 'gpt-4o-mini'); }}
+                      onClick={() => { setConfigBot(b); setEditBotName(b.name); setEditSystemPrompt(b.systemPrompt || ''); setEditAiModel(b.aiModel || 'gpt-4o-mini'); setEditTimezone(b.timezone || 'America/Santiago'); }}
                     className="text-xs px-3.5 py-2.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all flex items-center gap-1.5"
                   >
                     <Settings className="w-4 h-4" /> Configurar
@@ -221,6 +223,23 @@ export function BotsPanel() {
                   <option value="claude-3-5-sonnet">Claude 3.5 Sonnet</option>
                   <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
                 </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">Zona Horaria (Sincronización Bot)</label>
+                <select
+                  value={editTimezone}
+                  onChange={e => setEditTimezone(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-900 dark:text-slate-200 focus:outline-none focus:border-emerald-500"
+                >
+                  <option value="America/Santiago">Santiago, Chile (America/Santiago)</option>
+                  <option value="America/Argentina/Buenos_Aires">Buenos Aires, Argentina</option>
+                  <option value="America/Bogota">Bogotá, Colombia (America/Bogota)</option>
+                  <option value="America/Mexico_City">Ciudad de México (America/Mexico_City)</option>
+                  <option value="America/Lima">Lima, Perú (America/Lima)</option>
+                  <option value="Europe/Madrid">Madrid, España (Europe/Madrid)</option>
+                  <option value="UTC">UTC Universal</option>
+                </select>
+                <p className="text-xs text-slate-500 mt-2">Permite que el bot responda correctamente preguntas como "¿qué día es hoy?".</p>
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">Instrucciones del Sistema (Prompt)</label>
