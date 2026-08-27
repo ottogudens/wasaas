@@ -67,7 +67,170 @@ export class AiService {
   }
 
   /**
-   * Simular interacción con el bot dentro de la app (Playground / Simulador de Pruebas)
+   * Ejecutar la solicitud completando la respuesta con el proveedor seleccionado:
+   * 'openai' | 'gemini' | 'anthropic' | 'deepseek'
+   */
+  private async generateCompletionWithProvider(params: {
+    provider?: string;
+    model?: string;
+    systemPrompt: string;
+    userMessage: string;
+    history: Array<{ role: 'user' | 'assistant'; content: string }>;
+  }): Promise<{ reply: string; usedProvider: string; usedModel: string }> {
+    // 1. Obtener la clave por defecto o de base de datos
+    const dbSettings = await this.prisma.platformSetting.findMany({
+      where: {
+        key: {
+          in: ['OPENAI_API_KEY', 'GEMINI_API_KEY', 'ANTHROPIC_API_KEY', 'DEEPSEEK_API_KEY', 'DEFAULT_AI_PROVIDER', 'DEFAULT_AI_MODEL'],
+        },
+      },
+    });
+
+    const settingsMap = new Map(dbSettings.map((s) => [s.key, s.value]));
+
+    const openAiKey = settingsMap.get('OPENAI_API_KEY') || this.configService.get<string>('OPENAI_API_KEY') || '';
+    const geminiKey = settingsMap.get('GEMINI_API_KEY') || this.configService.get<string>('GEMINI_API_KEY') || '';
+    const anthropicKey = settingsMap.get('ANTHROPIC_API_KEY') || this.configService.get<string>('ANTHROPIC_API_KEY') || '';
+    const deepseekKey = settingsMap.get('DEEPSEEK_API_KEY') || this.configService.get<string>('DEEPSEEK_API_KEY') || '';
+
+    const defaultProvider = settingsMap.get('DEFAULT_AI_PROVIDER') || 'openai';
+    const defaultModel = settingsMap.get('DEFAULT_AI_MODEL') || 'gpt-4o-mini';
+
+    const provider = (params.provider || defaultProvider).toLowerCase();
+
+    // ── GOOGLE GEMINI ──────────────────────────────────────────────
+    if (provider === 'gemini') {
+      if (!geminiKey) {
+        throw new Error('Google Gemini API Key no está configurada en la plataforma.');
+      }
+      const modelName = params.model || 'gemini-1.5-flash';
+      const contents: any[] = [];
+      for (const h of params.history) {
+        contents.push({
+          role: h.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: h.content }],
+        });
+      }
+      contents.push({ role: 'user', parts: [{ text: params.userMessage }] });
+
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: params.systemPrompt }] },
+          contents,
+          generationConfig: { temperature: 0.7, maxOutputTokens: 800 },
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error?.message || `Error HTTP ${res.status} desde Google Gemini.`);
+      }
+      const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No se recibió respuesta de Gemini.';
+      return { reply, usedProvider: 'Gemini', usedModel: modelName };
+    }
+
+    // ── ANTHROPIC CLAUDE ───────────────────────────────────────────
+    if (provider === 'anthropic') {
+      if (!anthropicKey) {
+        throw new Error('Anthropic Claude API Key no está configurada en la plataforma.');
+      }
+      const modelName = params.model || 'claude-3-5-sonnet-20240620';
+      const anthropicMessages = params.history.map((h) => ({
+        role: h.role === 'assistant' ? 'assistant' : 'user',
+        content: h.content,
+      }));
+      anthropicMessages.push({ role: 'user', content: params.userMessage });
+
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': anthropicKey,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: modelName,
+          system: params.systemPrompt,
+          messages: anthropicMessages,
+          max_tokens: 800,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error?.message || `Error HTTP ${res.status} desde Anthropic.`);
+      }
+      const reply = data.content?.[0]?.text || 'No se recibió respuesta de Claude.';
+      return { reply, usedProvider: 'Claude', usedModel: modelName };
+    }
+
+    // ── DEEPSEEK AI ────────────────────────────────────────────────
+    if (provider === 'deepseek') {
+      if (!deepseekKey) {
+        throw new Error('DeepSeek API Key no está configurada en la plataforma.');
+      }
+      const modelName = params.model || 'deepseek-chat';
+      const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${deepseekKey}`,
+        },
+        body: JSON.stringify({
+          model: modelName,
+          messages: [
+            { role: 'system', content: params.systemPrompt },
+            ...params.history,
+            { role: 'user', content: params.userMessage },
+          ],
+          temperature: 0.7,
+          max_tokens: 800,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error?.message || `Error HTTP ${res.status} desde DeepSeek.`);
+      }
+      const reply = data.choices?.[0]?.message?.content || 'No se recibió respuesta de DeepSeek.';
+      return { reply, usedProvider: 'DeepSeek', usedModel: modelName };
+    }
+
+    // ── OPENAI (FALLBACK DEFAULT) ──────────────────────────────────
+    if (!openAiKey) {
+      throw new Error('OpenAI API Key no está configurada en la plataforma.');
+    }
+    const modelName = params.model || defaultModel || 'gpt-4o-mini';
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${openAiKey}`,
+      },
+      body: JSON.stringify({
+        model: modelName,
+        messages: [
+          { role: 'system', content: params.systemPrompt },
+          ...params.history,
+          { role: 'user', content: params.userMessage },
+        ],
+        temperature: 0.7,
+        max_tokens: 800,
+      }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error?.message || `Error HTTP ${res.status} desde OpenAI.`);
+    }
+    const reply = data.choices?.[0]?.message?.content || 'No se recibió respuesta de OpenAI.';
+    return { reply, usedProvider: 'OpenAI', usedModel: modelName };
+  }
+
+  /**
+   * Simular interacción con el bot dentro de la app (Playground / Simulador de Pruebas / Agente Directo)
    */
   async simulateBotResponse(
     botId: string,
@@ -75,7 +238,9 @@ export class AiService {
     userMessage: string,
     history: Array<{ role: 'user' | 'assistant'; content: string }> = [],
     isSuperAdmin: boolean = false,
-  ): Promise<{ reply: string; sources: string[]; model: string }> {
+    provider?: string,
+    overrideModel?: string,
+  ): Promise<{ reply: string; sources: string[]; model: string; provider?: string }> {
     const where = isSuperAdmin ? { id: botId } : { id: botId, organizationId };
     const bot = await this.prisma.botInstance.findFirst({ where });
     if (!bot) {
@@ -101,31 +266,30 @@ export class AiService {
       content: h.content,
     }));
 
-    const modelToUse = bot.aiModel || 'gpt-4o-mini';
+    const targetModel = overrideModel || bot.aiModel;
 
     try {
-      const response = await this.openai.chat.completions.create({
-        model: modelToUse,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ...formattedHistory,
-          { role: 'user', content: userMessage },
-        ],
-        temperature: 0.7,
-        max_tokens: 600,
+      const completionResult = await this.generateCompletionWithProvider({
+        provider,
+        model: targetModel,
+        systemPrompt,
+        userMessage,
+        history: formattedHistory,
       });
 
       return {
-        reply: response.choices[0]?.message?.content || 'No se pudo generar una respuesta.',
+        reply: completionResult.reply,
         sources: ragChunks.map((c) => c.content.slice(0, 80) + '...'),
-        model: modelToUse,
+        model: completionResult.usedModel,
+        provider: completionResult.usedProvider,
       };
-    } catch (error) {
-      this.logger.error('Error simulando respuesta del bot:', error);
+    } catch (error: any) {
+      this.logger.error('Error simulando respuesta del bot con IA:', error);
       return {
-        reply: 'Lo siento, ocurrió un error procesando tu consulta en el simulador. Revisa que tu API key de OpenAI esté configurada.',
+        reply: `Lo siento, ocurrió un error procesando tu consulta con el proveedor de IA (${error.message || 'Error de conexión'}). Revisa la configuración de API Keys en la plataforma.`,
         sources: [],
-        model: modelToUse,
+        model: targetModel || 'desconocido',
+        provider: provider || 'desconocido',
       };
     }
   }

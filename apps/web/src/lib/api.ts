@@ -389,15 +389,18 @@ class ApiClient {
     botId: string,
     message: string,
     documentAttachment?: { documentName: string; documentContent: string },
-    history?: Array<{ role: 'user' | 'assistant'; content: string }>
+    history?: Array<{ role: 'user' | 'assistant'; content: string }>,
+    options?: { provider?: string; model?: string }
   ) {
-    return this.request<{ reply: string; sources: string[]; model: string }>(`/ai/direct-agent/${botId}`, {
+    return this.request<{ reply: string; sources: string[]; model: string; provider?: string }>(`/ai/direct-agent/${botId}`, {
       method: 'POST',
       body: JSON.stringify({
         message,
         documentName: documentAttachment?.documentName,
         documentContent: documentAttachment?.documentContent,
         history,
+        provider: options?.provider,
+        model: options?.model,
       }),
     });
   }

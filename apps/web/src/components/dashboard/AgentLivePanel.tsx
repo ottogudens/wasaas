@@ -36,14 +36,51 @@ interface Message {
   transcribedText?: string;
   documentName?: string;
   sources?: string[];
+  provider?: string;
+  model?: string;
   time: string;
 }
+
+const PROVIDER_MODELS: Record<string, { label: string; models: { id: string; name: string }[] }> = {
+  openai: {
+    label: 'OpenAI',
+    models: [
+      { id: 'gpt-4o-mini', name: 'GPT-4o Mini (Rápido)' },
+      { id: 'gpt-4o', name: 'GPT-4o (Avanzado)' },
+      { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' },
+    ],
+  },
+  gemini: {
+    label: 'Google Gemini',
+    models: [
+      { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
+      { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
+    ],
+  },
+  anthropic: {
+    label: 'Anthropic Claude',
+    models: [
+      { id: 'claude-3-5-sonnet-20240620', name: 'Claude 3.5 Sonnet' },
+      { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku' },
+    ],
+  },
+  deepseek: {
+    label: 'DeepSeek AI',
+    models: [
+      { id: 'deepseek-chat', name: 'DeepSeek V3 (Chat)' },
+      { id: 'deepseek-coder', name: 'DeepSeek Coder' },
+    ],
+  },
+};
 
 export function AgentLivePanel() {
   const { selectedBotId, setSelectedBotId } = useBotContext();
   const { token } = useAuth();
   const { bots } = useBots(token);
   const activeBot = bots?.find((b: any) => b.id === selectedBotId);
+
+  const [selectedProvider, setSelectedProvider] = useState<string>('openai');
+  const [selectedModel, setSelectedModel] = useState<string>('gpt-4o-mini');
 
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -178,7 +215,8 @@ export function AgentLivePanel() {
           selectedBotId,
           transcribedText,
           attachedDoc ? { documentName: attachedDoc.name, documentContent: attachedDoc.content } : undefined,
-          historyForAi
+          historyForAi,
+          { provider: selectedProvider, model: selectedModel }
         );
 
         setAttachedDoc(null);
@@ -188,6 +226,8 @@ export function AgentLivePanel() {
           role: 'assistant',
           content: aiRes.reply,
           sources: aiRes.sources,
+          provider: aiRes.provider || PROVIDER_MODELS[selectedProvider]?.label || selectedProvider,
+          model: aiRes.model || selectedModel,
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         };
 
@@ -227,7 +267,8 @@ export function AgentLivePanel() {
         selectedBotId,
         userText,
         currentDoc ? { documentName: currentDoc.name, documentContent: currentDoc.content } : undefined,
-        historyForAi
+        historyForAi,
+        { provider: selectedProvider, model: selectedModel }
       );
 
       const botMsg: Message = {
@@ -235,6 +276,8 @@ export function AgentLivePanel() {
         role: 'assistant',
         content: aiRes.reply,
         sources: aiRes.sources,
+        provider: aiRes.provider || PROVIDER_MODELS[selectedProvider]?.label || selectedProvider,
+        model: aiRes.model || selectedModel,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 
@@ -244,7 +287,7 @@ export function AgentLivePanel() {
       const errorMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: 'Ocurrió un inconveniente al comunicarse con el agente. Verifica que la API key de OpenAI esté activa.',
+        content: 'Ocurrió un inconveniente al comunicarse con el agente. Verifica que la API key seleccionada esté activa.',
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
       setMessages((prev) => [...prev, errorMsg]);
@@ -302,29 +345,71 @@ export function AgentLivePanel() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {/* Bot selector */}
           {bots && bots.length > 0 && (
+            <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
+              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 px-1.5">Bot:</span>
+              <select
+                value={selectedBotId || ''}
+                onChange={(e) => setSelectedBotId(e.target.value)}
+                className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-semibold text-slate-800 dark:text-slate-200 px-2 py-1 focus:outline-none focus:border-emerald-500"
+              >
+                {bots.map((b: any) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* AI Provider selector */}
+          <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
+            <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 px-1.5 flex items-center gap-1">
+              <Sparkles className="w-3 h-3" />
+              Proveedor:
+            </span>
             <select
-              value={selectedBotId || ''}
-              onChange={(e) => setSelectedBotId(e.target.value)}
-              className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:border-emerald-500"
+              value={selectedProvider}
+              onChange={(e) => {
+                const newProv = e.target.value;
+                setSelectedProvider(newProv);
+                setSelectedModel(PROVIDER_MODELS[newProv]?.models[0]?.id || '');
+              }}
+              className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-semibold text-slate-800 dark:text-slate-200 px-2 py-1 focus:outline-none focus:border-emerald-500"
             >
-              {bots.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name} ({b.aiModel || 'gpt-4o-mini'})
+              {Object.entries(PROVIDER_MODELS).map(([key, config]) => (
+                <option key={key} value={key}>
+                  {config.label}
                 </option>
               ))}
             </select>
-          )}
+          </div>
+
+          {/* AI Model selector */}
+          <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
+            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 px-1.5">Modelo:</span>
+            <select
+              value={selectedModel}
+              onChange={(e) => setSelectedModel(e.target.value)}
+              className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-semibold text-slate-800 dark:text-slate-200 px-2 py-1 focus:outline-none focus:border-emerald-500"
+            >
+              {PROVIDER_MODELS[selectedProvider]?.models.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
           {/* Add shortcut button */}
           <button
             onClick={() => setShowShortcutModal(true)}
-            className="px-3.5 py-1.5 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 border border-emerald-300 dark:border-emerald-500/30 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
+            className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 border border-emerald-300 dark:border-emerald-500/30 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
           >
             <Smartphone className="w-4 h-4" />
-            Acceso Directo en Teléfono
+            Acceso Directo
           </button>
         </div>
       </div>
@@ -349,6 +434,16 @@ export function AgentLivePanel() {
               </div>
 
               <div className={`max-w-[80%] md:max-w-[70%] space-y-1 ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
+                {/* AI Provider & Model Tag for Assistant Messages */}
+                {msg.role === 'assistant' && msg.provider && (
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mb-0.5">
+                    <Sparkles className="w-3 h-3" />
+                    <span>{msg.provider}</span>
+                    <span className="text-slate-400">•</span>
+                    <span className="text-slate-500 dark:text-slate-400 font-mono">{msg.model}</span>
+                  </div>
+                )}
+
                 <div
                   className={`inline-block p-4 rounded-2xl text-sm leading-relaxed ${
                     msg.role === 'user'

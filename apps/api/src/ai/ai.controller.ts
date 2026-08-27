@@ -24,7 +24,12 @@ export class AiController {
   async simulateBot(
     @Param('botId') botId: string,
     @Req() req: any,
-    @Body() body: { message: string; history?: Array<{ role: 'user' | 'assistant'; content: string }> }
+    @Body() body: {
+      message: string;
+      history?: Array<{ role: 'user' | 'assistant'; content: string }>;
+      provider?: string;
+      model?: string;
+    }
   ) {
     const isSuperAdmin = req.user?.role === 'SUPER_ADMIN';
     return this.aiService.simulateBotResponse(
@@ -33,6 +38,8 @@ export class AiController {
       body.message,
       body.history || [],
       isSuperAdmin,
+      body.provider,
+      body.model,
     );
   }
 
@@ -156,6 +163,8 @@ export class AiController {
       documentName?: string;
       documentContent?: string;
       history?: Array<{ role: 'user' | 'assistant'; content: string }>;
+      provider?: string;
+      model?: string;
     }
   ) {
     const isSuperAdmin = req.user?.role === 'SUPER_ADMIN';
@@ -170,6 +179,8 @@ export class AiController {
       fullQuery,
       body.history || [],
       isSuperAdmin,
+      body.provider,
+      body.model,
     );
   }
 }
