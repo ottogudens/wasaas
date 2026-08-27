@@ -114,7 +114,7 @@ export class BotsService {
   /**
    * Actualizar configuración de un bot
    */
-  async updateBot(botId: string, organizationId: string, data: { name?: string; systemPrompt?: string; aiModel?: string; provider?: string; metaJwtToken?: string; metaNumberId?: string; metaVerifyToken?: string }, isSuperAdmin: boolean = false) {
+  async updateBot(botId: string, organizationId: string, data: { name?: string; systemPrompt?: string; aiModel?: string; provider?: string; timezone?: string; metaJwtToken?: string; metaNumberId?: string; metaVerifyToken?: string }, isSuperAdmin: boolean = false) {
     const bot = await this.getBot(botId, organizationId, isSuperAdmin);
 
     const updated = await this.prisma.botInstance.update({
