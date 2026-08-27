@@ -298,7 +298,9 @@ export class RagService {
     botId?: string,
   ): Promise<Array<{ id: string; content: string; similarity: number }>> {
     try {
-      const queryEmbedding = await this.generateEmbedding(query);
+      // Limitar a máximo 8000 caracteres para evitar Error 400 (8192 tokens máximo en OpenAI Embeddings)
+      const safeQuery = query.length > 8000 ? query.substring(0, 8000) : query;
+      const queryEmbedding = await this.generateEmbedding(safeQuery);
 
       const results = await this.prisma.$queryRaw<
         Array<{ id: string; content: string; similarity: number }>
