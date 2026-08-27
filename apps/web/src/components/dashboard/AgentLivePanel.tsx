@@ -204,7 +204,8 @@ export function AgentLivePanel({ standaloneBotId, isStandalone }: { standaloneBo
 
   // Process Recorded Audio via Whisper API
   const processAudioMessage = async (audioBlob: Blob) => {
-    if (!selectedBotId) return;
+    const currentBotId = activeBotId;
+    if (!currentBotId) return;
     setIsProcessing(true);
 
     try {
@@ -238,7 +239,7 @@ export function AgentLivePanel({ standaloneBotId, isStandalone }: { standaloneBo
         // 2. Enviar a la IA del bot
         const historyForAi = messages.slice(-50).map((m) => ({ role: m.role, content: m.content }));
         const aiRes = await api.interactDirectAgent(
-          activeBotId,
+          currentBotId,
           transcribedText,
           attachedDoc ? { documentName: attachedDoc.name, documentContent: attachedDoc.content } : undefined,
           historyForAi,
@@ -269,7 +270,7 @@ export function AgentLivePanel({ standaloneBotId, isStandalone }: { standaloneBo
   // Send Text Message
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    const targetBotId = selectedBotId || (bots && bots.length > 0 ? bots[0].id : null);
+    const targetBotId = activeBotId || (bots && bots.length > 0 ? bots[0].id : null);
     if ((!inputText.trim() && !attachedDoc) || !targetBotId || isProcessing) return;
 
     const userText = inputText.trim();
