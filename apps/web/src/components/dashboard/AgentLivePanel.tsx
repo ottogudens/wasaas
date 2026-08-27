@@ -308,12 +308,14 @@ export function AgentLivePanel() {
       };
 
       setMessages((prev) => [...prev, botMsg]);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error al comunicarse con el agente:', err);
       const errorMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: 'Ocurrió un inconveniente al comunicarse con el agente. Verifica que la API key seleccionada esté activa.',
+        content: `⚠️ No se pudo completar la conexión con el servidor API (${err?.message || 'Error de conexión / Timeout'}). Si acabas de desplegar la API, espera unos segundos a que se complete el reinicio del servidor de Railway e intenta nuevamente.`,
+        provider: selectedProvider,
+        model: selectedModel,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
       setMessages((prev) => [...prev, errorMsg]);

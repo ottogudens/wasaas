@@ -173,20 +173,29 @@ export class AiController {
       model?: string;
     }
   ) {
-    const isSuperAdmin = req.user?.role === 'SUPER_ADMIN';
-    let fullQuery = body.message || '';
-    if (body.documentName && body.documentContent) {
-      fullQuery = `[DOCUMENTO ADJUNTO: ${body.documentName}]\nContenido del documento:\n${body.documentContent}\n\nConsulta del usuario sobre el documento:\n${body.message || 'Analiza el documento adjunto y resume los puntos clave.'}`;
-    }
+    try {
+      const isSuperAdmin = req.user?.role === 'SUPER_ADMIN';
+      let fullQuery = body.message || '';
+      if (body.documentName && body.documentContent) {
+        fullQuery = `[DOCUMENTO ADJUNTO: ${body.documentName}]\nContenido del documento:\n${body.documentContent}\n\nConsulta del usuario sobre el documento:\n${body.message || 'Analiza el documento adjunto y resume los puntos clave.'}`;
+      }
 
-    return this.aiService.simulateBotResponse(
-      botId,
-      req.user.organizationId,
-      fullQuery,
-      body.history || [],
-      isSuperAdmin,
-      body.provider,
-      body.model,
-    );
+      return await this.aiService.simulateBotResponse(
+        botId,
+        req.user.organizationId,
+        fullQuery,
+        body.history || [],
+        isSuperAdmin,
+        body.provider,
+        body.model,
+      );
+    } catch (error: any) {
+      return {
+        reply: `Ocurrió un inconveniente temporal de comunicación con el servicio de IA (${error.message || 'Error de conexión'}). Por favor intenta nuevamente.`,
+        sources: [],
+        model: body.model || 'desconocido',
+        provider: body.provider || 'desconocido',
+      };
+    }
   }
 }
