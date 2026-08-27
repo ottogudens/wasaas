@@ -53,10 +53,8 @@ const PROVIDER_MODELS: Record<string, { label: string; models: { id: string; nam
   gemini: {
     label: 'Google Gemini',
     models: [
-      { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash (Nuevo / Ultra Rápido)' },
-      { id: 'gemini-2.0-flash-lite', name: 'Gemini 2.0 Flash Lite' },
-      { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
-      { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
+      { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash (Rápido y Estable)' },
+      { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro (Avanzado)' },
     ],
   },
   anthropic: {

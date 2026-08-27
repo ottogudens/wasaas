@@ -119,7 +119,7 @@ export class AiService {
       if (!geminiKey) {
         throw new Error('Google Gemini API Key no está configurada en la plataforma.');
       }
-      const modelName = params.model || 'gemini-2.0-flash';
+      const modelName = params.model || 'gemini-1.5-flash';
       const contents: any[] = [];
       for (const h of params.history) {
         contents.push({
