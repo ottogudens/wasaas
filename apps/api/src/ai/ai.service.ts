@@ -120,13 +120,13 @@ export class AiService {
         throw new Error('Google Gemini API Key no está configurada en la plataforma.');
       }
 
-      const requestedModel = params.model || 'gemini-1.5-flash';
-      // Lista de nombres de modelos a intentar en orden
+      const requestedModel = params.model || 'gemini-3.6-flash';
+      // Lista de nombres de modelos vigentes en la API de Google (con gemini-3.6-flash como prioridad)
       const modelsToTry = Array.from(new Set([
         requestedModel,
+        'gemini-3.6-flash',
         'gemini-1.5-flash',
-        'gemini-2.0-flash',
-        'gemini-1.5-pro',
+        'gemini-2.5-flash',
       ]));
 
       const apiVersions = ['v1beta', 'v1'];
@@ -163,11 +163,11 @@ export class AiService {
 
             lastError = data.error?.message || `HTTP ${res.status}`;
             if (lastError.toLowerCase().includes('quota exceeded') || lastError.toLowerCase().includes('exceeded your current quota')) {
-              throw new Error(`Excedida la cuota de la API Key de Gemini (${modelName}). Cambia a Gemini 1.5/2.0 Flash o verifica tu plan en Google AI Studio.`);
+              throw new Error(`Excedida la cuota de la API Key de Gemini (${modelName}). Cambia a Gemini 3.6/1.5 Flash o verifica tu plan en Google AI Studio.`);
             }
 
-            // Si no es un error 404 (not found), detener iteraciones secundarias
-            if (!lastError.includes('not found') && !lastError.includes('not supported')) {
+            // Si el error no es de "modelo deshabilitado / no encontrado", detener reintentos
+            if (!lastError.includes('not found') && !lastError.includes('not supported') && !lastError.includes('no longer available')) {
               break;
             }
           } catch (err: any) {
