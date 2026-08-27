@@ -114,16 +114,28 @@ export class AiService {
 
     const provider = (params.provider || defaultProvider).toLowerCase();
 
+    // Saneador de modelos obsoletos de la base de datos o solicitudes
+    const sanitizeModel = (prov: string, mod?: string): string => {
+      if (prov === 'gemini') {
+        if (!mod || mod.includes('gemini-pro') || mod.includes('gemini-2.0') || mod.includes('gemini-3.1') || mod === 'gemini-1.5-pro') {
+          return 'gemini-3.6-flash';
+        }
+      }
+      return mod || '';
+    };
+
+    const requestedModel = sanitizeModel(provider, params.model);
+
     // ── GOOGLE GEMINI ──────────────────────────────────────────────
     if (provider === 'gemini') {
       if (!geminiKey) {
         throw new Error('Google Gemini API Key no está configurada en la plataforma.');
       }
 
-      const requestedModel = params.model || 'gemini-3.6-flash';
+      const effectiveModel = requestedModel || 'gemini-3.6-flash';
       // Lista de nombres de modelos vigentes en la API de Google (con gemini-3.6-flash como prioridad)
       const modelsToTry = Array.from(new Set([
-        requestedModel,
+        effectiveModel,
         'gemini-3.6-flash',
         'gemini-1.5-flash',
         'gemini-2.5-flash',
@@ -483,35 +495,29 @@ ${ragContext}`;
 
     const fullSystemPrompt = systemInstruction;
 
-    // 7. Construir mensajes para OpenAI
-    const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
-      { role: 'system', content: fullSystemPrompt },
-    ];
+    // 7. Construir historial formateado
+    const formattedHistory: Array<{ role: 'user' | 'assistant'; content: string }> = [];
 
     for (const msg of orderedHistory) {
-      // No duplicar el mensaje actual del usuario (ya está al final del historial)
       if (msg.id === history[history.length - 1]?.id) continue;
-
-      messages.push({
+      formattedHistory.push({
         role: msg.sender === 'USER' ? 'user' : 'assistant',
         content: msg.content,
       });
     }
 
-    // Agregar el mensaje actual del usuario al final
-    messages.push({ role: 'user', content: userMessage });
-
-    // 8. Llamar a OpenAI
+    // 8. Llamar al proveedor de IA correspondiente (Gemini, OpenAI, Claude, DeepSeek)
     let reply: string;
     try {
-      const response = await this.openai.chat.completions.create({
-        model: bot.aiModel || 'gpt-4o-mini',
-        messages,
-        temperature: 0.7,
-        max_tokens: 800,
+      const completionResult = await this.generateCompletionWithProvider({
+        provider: bot.aiProvider || undefined,
+        model: bot.aiModel || undefined,
+        systemPrompt: fullSystemPrompt,
+        userMessage,
+        history: formattedHistory,
       });
 
-      const assistantReply = response.choices[0]?.message?.content || 'No se pudo generar una respuesta.';
+      const assistantReply = completionResult.reply;
       reply = assistantReply;
 
       // 8.5. Memorizar en caché semántico si se encontró información relevante y no fue un error
@@ -522,9 +528,9 @@ ${ragContext}`;
         // Almacenar el contexto de la respuesta exitosa en memoria semántica
         await this.ragService.storeMemory(bot.organizationId, userMessage, assistantReply, bot.id);
       }
-    } catch (error) {
-      this.logger.error('Error generando respuesta con IA:', error);
-      reply = 'Lo siento, en este momento no puedo procesar tu solicitud. Por favor intenta más tarde.';
+    } catch (error: any) {
+      this.logger.error('Error generando respuesta con IA en WhatsApp:', error);
+      reply = 'Lo siento, en este momento ocurrió un inconveniente al procesar tu solicitud con el servicio de IA. Por favor intenta nuevamente en unos momentos.';
     }
 
     // 9. Guardar respuesta del bot en BD
