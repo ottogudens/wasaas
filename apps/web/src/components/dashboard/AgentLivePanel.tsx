@@ -74,11 +74,12 @@ const PROVIDER_MODELS: Record<string, { label: string; models: { id: string; nam
   },
 };
 
-export function AgentLivePanel() {
+export function AgentLivePanel({ standaloneBotId, isStandalone }: { standaloneBotId?: string; isStandalone?: boolean } = {}) {
   const { selectedBotId, setSelectedBotId } = useBotContext();
+  const activeBotId = standaloneBotId || selectedBotId;
   const { token } = useAuth();
   const { bots } = useBots(token);
-  const activeBot = bots?.find((b: any) => b.id === selectedBotId);
+  const activeBot = bots?.find((b: any) => b.id === activeBotId);
 
   const [selectedProvider, setSelectedProvider] = useState<string>('openai');
   const [selectedModel, setSelectedModel] = useState<string>('gpt-4o-mini');
@@ -235,9 +236,9 @@ export function AgentLivePanel() {
         setMessages((prev) => [...prev, userMsg]);
 
         // 2. Enviar a la IA del bot
-        const historyForAi = messages.slice(-8).map((m) => ({ role: m.role, content: m.content }));
+        const historyForAi = messages.slice(-50).map((m) => ({ role: m.role, content: m.content }));
         const aiRes = await api.interactDirectAgent(
-          selectedBotId,
+          activeBotId,
           transcribedText,
           attachedDoc ? { documentName: attachedDoc.name, documentContent: attachedDoc.content } : undefined,
           historyForAi,
@@ -288,7 +289,7 @@ export function AgentLivePanel() {
     setIsProcessing(true);
 
     try {
-      const historyForAi = messages.slice(-8).map((m) => ({ role: m.role, content: m.content }));
+      const historyForAi = messages.slice(-50).map((m) => ({ role: m.role, content: m.content }));
       const aiRes = await api.interactDirectAgent(
         targetBotId,
         userText,
@@ -351,7 +352,7 @@ export function AgentLivePanel() {
   };
 
   return (
-    <div className="h-full flex flex-col space-y-4 max-w-5xl mx-auto">
+    <div className={isStandalone ? 'flex flex-col h-[100dvh] w-full bg-slate-50 dark:bg-slate-950 overflow-hidden' : 'h-full flex flex-col space-y-4 max-w-5xl mx-auto'}>
       {/* Header Bar */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
         <div className="flex items-center gap-3">

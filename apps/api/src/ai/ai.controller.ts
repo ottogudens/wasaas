@@ -1,12 +1,16 @@
 import { Controller, Post, Get, Body, Headers, UseGuards, UnauthorizedException, Param, Req } from '@nestjs/common';
 import { AiService } from './ai.service';
+import { RagService } from '../rag/rag.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { SkipThrottle } from '@nestjs/throttler';
 import { AiChatDto, AiChatWithContextDto } from './ai-chat.dto';
 
 @Controller('ai')
 export class AiController {
-  constructor(private readonly aiService: AiService) {}
+  constructor(
+    private readonly aiService: AiService,
+    private readonly ragService: RagService
+  ) {}
 
   private validateApiKey(apiKey: string) {
     // INTERNAL_API_KEY es obligatoria — check-env.ts ya validó que existe al arrancar.
@@ -178,6 +182,20 @@ export class AiController {
       let fullQuery = body.message || '';
       if (body.documentName && body.documentContent) {
         fullQuery = `[DOCUMENTO ADJUNTO: ${body.documentName}]\nContenido del documento:\n${body.documentContent}\n\nConsulta del usuario sobre el documento:\n${body.message || 'Analiza el documento adjunto y resume los puntos clave.'}`;
+        
+        // Guardar el documento en la base de conocimientos RAG permanentemente
+        try {
+           this.ragService.processAndStoreDocument(
+            req.user.organizationId,
+            body.documentName,
+            body.documentContent,
+            'TEXT', // source type
+            undefined, // url
+            botId // asociado al bot actual
+          ).catch(e => console.error('Error guardando doc asícrono en RAG:', e));
+        } catch(e) {
+          console.error("Error al disparar guardado RAG en directAgent", e)
+        }
       }
 
       return await this.aiService.simulateBotResponse(

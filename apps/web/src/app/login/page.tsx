@@ -25,7 +25,13 @@ export default function LoginPage() {
     try {
       const res = await api.login({ email, password });
       login(res.accessToken, res.user, res.organization);
-      router.push('/dashboard');
+      const redirectPath = localStorage.getItem('redirectAfterLogin');
+      if (redirectPath) {
+        localStorage.removeItem('redirectAfterLogin');
+        router.push(redirectPath);
+      } else {
+        router.push('/dashboard');
+      }
     } catch (err: any) {
       setError(err.message || 'Error al iniciar sesión');
     } finally {
