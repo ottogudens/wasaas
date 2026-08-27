@@ -119,14 +119,10 @@ export class AiService {
       if (!geminiKey) {
         throw new Error('Google Gemini API Key no está configurada en la plataforma.');
       }
-      const requestedModel = params.model || 'gemini-1.5-flash-latest';
-      const candidateModels = Array.from(new Set([
-        requestedModel,
-        `${requestedModel}-latest`,
-        'gemini-1.5-flash-latest',
-        'gemini-1.5-pro-latest',
-        'gemini-pro',
-      ]));
+      // Asegurar un modelo valido en la API REST de Google (gemini-1.5-flash por defecto)
+      let modelName = params.model || 'gemini-1.5-flash';
+      if (modelName === 'gemini-1.5-flash-latest') modelName = 'gemini-1.5-flash';
+      if (modelName === 'gemini-1.5-pro-latest' || modelName === 'gemini-pro') modelName = 'gemini-1.5-pro';
 
       const contents: any[] = [];
       for (const h of params.history) {
@@ -137,44 +133,31 @@ export class AiService {
       }
       contents.push({ role: 'user', parts: [{ text: params.userMessage }] });
 
-      let lastError = '';
-      for (const modelName of candidateModels) {
-        try {
-          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              systemInstruction: { parts: [{ text: params.systemPrompt }] },
-              contents,
-              generationConfig: { temperature: 0.7, maxOutputTokens: 800 },
-            }),
-          });
+      try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: params.systemPrompt }] },
+            contents,
+            generationConfig: { temperature: 0.7, maxOutputTokens: 800 },
+          }),
+        });
 
-          const data = await res.json();
-          if (res.ok) {
-            const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No se recibió respuesta de Gemini.';
-            return { reply, usedProvider: 'Gemini', usedModel: modelName };
+        const data = await res.json();
+        if (!res.ok) {
+          const errMsg = data.error?.message || `HTTP ${res.status}`;
+          if (errMsg.toLowerCase().includes('quota exceeded') || errMsg.toLowerCase().includes('exceeded your current quota')) {
+            throw new Error(`Tu API Key de Gemini excedió el límite de cuotas para "${modelName}". Selecciona "Gemini 1.5 Flash" en la parte superior o verifica tu plan en Google AI Studio.`);
           }
-
-          lastError = data.error?.message || `HTTP ${res.status}`;
-          // Si el error es de cuota excedida (Quota exceeded), avisar explícitamente al usuario
-          if (lastError.toLowerCase().includes('quota exceeded') || lastError.toLowerCase().includes('exceeded your current quota')) {
-            throw new Error(`Se ha excedido la cuota de uso de la API Key de Google Gemini para el modelo ${modelName}. Por favor usa Gemini 1.5 Flash o revisa la facturación de tu clave en Google AI Studio.`);
-          }
-
-          // Si el error no es de "modelo no encontrado", no vale la pena probar otros candidatos
-          if (!lastError.includes('not found') && !lastError.includes('not supported')) {
-            break;
-          }
-        } catch (e: any) {
-          lastError = e.message;
-          if (lastError.includes('cuota de uso')) {
-            throw e;
-          }
+          throw new Error(errMsg);
         }
-      }
 
-      throw new Error(lastError || 'Error al comunicarse con Google Gemini.');
+        const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No se recibió respuesta de Gemini.';
+        return { reply, usedProvider: 'Gemini', usedModel: modelName };
+      } catch (err: any) {
+        throw new Error(err.message || 'Error al comunicarse con Google Gemini.');
+      }
     }
 
     // ── ANTHROPIC CLAUDE ───────────────────────────────────────────
