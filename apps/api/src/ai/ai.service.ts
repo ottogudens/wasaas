@@ -157,12 +157,20 @@ export class AiService {
           }
 
           lastError = data.error?.message || `HTTP ${res.status}`;
+          // Si el error es de cuota excedida (Quota exceeded), avisar explícitamente al usuario
+          if (lastError.toLowerCase().includes('quota exceeded') || lastError.toLowerCase().includes('exceeded your current quota')) {
+            throw new Error(`Se ha excedido la cuota de uso de la API Key de Google Gemini para el modelo ${modelName}. Por favor usa Gemini 1.5 Flash o revisa la facturación de tu clave en Google AI Studio.`);
+          }
+
           // Si el error no es de "modelo no encontrado", no vale la pena probar otros candidatos
           if (!lastError.includes('not found') && !lastError.includes('not supported')) {
             break;
           }
         } catch (e: any) {
           lastError = e.message;
+          if (lastError.includes('cuota de uso')) {
+            throw e;
+          }
         }
       }
 
