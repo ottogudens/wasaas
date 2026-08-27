@@ -510,7 +510,7 @@ ${ragContext}`;
     let reply: string;
     try {
       const completionResult = await this.generateCompletionWithProvider({
-        provider: bot.aiProvider || undefined,
+        provider: (bot as any).aiProvider || undefined,
         model: bot.aiModel || undefined,
         systemPrompt: fullSystemPrompt,
         userMessage,
