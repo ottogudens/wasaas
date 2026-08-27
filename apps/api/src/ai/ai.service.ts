@@ -119,7 +119,15 @@ export class AiService {
       if (!geminiKey) {
         throw new Error('Google Gemini API Key no está configurada en la plataforma.');
       }
-      const modelName = params.model || 'gemini-1.5-flash';
+      const requestedModel = params.model || 'gemini-1.5-flash-latest';
+      const candidateModels = Array.from(new Set([
+        requestedModel,
+        `${requestedModel}-latest`,
+        'gemini-1.5-flash-latest',
+        'gemini-1.5-pro-latest',
+        'gemini-pro',
+      ]));
+
       const contents: any[] = [];
       for (const h of params.history) {
         contents.push({
@@ -129,22 +137,36 @@ export class AiService {
       }
       contents.push({ role: 'user', parts: [{ text: params.userMessage }] });
 
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: params.systemPrompt }] },
-          contents,
-          generationConfig: { temperature: 0.7, maxOutputTokens: 800 },
-        }),
-      });
+      let lastError = '';
+      for (const modelName of candidateModels) {
+        try {
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              systemInstruction: { parts: [{ text: params.systemPrompt }] },
+              contents,
+              generationConfig: { temperature: 0.7, maxOutputTokens: 800 },
+            }),
+          });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error?.message || `Error HTTP ${res.status} desde Google Gemini.`);
+          const data = await res.json();
+          if (res.ok) {
+            const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No se recibió respuesta de Gemini.';
+            return { reply, usedProvider: 'Gemini', usedModel: modelName };
+          }
+
+          lastError = data.error?.message || `HTTP ${res.status}`;
+          // Si el error no es de "modelo no encontrado", no vale la pena probar otros candidatos
+          if (!lastError.includes('not found') && !lastError.includes('not supported')) {
+            break;
+          }
+        } catch (e: any) {
+          lastError = e.message;
+        }
       }
-      const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No se recibió respuesta de Gemini.';
-      return { reply, usedProvider: 'Gemini', usedModel: modelName };
+
+      throw new Error(lastError || 'Error al comunicarse con Google Gemini.');
     }
 
     // ── ANTHROPIC CLAUDE ───────────────────────────────────────────
